@@ -36,6 +36,7 @@ import { ReviewsModule } from './reviews/reviews.module';
 import { DiscountsModule } from './discounts/discounts.module';
 import { InventoryModule } from './inventory/inventory.module';
 import { installNetworkIsolation, validateProjectEnvironment } from './config/project-isolation';
+import { getDatabaseSsl } from './config/database-ssl';
 
 @Module({
   imports: [
@@ -58,6 +59,7 @@ import { installNetworkIsolation, validateProjectEnvironment } from './config/pr
         username: configService.get('DB_USERNAME'),
         password: configService.get('DB_PASSWORD'),
         database: configService.get('DB_DATABASE'),
+        ssl: getDatabaseSsl({ DB_SSL: configService.get('DB_SSL'), DB_SSL_CA: configService.get('DB_SSL_CA') }),
         entities: [__dirname + '/**/*.entity{.ts,.js}'],
         synchronize: false, // DESHABILITADO para evitar pérdida de datos - usar migraciones manuales
         logging: false, // Deshabilitado para reducir logs

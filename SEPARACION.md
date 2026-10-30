@@ -51,7 +51,7 @@ En el proyecto Vercel exclusivo, usar Root Directory `frontend`, framework Next.
 | NEXT_PUBLIC_ANALYTICS_ENABLED | false |
 | INTEGRATIONS_ENABLED | false |
 
-El backend NestJS necesita un alojamiento aparte; el proyecto Vercel del frontend no lo despliega. Configurar allí NODE_ENV=production, PROJECT_ID=propiedades, la BD y usuario exclusivos, JWT_SECRET aleatorio propio, BACKEND_URL/API_PUBLIC_URL del backend, FRONTEND_URL y CORS_ORIGINS del nuevo frontend. DB_PASSWORD es obligatorio en producción. La conexión MySQL conserva la configuración heredada sin TLS explícito: definir CA/TLS antes de utilizar una BD remota que lo requiera. No usar credenciales de MundoBeat para resolverlo.
+El backend NestJS necesita un alojamiento aparte; el proyecto Vercel del frontend no lo despliega. Configurar allí NODE_ENV=production, PROJECT_ID=propiedades, la BD y usuario exclusivos, JWT_SECRET aleatorio propio, BACKEND_URL/API_PUBLIC_URL del backend, FRONTEND_URL y CORS_ORIGINS del nuevo frontend. DB_PASSWORD es obligatorio en producción. La conexión MySQL permite DB_SSL=true con DB_SSL_CA (certificado CA PEM, con saltos reales o escapados como \n). Valida el certificado y el hostname; no usa rejectUnauthorized=false. El servidor compartido requiere TLS y el certificado CA. No usar credenciales de MundoBeat para resolverlo.
 
 Las variables NEXT_PUBLIC_* se incorporan durante el build: recompilar tras cambiarlas. Los fallbacks localhost sirven solo para desarrollo. No desplegar con localhost como API. Los dominios personalizados y subdominios quedan desactivados en el middleware; las tiendas usan `/tiendas/:slug`. Reactivar la variable por sí sola no restaura el enrutamiento: requiere implementación y revisión propia.
 
@@ -59,7 +59,7 @@ Las variables NEXT_PUBLIC_* se incorporan durante el build: recompilar tras camb
 
 Se conservaron módulos de Payku/Flow, SMTP, Spaces/S3, WooCommerce, Mercado Libre, Falabella, Paris, envíos, Spotify, Discogs e IA para revisión posterior. No se transfirieron sus credenciales al entorno activo ni sus ajustes desde la BD original. Storage usa el directorio nuevo; el proxy de imágenes del frontend devuelve 503 mientras las integraciones estén apagadas. Vercel Analytics está apagado.
 
-`project-isolation.ts` instala un control en `net.Socket.connect` antes de inicializar TypeORM: con las integraciones apagadas permite solo el host/puerto configurados de la BD. Rechaza nombres conocidos de infraestructura heredada incluso al habilitar integraciones. Es un control de esta aplicación Node, no un firewall ni una protección para scripts externos, procesos hijos, redirecciones del navegador o recursos identificados solamente por IP. No habilitar integraciones sin revisar destinos y credenciales propios. Los scripts operativos heredados fueron apartados para evitar ejecutarlos por rutina.
+`project-isolation.ts` instala un control en `net.Socket.connect` antes de inicializar TypeORM: con las integraciones apagadas permite solo el host/puerto configurados de la BD. Rechaza nombres conocidos de infraestructura heredada incluso al habilitar integraciones, salvo la excepción explícita de host/usuario/puerto MySQL para la BD propiedades descrita abajo. Es un control de esta aplicación Node, no un firewall ni una protección para scripts externos, procesos hijos, redirecciones del navegador o recursos identificados solamente por IP. No habilitar integraciones sin revisar destinos y credenciales propios. Los scripts operativos heredados fueron apartados para evitar ejecutarlos por rutina.
 
 Se sustituyeron endpoints productivos y assets remotos de MundoBeat por fallbacks locales. Quedan textos de marca, correos de ejemplo, reglas de dominios heredados, contenido comercial musical y referencias históricas en documentación/pruebas. No se hizo un rebranding completo. Los assets remotos sustituidos pueden quedar sin imagen hasta crear o cargar recursos propios. No copiar uploads, dumps, usuarios, clientes, pedidos ni settings de producción.
 
@@ -86,3 +86,28 @@ No se verificó el arranque contra MySQL, la inicialización real del esquema, u
 El repositorio GitHub es público. Se excluyeron de Git los documentos operativos heredados de la raíz, exportaciones de datos, fixtures históricos de recibos y plugins de WooCommerce de la raíz; se conservan localmente. Se revisaron los archivos publicables mediante patrones de claves privadas, tokens, contraseñas literales, credenciales en URLs y JWT. Los únicos candidatos eran valores ficticios de pruebas; no se detectaron credenciales reales con esos patrones. Esta comprobación es limitada y no equivale a una auditoría completa de secretos.
 
 El acceso por Git funciona con el gestor de credenciales del sistema. La sesión de GitHub CLI (gh) reportó un token inválido, pero no es necesaria para commit/push por Git y no se modificó.
+
+## MySQL compartido con MundoBeat — aclaración del usuario
+
+El usuario confirmó que creó la BD propiedades y un usuario exclusivo dentro del mismo servidor MySQL administrado que aloja MundoBeat. Compartir ese host está autorizado para conectar únicamente a propiedades; no autoriza acceder a los esquemas, cuentas, datos o integraciones de MundoBeat.
+
+En Environment Variables del Web Service propiedades configurar:
+
+| Variable | Valor |
+| --- | --- |
+| PROJECT_ID | propiedades |
+| DB_DATABASE | propiedades (no defaultdb) |
+| DB_HOST | Host MySQL compartido de Connection Details |
+| DB_PORT | 25060, según Connection Details |
+| DB_USERNAME | Usuario exclusivo de Propiedades |
+| DB_PASSWORD | Contraseña del usuario exclusivo, como secreto |
+| DB_SHARED_HOST | Exactamente el mismo valor de DB_HOST |
+| DB_SHARED_USERNAME | Exactamente el mismo valor de DB_USERNAME |
+| DB_SSL | true |
+| DB_SSL_CA | Contenido completo del certificado CA descargado desde DigitalOcean, incluidos BEGIN CERTIFICATE y END CERTIFICATE |
+
+DB_SHARED_HOST y DB_SHARED_USERNAME son la aprobación explícita de ese destino; no son los datos de una segunda conexión. El host aprobado debe pertenecer a .db.ondigitalocean.com. La excepción de red aplica solo al puerto DB_PORT del host DB_HOST, con PROJECT_ID y DB_DATABASE fijos a propiedades y usuario distinto de root/doadmin. Los demás recursos heredados continúan bloqueados. Mantener las integraciones y cron desactivados.
+
+El usuario MySQL debe tener permisos limitados a propiedades. Las validaciones del código no pueden comprobar ni sustituir los GRANT del servidor sin conectarse. No se consultaron ni cambiaron usuarios, permisos, esquemas, reglas de red o certificados del cluster. Tampoco se ejecutó el inicializador de tablas.
+
+La CA se configura en el entorno del backend, nunca la contraseña en Git ni en el frontend. La verificación TLS es compartida por el backend y el inicializador de BD. El archivo .env.example incluye los nuevos nombres con valores vacíos.

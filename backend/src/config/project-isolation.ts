@@ -1,6 +1,17 @@
 import * as net from 'node:net';
+import { getDatabaseSsl } from './database-ssl';
 
 const inheritedResource = /mundobeat|clownfish-app-x3a5k|tiendas-chi|marketplace_music/i;
+
+function isApprovedSharedDatabase(env: Record<string, any>) {
+  return env.PROJECT_ID === 'propiedades' && env.DB_DATABASE === 'propiedades'
+    && typeof env.DB_SHARED_HOST === 'string' && env.DB_SHARED_HOST.length > 0
+    && env.DB_SHARED_HOST.toLowerCase() === String(env.DB_HOST).toLowerCase()
+    && String(env.DB_HOST).toLowerCase().endsWith('.db.ondigitalocean.com')
+    && typeof env.DB_SHARED_USERNAME === 'string' && env.DB_SHARED_USERNAME.length > 0
+    && env.DB_SHARED_USERNAME === env.DB_USERNAME
+    && !/^(root|doadmin|CHANGE_ME)$/i.test(env.DB_USERNAME);
+}
 
 export function validateProjectEnvironment(env: Record<string, any>) {
   if (env.PROJECT_ID !== 'propiedades' || env.DB_DATABASE !== 'propiedades') {
@@ -16,11 +27,16 @@ export function validateProjectEnvironment(env: Record<string, any>) {
     throw new Error('JWT_SECRET debe ser propio y tener al menos 32 caracteres.');
   }
   for (const [key, value] of Object.entries(env)) {
+    if (['DB_HOST', 'DB_SHARED_HOST'].includes(key) && isApprovedSharedDatabase(env)) continue;
     if (/^(DB_|SPACES_|BACKEND_URL|API_PUBLIC_URL|FRONTEND_URL|CORS_ORIGINS|MERCADOLIBRE_REDIRECT_URI)/.test(key)
         && !/PASSWORD|SECRET|KEY/.test(key) && inheritedResource.test(String(value))) {
       throw new Error(`Configuración heredada bloqueada: ${key}`);
     }
   }
+  if (isApprovedSharedDatabase(env) && env.DB_SSL !== 'true') {
+    throw new Error('El servidor MySQL compartido exige DB_SSL=true y DB_SSL_CA.');
+  }
+  getDatabaseSsl(env);
   if (!['true', 'false', undefined].includes(env.INTEGRATIONS_ENABLED)
       || !['true', 'false', undefined].includes(env.SCHEDULED_JOBS_ENABLED)) {
     throw new Error('Las opciones de integraciones y tareas deben ser true o false.');
@@ -36,9 +52,11 @@ export function assertConnectionAllowed(args: any[], env: Record<string, any>) {
   while (Array.isArray(args[0])) args = args[0];
   const options = typeof args[0] === 'object' ? args[0] : { port: args[0], host: typeof args[1] === 'string' ? args[1] : 'localhost' };
   const host = String(options?.host || 'localhost').toLowerCase();
-  if (inheritedResource.test(host)) throw new Error('Conexión a infraestructura heredada bloqueada.');
   const isDatabase = !options?.path && host === String(env.DB_HOST).toLowerCase()
     && Number(options?.port) === Number(env.DB_PORT || 3306);
+  if (inheritedResource.test(host) && !(isDatabase && isApprovedSharedDatabase(env))) {
+    throw new Error('Conexión a infraestructura heredada bloqueada.');
+  }
   if (env.INTEGRATIONS_ENABLED !== 'true' && !isDatabase) {
     throw new Error('Integraciones externas deshabilitadas en Propiedades.');
   }

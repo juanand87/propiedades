@@ -5,6 +5,7 @@ require('dotenv').config({ path: path.join(__dirname, '../.env'), quiet: true })
 require('ts-node/register/transpile-only');
 const { DataSource } = require('typeorm');
 const { validateProjectEnvironment, installNetworkIsolation } = require('../src/config/project-isolation');
+const { getDatabaseSsl } = require('../src/config/database-ssl');
 
 async function main() {
   validateProjectEnvironment(process.env);
@@ -18,6 +19,7 @@ async function main() {
     type: 'mysql', host: process.env.DB_HOST, port: Number(process.env.DB_PORT || 3306),
     username: process.env.DB_USERNAME, password: process.env.DB_PASSWORD,
     database: 'propiedades', charset: 'utf8mb4', synchronize: false,
+    ssl: getDatabaseSsl(process.env),
     entities: [path.join(__dirname, '../src/**/*.entity.ts')],
   });
   await db.initialize();
