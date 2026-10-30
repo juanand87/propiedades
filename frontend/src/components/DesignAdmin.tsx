@@ -734,7 +734,10 @@ export function DesignAdmin({ broker = false }: { broker?: boolean }) {
               <div className="design-preview-label">
                 <EyeLabel /> Vista previa · sin publicar
               </div>
-              <div className="design-preview" style={designStyle(draft)}>
+              <div
+                className={`design-preview${draft.sections.find((s) => s.visible)?.id === "hero" ? " preview-cover-first" : ""}`}
+                style={designStyle(draft)}
+              >
                 <div className="design-preview-header">
                   {imageUrl("logo_media_id") ? (
                     <img
@@ -757,14 +760,18 @@ export function DesignAdmin({ broker = false }: { broker?: boolean }) {
                     >
                       {s.id === "hero" ? (
                         <>
-                          <div>
+                          <div className="preview-hero-copy">
                             <small>ENCUENTRA TU PRÓXIMO LUGAR</small>
                             <h2>
                               {broker
                                 ? draft.hero_title
                                 : settings.homepage_title}
                             </h2>
-                            {broker && <p>{draft.hero_subtitle}</p>}
+                            <p>
+                              {broker
+                                ? draft.hero_subtitle
+                                : "Descubre propiedades y conecta con su anunciante."}
+                            </p>
                           </div>
                           <HeroMedia
                             preview

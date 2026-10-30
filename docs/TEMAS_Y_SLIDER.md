@@ -40,3 +40,9 @@ Compilaciones de backend y frontend correctas, lint del frontend sin errores, 29
 Revisión en navegador: primer guardado de una cuenta nueva, temas, biblioteca, slider, descripciones, navegación manual, pausa durante más de un intervalo y reanudación automática; buscador y presupuesto con cierre del selector; escritorio y móvil de 390 × 844, sin desbordamiento horizontal. Las capturas contienen datos de QA.
 
 Al iniciar la revisión, la API de producción respondió con la BD lista y el editor general habilitado. El directorio público contenía cero anunciantes: no había un sitio de corredor real publicado que se pudiera revisar de forma pública. Las pruebas completas con corredores se realizaron localmente, sin crear cuentas o anuncios ficticios en producción ni acceder a MundoBeat.
+
+### Ajuste de la vista previa
+
+El editor compartido del marketplace y los corredores muestra ahora la fotografía como fondo de la portada, con el mismo degradado y la cabecera flotante del diseño público. Si la portada deja de ser la primera sección visible, la cabecera vuelve a su posición normal. El buscador se superpone solo cuando viene inmediatamente después de la portada. Los controles del slider permanecen accesibles sobre la imagen.
+
+Se verificaron en el navegador local la selección del tema Océano, el cambio de orden y su reversión, y el descarte del borrador sin publicar. El panel, el catálogo con filtros y la ficha se revisaron a 390 × 844 sin desbordamiento horizontal. Evidencia: [vista previa del editor](qa/vista-previa-portada-moderna.png). Este ajuste afecta únicamente al frontend y no requiere SQL.

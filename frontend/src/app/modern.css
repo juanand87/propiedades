@@ -708,8 +708,75 @@ body {
 .design-preview-block p {
   font-size: 11px;
 }
+.design-preview {
+  position: relative;
+}
+.design-preview-header {
+  background: white;
+}
+.preview-cover-first .design-preview-header {
+  position: absolute;
+  z-index: 5;
+  top: 10px;
+  left: 10px;
+  right: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #ffffffed;
+  box-shadow: 0 4px 15px #102b5010;
+}
+.design-preview-block.preview-hero {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  align-items: center;
+  min-height: 290px;
+  padding: 30px 20px 60px;
+  overflow: hidden;
+}
+.preview-cover-first .preview-hero {
+  padding-top: 85px;
+  min-height: 340px;
+}
+.preview-hero::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: linear-gradient(90deg, #f7fbfff5, #f7fbffe0 45%, #ffffff15);
+}
+.preview-hero-copy {
+  position: relative;
+  z-index: 2;
+  width: 78%;
+  pointer-events: none;
+  overflow-wrap: anywhere;
+}
+.preview-hero-copy small {
+  color: var(--green);
+}
 .design-preview-block.preview-hero > .hero-media {
-  height: 180px;
+  position: absolute;
+  inset: 0;
+  height: 100%;
+  border-radius: 0;
+}
+.preview-hero .hero-media-image {
+  position: absolute;
+  inset: 0;
+  height: 100%;
+  border-radius: 0;
+}
+.preview-hero .hero-media-controls {
+  bottom: 10px;
+  right: 10px;
+}
+.design-preview .preview-hero + .preview-search {
+  position: relative;
+  z-index: 6;
+  margin-top: -22px;
+  box-shadow: 0 6px 20px #102b5010;
 }
 @media (max-width: 1100px) {
   .hero-search {
