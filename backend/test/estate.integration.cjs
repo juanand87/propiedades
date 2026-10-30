@@ -506,6 +506,241 @@ async function main() {
     assertions++;
     await call('GET', '/media/' + adminMedia.id, null, null, 404);
     await call('DELETE', '/manage/media/' + adminMedia.id, null, admin);
+    const pendingBrokerSite = await call(
+      'GET',
+      '/me/site',
+      null,
+      one.access_token,
+    );
+    assert.equal(pendingBrokerSite.design_ready, false);
+    assert.equal(pendingBrokerSite.advertiser.id, a.id);
+    assertions += 2;
+    await call('GET', '/me/site', null, null, 401);
+    await call('GET', '/me/site', null, admin, 400);
+    await call(
+      'PATCH',
+      '/me/site',
+      { design: pendingBrokerSite.design, revision: 0 },
+      one.access_token,
+      503,
+    );
+    const brokerMigration = fs.readFileSync(
+      path.join(root, 'database/005_sitios_corredores.sql'),
+      'utf8',
+    );
+    await db.query(brokerMigration);
+    await db.query(brokerMigration);
+    const baseBroker = await call('GET', '/me/site', null, one.access_token);
+    assert.equal(baseBroker.design_ready, true);
+    assert.equal(baseBroker.design_revision, 0);
+    assertions += 2;
+    const brokerMediaA = await call(
+      'POST',
+      '/manage/media',
+      fd,
+      one.access_token,
+      201,
+    );
+    const brokerMediaB = await call(
+      'POST',
+      '/manage/media',
+      fd,
+      two.access_token,
+      201,
+    );
+    await call('GET', '/media/' + brokerMediaA.id, null, null, 404);
+    const designA = {
+      ...baseBroker.design,
+      primary_color: '#18436a',
+      hero_title: 'Corredor Azul · Tu próximo lugar',
+      hero_media_id: brokerMediaA.id,
+      logo_media_id: brokerMediaA.id,
+      sections: [...baseBroker.design.sections].reverse(),
+    };
+    const savedSiteA = await call(
+      'PATCH',
+      '/me/site',
+      { design: designA, revision: 0, advertiser_id: b.id },
+      one.access_token,
+    );
+    assert.equal(savedSiteA.advertiser.id, a.id);
+    assert.equal(savedSiteA.design_revision, 1);
+    assertions += 2;
+    await call(
+      'PATCH',
+      '/me/site',
+      { design: designA, revision: 0 },
+      one.access_token,
+      409,
+    );
+    await call(
+      'PATCH',
+      '/me/site',
+      { design: { ...designA, logo_media_id: brokerMediaB.id }, revision: 1 },
+      one.access_token,
+      403,
+    );
+    await call(
+      'PATCH',
+      '/me/site',
+      { design: designA, revision: 0 },
+      admin,
+      403,
+    );
+    const publicSiteA = await call('GET', '/advertisers/' + a.slug);
+    assert.equal(publicSiteA.site.hero_title, designA.hero_title);
+    assert.equal(publicSiteA.site.sections[0].id, 'contact');
+    for (const key of ['user_id', 'tax_id', 'legal_name', 'password'])
+      assert.ok(!(key in publicSiteA));
+    assertions += 6;
+    await call('GET', '/media/' + brokerMediaA.id);
+    await call(
+      'DELETE',
+      '/manage/media/' + brokerMediaA.id,
+      null,
+      one.access_token,
+      409,
+    );
+    await call(
+      'DELETE',
+      '/manage/media/' + brokerMediaA.id,
+      null,
+      two.access_token,
+      403,
+    );
+    const ownB = await call(
+      'GET',
+      '/me/site?advertiser_id=' + a.id,
+      null,
+      two.access_token,
+    );
+    assert.equal(ownB.advertiser.id, b.id);
+    assert.equal(ownB.design.primary_color, '#285d50');
+    assert.equal(ownB.design_revision, 0);
+    assert.equal(ownB.design.hero_media_id, null);
+    assertions += 4;
+    await call(
+      'PATCH',
+      '/me/site',
+      {
+        design: {
+          ...ownB.design,
+          primary_color: '#701d40',
+          hero_title: 'Corredor Rosa',
+          hero_media_id: brokerMediaB.id,
+        },
+        revision: 0,
+        advertiser_id: a.id,
+      },
+      two.access_token,
+    );
+    assert.equal(
+      (await call('GET', '/advertisers/' + a.slug)).site.primary_color,
+      '#18436a',
+    );
+    assertions++;
+    await call(
+      'PATCH',
+      '/admin/advertisers/' + a.id,
+      { status: 'suspended' },
+      admin,
+    );
+    await call('GET', '/advertisers/' + a.slug, null, null, 404);
+    await call('GET', '/media/' + brokerMediaA.id, null, null, 404);
+    const privatePreview = await call(
+      'GET',
+      '/me/site',
+      null,
+      one.access_token,
+    );
+    await call('GET', privatePreview.design.hero_url.slice(4), null, null, 200);
+    await call('GET', '/advertisers/' + b.slug);
+    await call(
+      'PATCH',
+      '/admin/advertisers/' + a.id,
+      { status: 'approved' },
+      admin,
+    );
+    await call('GET', '/advertisers/' + a.slug);
+    await call(
+      'PATCH',
+      '/me/site',
+      {
+        design: { ...designA, hero_media_id: null, logo_media_id: null },
+        revision: 1,
+      },
+      one.access_token,
+    );
+    await call('GET', '/media/' + brokerMediaA.id, null, null, 404);
+    await call(
+      'DELETE',
+      '/manage/media/' + brokerMediaA.id,
+      null,
+      one.access_token,
+    );
+    const freshBrokerImage = await call(
+      'POST',
+      '/manage/media',
+      fd,
+      one.access_token,
+      201,
+    );
+    await call(
+      'PATCH',
+      '/me/site',
+      {
+        design: {
+          ...designA,
+          hero_media_id: freshBrokerImage.id,
+          logo_media_id: freshBrokerImage.id,
+          sections: baseBroker.design.sections,
+        },
+        revision: 2,
+      },
+      one.access_token,
+    );
+    await db.query(brokerMigration);
+    assert.equal(
+      (await call('GET', '/me/site', null, one.access_token)).design_revision,
+      3,
+    );
+    assertions++;
+    await call(
+      'PATCH',
+      `/manage/properties/${p.id}/status`,
+      { status: 'published' },
+      admin,
+    );
+    const pB = await call(
+      'POST',
+      '/manage/properties',
+      {
+        ...payload,
+        title: 'Casa del segundo corredor',
+        media_ids: [brokerMediaB.id],
+      },
+      two.access_token,
+      201,
+    );
+    await call(
+      'PATCH',
+      `/manage/properties/${pB.id}/status`,
+      { status: 'pending_review' },
+      two.access_token,
+    );
+    await call(
+      'PATCH',
+      `/manage/properties/${pB.id}/status`,
+      { status: 'published' },
+      admin,
+    );
+    const listA = await call('GET', '/properties?advertiser_id=' + a.id);
+    const listB = await call('GET', '/properties?advertiser_id=' + b.id);
+    assert.equal(listA.items.length, 1);
+    assert.equal(listA.items[0].id, p.id);
+    assert.equal(listB.items.length, 1);
+    assert.equal(listB.items[0].id, pB.id);
+    assertions += 4;
     console.log(
       JSON.stringify({
         passed: true,

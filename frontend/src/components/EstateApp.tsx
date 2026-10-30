@@ -8,6 +8,7 @@ import { designStyle, siteDesign } from "@/lib/site-design";
 import { PublicView } from "./PublicView";
 import { Workspace } from "./Workspace";
 import { AuthView } from "./AuthView";
+import { BrokerSite } from "./BrokerSite";
 
 type State = {
   user: any;
@@ -99,10 +100,12 @@ export default function EstateApp({
   path,
   initialProperty,
   initialSettings,
+  initialAdvertiser,
 }: {
   path: string[];
   initialProperty?: any;
   initialSettings?: any;
+  initialAdvertiser?: any;
 }) {
   const [user, setUser] = useState<any>(null),
     [loading, setLoading] = useState(true),
@@ -190,122 +193,131 @@ export default function EstateApp({
         setFavorites,
       }}
     >
-      <div className="estate-site" style={designStyle(design)}>
-        <header className="site-header">
-          <Link
-            href="/"
-            className="brand"
-            aria-label={`${settings.site_name}, inicio`}
-          >
-            {brand}
-            {(!design.logo_url || design.show_site_name) && (
-              <>
-                {settings.site_name}
-                <span className="brand-dot">.</span>
-              </>
-            )}
-          </Link>
-          <nav
-            className={menu ? "main-nav open" : "main-nav"}
-            aria-label="Navegación principal"
-          >
+      {path[0] === "anunciantes" && path[1] ? (
+        <BrokerSite
+          slug={path[1]}
+          advertiser={initialAdvertiser}
+          property={initialProperty}
+          propertyIdentifier={path[2] === "propiedades" ? path[3] : undefined}
+        />
+      ) : (
+        <div className="estate-site" style={designStyle(design)}>
+          <header className="site-header">
             <Link
-              href="/propiedades"
-              className={path[0] === "propiedades" ? "active" : ""}
+              href="/"
+              className="brand"
+              aria-label={`${settings.site_name}, inicio`}
             >
-              Buscar propiedades
+              {brand}
+              {(!design.logo_url || design.show_site_name) && (
+                <>
+                  {settings.site_name}
+                  <span className="brand-dot">.</span>
+                </>
+              )}
             </Link>
-            <Link href="/anunciantes">Anunciantes</Link>
-            <Link href="/informacion">Nosotros</Link>
-          </nav>
-          <div className="header-actions">
-            <Link
-              href="/favoritos"
-              aria-label="Mis favoritos"
-              className="icon-link"
+            <nav
+              className={menu ? "main-nav open" : "main-nav"}
+              aria-label="Navegación principal"
             >
-              <Heart size={20} />
-            </Link>
-            <Link
-              className="account-link"
-              href={
-                user
-                  ? user.role === "admin"
-                    ? "/panel"
-                    : "/dashboard"
-                  : "/login"
-              }
-            >
-              {user ? "Mi panel" : "Ingresar"}
-            </Link>
-            <Link
-              className="button small publish-link"
-              href={user ? "/dashboard/perfil" : "/register"}
-            >
-              Publicar propiedad <ArrowUpRight size={16} />
-            </Link>
-            <button
-              className="mobile-toggle"
-              aria-label="Abrir navegación"
-              aria-expanded={menu}
-              onClick={() => setMenu(!menu)}
-            >
-              {menu ? <X /> : <Menu />}
-            </button>
-          </div>
-        </header>
-        {workspace ? (
-          <Workspace path={path} />
-        ) : auth ? (
-          <AuthView
-            register={path[0] === "register"}
-            panel={path[0] === "panel"}
-          />
-        ) : (
-          <PublicView path={path} initialProperty={initialProperty} />
-        )}
-        {!workspace && (
-          <footer className="site-footer">
-            <div>
-              <Link href="/" className="brand">
-                {brand}
-                {(!design.logo_url || design.show_site_name) && (
-                  <>
-                    {settings.site_name}
-                    <span className="brand-dot">.</span>
-                  </>
-                )}
+              <Link
+                href="/propiedades"
+                className={path[0] === "propiedades" ? "active" : ""}
+              >
+                Buscar propiedades
               </Link>
-              <p>
-                Un lugar para comenzar algo nuevo.
-                <br />
-                Propiedades y personas, más cerca.
-              </p>
+              <Link href="/anunciantes">Anunciantes</Link>
+              <Link href="/informacion">Nosotros</Link>
+            </nav>
+            <div className="header-actions">
+              <Link
+                href="/favoritos"
+                aria-label="Mis favoritos"
+                className="icon-link"
+              >
+                <Heart size={20} />
+              </Link>
+              <Link
+                className="account-link"
+                href={
+                  user
+                    ? user.role === "admin"
+                      ? "/panel"
+                      : "/dashboard"
+                    : "/login"
+                }
+              >
+                {user ? "Mi panel" : "Ingresar"}
+              </Link>
+              <Link
+                className="button small publish-link"
+                href={user ? "/dashboard/perfil" : "/register"}
+              >
+                Publicar propiedad <ArrowUpRight size={16} />
+              </Link>
+              <button
+                className="mobile-toggle"
+                aria-label="Abrir navegación"
+                aria-expanded={menu}
+                onClick={() => setMenu(!menu)}
+              >
+                {menu ? <X /> : <Menu />}
+              </button>
             </div>
-            <div>
-              <span className="eyebrow">EXPLORA</span>
-              <Link href="/propiedades">Propiedades en venta</Link>
-              <Link href="/anunciantes">Nuestros anunciantes</Link>
-              <Link href="/favoritos">Tus favoritos</Link>
-            </div>
-            <div>
-              <span className="eyebrow">PUBLICA</span>
-              <Link href="/dashboard/perfil">Propietarios y corredores</Link>
-              <Link href="/informacion">Acerca del marketplace</Link>
-              <Link href="/privacidad">Privacidad y contacto</Link>
-            </div>
-            <div className="footer-bottom">
-              <span>
-                © {new Date().getFullYear()} {settings.site_name}. Chile.
-              </span>
-              <span>
-                Las consultas y visitas se coordinan directamente con el
-                anunciante.
-              </span>
-            </div>
-          </footer>
-        )}
-      </div>
+          </header>
+          {workspace ? (
+            <Workspace path={path} />
+          ) : auth ? (
+            <AuthView
+              register={path[0] === "register"}
+              panel={path[0] === "panel"}
+            />
+          ) : (
+            <PublicView path={path} initialProperty={initialProperty} />
+          )}
+          {!workspace && (
+            <footer className="site-footer">
+              <div>
+                <Link href="/" className="brand">
+                  {brand}
+                  {(!design.logo_url || design.show_site_name) && (
+                    <>
+                      {settings.site_name}
+                      <span className="brand-dot">.</span>
+                    </>
+                  )}
+                </Link>
+                <p>
+                  Un lugar para comenzar algo nuevo.
+                  <br />
+                  Propiedades y personas, más cerca.
+                </p>
+              </div>
+              <div>
+                <span className="eyebrow">EXPLORA</span>
+                <Link href="/propiedades">Propiedades en venta</Link>
+                <Link href="/anunciantes">Nuestros anunciantes</Link>
+                <Link href="/favoritos">Tus favoritos</Link>
+              </div>
+              <div>
+                <span className="eyebrow">PUBLICA</span>
+                <Link href="/dashboard/perfil">Propietarios y corredores</Link>
+                <Link href="/informacion">Acerca del marketplace</Link>
+                <Link href="/privacidad">Privacidad y contacto</Link>
+              </div>
+              <div className="footer-bottom">
+                <span>
+                  © {new Date().getFullYear()} {settings.site_name}. Chile.
+                </span>
+                <span>
+                  Las consultas y visitas se coordinan directamente con el
+                  anunciante.
+                </span>
+              </div>
+            </footer>
+          )}
+        </div>
+      )}
     </Context.Provider>
   );
 }

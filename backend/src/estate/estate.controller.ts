@@ -230,6 +230,15 @@ export class EstateController {
   ) {
     return this.estate.advertisers(req.user);
   }
+  @Get('me/site') @UseGuards(EstateGuard) myBrokerSite(@Req() req: any) {
+    return this.estate.myBrokerSite(req.user);
+  }
+  @Patch('me/site') @UseGuards(EstateGuard) saveBrokerSite(
+    @Req() req: any,
+    @Body() b: any,
+  ) {
+    return this.estate.saveBrokerSite(req.user, b);
+  }
   @Patch('admin/advertisers/:id') @UseGuards(EstateGuard) moderateAdvertiser(
     @Req() req: any,
     @Param('id') id: string,

@@ -2,7 +2,7 @@ import { BadRequestException } from '@nestjs/common';
 import { uuid } from './rules';
 
 export const HOME_SECTIONS = ['hero', 'search', 'types', 'listings', 'publish'];
-export const defaultDesign = () => ({
+export const defaultDesign = (sections = HOME_SECTIONS) => ({
   primary_color: '#285d50',
   accent_color: '#c9964e',
   background_color: '#f8f8f3',
@@ -11,7 +11,7 @@ export const defaultDesign = () => ({
   hero_media_id: null as string | null,
   hero_alt: 'Propiedad destacada en la portada',
   show_site_name: true,
-  sections: HOME_SECTIONS.map((id) => ({ id, visible: true })),
+  sections: sections.map((id) => ({ id, visible: true })),
 });
 function luminance(hex: string) {
   const c = [1, 3, 5]
@@ -24,10 +24,10 @@ function contrast(a: string, b: string) {
     y = luminance(b);
   return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05);
 }
-export function validateDesign(b: any) {
+export function validateDesign(b: any, sections = HOME_SECTIONS) {
   if (!b || typeof b !== 'object')
     throw new BadRequestException('Diseño inválido.');
-  const d = defaultDesign();
+  const d = defaultDesign(sections);
   for (const key of [
     'primary_color',
     'accent_color',
@@ -63,10 +63,10 @@ export function validateDesign(b: any) {
   d.show_site_name = b.show_site_name;
   if (
     !Array.isArray(b.sections) ||
-    b.sections.length !== HOME_SECTIONS.length ||
-    new Set(b.sections.map((s) => s?.id)).size !== HOME_SECTIONS.length ||
+    b.sections.length !== sections.length ||
+    new Set(b.sections.map((s) => s?.id)).size !== sections.length ||
     b.sections.some(
-      (s) => !HOME_SECTIONS.includes(s?.id) || typeof s.visible !== 'boolean',
+      (s) => !sections.includes(s?.id) || typeof s.visible !== 'boolean',
     ) ||
     !b.sections.some((s) => s.visible)
   )

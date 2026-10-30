@@ -26,5 +26,14 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       if (page >= data.pages) break;
     }
   } catch {}
+  try {
+    const r = await fetch(`${base}/advertisers`, {
+      cache: "no-store",
+      signal: AbortSignal.timeout(4000),
+    });
+    if (r.ok)
+      for (const a of await r.json())
+        result.push({ url: `${site}/anunciantes/${a.slug}` });
+  } catch {}
   return result;
 }

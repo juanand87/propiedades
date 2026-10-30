@@ -7,6 +7,12 @@ export const sectionNames: Record<string, string> = {
   listings: "Últimas propiedades",
   publish: "Invitación a publicar",
 };
+export const brokerSectionNames: Record<string, string> = {
+  hero: "Portada principal",
+  about: "Acerca de nosotros",
+  listings: "Mis propiedades",
+  contact: "Contacto",
+};
 export type SiteDesign = {
   primary_color: string;
   accent_color: string;
@@ -19,6 +25,12 @@ export type SiteDesign = {
   sections: { id: string; visible: boolean }[];
   logo_url?: string | null;
   hero_url?: string | null;
+  hero_title?: string;
+  hero_subtitle?: string;
+  about_title?: string;
+  about_text?: string;
+  listings_title?: string;
+  contact_title?: string;
 };
 export function defaultDesign(): SiteDesign {
   return {
@@ -31,6 +43,22 @@ export function defaultDesign(): SiteDesign {
     hero_alt: "Propiedad destacada en la portada",
     show_site_name: true,
     sections: Object.keys(sectionNames).map((id) => ({ id, visible: true })),
+  };
+}
+export function defaultBrokerDesign(profile: any = {}): SiteDesign {
+  return {
+    ...defaultDesign(),
+    logo_media_id: profile.logo_media_id || null,
+    hero_title: profile.display_name || "Tu próximo lugar comienza aquí.",
+    hero_subtitle: "Propiedades, asesoría y atención personalizada.",
+    about_title: "Conócenos",
+    about_text: profile.description || "",
+    listings_title: "Nuestras propiedades",
+    contact_title: "Conversemos",
+    sections: Object.keys(brokerSectionNames).map((id) => ({
+      id,
+      visible: true,
+    })),
   };
 }
 export function siteDesign(settings: { design?: SiteDesign }): SiteDesign {

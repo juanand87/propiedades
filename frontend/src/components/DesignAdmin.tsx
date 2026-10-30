@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ArrowDown,
   ArrowUp,
@@ -12,7 +12,9 @@ import { assetUrl, request, send } from "@/lib/estate-api";
 import {
   defaultDesign,
   designStyle,
-  sectionNames,
+  sectionNames as marketplaceSectionNames,
+  brokerSectionNames,
+  defaultBrokerDesign,
   SiteDesign,
 } from "@/lib/site-design";
 import { Notice, useEstate } from "./EstateApp";
@@ -24,8 +26,16 @@ const colors = [
   ["text_color", "Color del texto", "Títulos y contenido principal"],
 ] as const;
 
-export function DesignAdmin() {
+export function DesignAdmin({ broker = false }: { broker?: boolean }) {
   const { settings, reload } = useEstate();
+  const endpoint = broker ? "/me/site" : "/settings";
+  const sectionNames = broker ? brokerSectionNames : marketplaceSectionNames;
+  const [siteInfo, setSiteInfo] = useState<any>(null);
+  const displaySettings = broker ? siteInfo || settings : settings;
+  const makeDefault = () =>
+    broker
+      ? defaultBrokerDesign({ display_name: siteInfo?.site_name })
+      : defaultDesign();
   const [draft, setDraft] = useState<SiteDesign | null>(null);
   const [baseline, setBaseline] = useState("");
   const [revision, setRevision] = useState(1);
@@ -54,18 +64,23 @@ export function DesignAdmin() {
     setPicker(null);
     pickerButton.current?.focus();
   }
-  function accept(data: any) {
-    const design = data.design || defaultDesign();
-    setDraft(design);
-    setBaseline(JSON.stringify(design));
-    setRevision(data.design_revision || 1);
-    setReady(data.design_ready === true);
-    setPreviews({});
-    setPicker(null);
-  }
+  const accept = useCallback(
+    (data: any) => {
+      const design =
+        data.design || (broker ? defaultBrokerDesign() : defaultDesign());
+      setSiteInfo(data);
+      setDraft(design);
+      setBaseline(JSON.stringify(design));
+      setRevision(data.design_revision || 1);
+      setReady(data.design_ready === true);
+      setPreviews({});
+      setPicker(null);
+    },
+    [broker],
+  );
   useEffect(() => {
     let live = true;
-    request("/settings")
+    request(endpoint)
       .then((data) => {
         if (live) accept(data);
       })
@@ -75,7 +90,7 @@ export function DesignAdmin() {
     return () => {
       live = false;
     };
-  }, []);
+  }, [endpoint, accept]);
   useEffect(() => {
     if (!dirty) return;
     const warn = (e: BeforeUnloadEvent) => {
@@ -150,17 +165,43 @@ export function DesignAdmin() {
   return (
     <>
       <span className="eyebrow">TU MARCA, TU ESTILO</span>
-      <h1>Diseño del sitio</h1>
+      <h1>{broker ? "Mi sitio web" : "Diseño del sitio"}</h1>
       <p>
-        Personaliza la web principal. Los cambios se publican únicamente al
-        guardar.
+        {broker
+          ? "Personaliza tu propia web y muestra tus propiedades. Los cambios se aplican al guardar."
+          : "Personaliza la web principal. Los cambios se publican únicamente al guardar."}
       </p>
+      {broker && siteInfo?.advertiser && (
+        <p>
+          Tu dirección:{" "}
+          <a
+            className="text-link"
+            href={`/anunciantes/${siteInfo.advertiser.slug}`}
+            target="_blank"
+            rel="noreferrer"
+          >
+            /anunciantes/{siteInfo.advertiser.slug} ↗
+          </a>
+          {siteInfo.advertiser.status !== "approved" && (
+            <span className="notice">
+              {" "}
+              Tu sitio será público cuando administración apruebe tu perfil.
+            </span>
+          )}
+        </p>
+      )}
       <Notice error={error} success={success} />
       {draft && !ready && (
         <div className="notice error" role="alert">
           La configuración visual necesita una actualización de la base de
-          datos. Ejecuta el archivo <strong>004_diseno_sitio.sql</strong> de la
-          entrega y recarga esta página. Puedes explorar la vista previa
+          datos.{" "}
+          {broker
+            ? "Pide a administración que ejecute el archivo "
+            : "Ejecuta el archivo "}
+          <strong>
+            {broker ? "005_sitios_corredores.sql" : "004_diseno_sitio.sql"}
+          </strong>{" "}
+          de la entrega y recarga esta página. Puedes explorar la vista previa
           mientras tanto.
         </div>
       )}
@@ -175,14 +216,18 @@ export function DesignAdmin() {
             setSuccess("");
             try {
               const result = await send(
-                "/admin/design",
+                broker ? "/me/site" : "/admin/design",
                 { design: draft, revision },
                 "PATCH",
               );
               accept(result);
               await reload();
               setSuccess(
-                "Diseño publicado. Ya está disponible en el sitio principal.",
+                broker
+                  ? result.advertiser.status === "approved"
+                    ? "Tu sitio web está actualizado."
+                    : "Diseño guardado. Tu sitio se mostrará cuando el perfil esté aprobado."
+                  : "Diseño publicado. Ya está disponible en el sitio principal.",
               );
             } catch (e) {
               setError((e as Error).message);
@@ -209,7 +254,7 @@ export function DesignAdmin() {
                   setError("");
                   setSuccess("");
                   try {
-                    accept(await request("/settings"));
+                    accept(await request(endpoint));
                   } catch (e) {
                     setError((e as Error).message);
                   } finally {
@@ -220,12 +265,50 @@ export function DesignAdmin() {
                 Descartar cambios
               </button>
               <button className="button" disabled={busy || !ready || !dirty}>
-                <Save size={17} /> Guardar y publicar diseño
+                <Save size={17} />{" "}
+                {broker ? "Guardar mi sitio" : "Guardar y publicar diseño"}
               </button>
             </div>
           </div>
           <div className="design-editor-grid">
             <fieldset className="design-controls" disabled={busy}>
+              {broker && (
+                <section className="panel-card">
+                  <h2>Textos de tu sitio</h2>
+                  <p>
+                    El nombre y los datos de contacto se administran en tu
+                    perfil de anunciante.
+                  </p>
+                  {(
+                    [
+                      ["hero_title", "Título de la portada", 180],
+                      ["hero_subtitle", "Presentación breve", 400],
+                      ["about_title", "Título de presentación", 100],
+                      ["listings_title", "Título de propiedades", 100],
+                      ["contact_title", "Título de contacto", 100],
+                    ] as const
+                  ).map(([key, label, max]) => (
+                    <label key={key}>
+                      {label}
+                      <input
+                        required={key !== "hero_subtitle"}
+                        maxLength={max}
+                        value={draft[key] || ""}
+                        onChange={(e) => update(key, e.target.value)}
+                      />
+                    </label>
+                  ))}
+                  <label>
+                    Acerca de ti o de tu inmobiliaria
+                    <textarea
+                      maxLength={4000}
+                      rows={6}
+                      value={draft.about_text || ""}
+                      onChange={(e) => update("about_text", e.target.value)}
+                    />
+                  </label>
+                </section>
+              )}
               <section className="panel-card">
                 <h2>
                   <Palette size={22} /> Colores
@@ -402,7 +485,7 @@ export function DesignAdmin() {
                 className="button outline"
                 type="button"
                 onClick={() => {
-                  setDraft(defaultDesign());
+                  setDraft(makeDefault());
                   setSuccess("");
                 }}
               >
@@ -428,7 +511,7 @@ export function DesignAdmin() {
                     <House size={25} />
                   )}
                   {(!draft.logo_media_id || draft.show_site_name) && (
-                    <strong>{settings.site_name}</strong>
+                    <strong>{displaySettings.site_name}</strong>
                   )}
                 </div>
                 {draft.sections
@@ -442,7 +525,12 @@ export function DesignAdmin() {
                         <>
                           <div>
                             <small>ENCUENTRA TU PRÓXIMO LUGAR</small>
-                            <h2>{settings.homepage_title}</h2>
+                            <h2>
+                              {broker
+                                ? draft.hero_title
+                                : settings.homepage_title}
+                            </h2>
+                            {broker && <p>{draft.hero_subtitle}</p>}
                           </div>
                           <img
                             src={
@@ -450,6 +538,21 @@ export function DesignAdmin() {
                             }
                             alt={draft.hero_alt}
                           />
+                        </>
+                      ) : s.id === "about" ? (
+                        <>
+                          <h3>{draft.about_title}</h3>
+                          <p className="preserve-lines">
+                            {draft.about_text ||
+                              "Tu presentación aparecerá aquí."}
+                          </p>
+                        </>
+                      ) : s.id === "contact" ? (
+                        <>
+                          <h3>{draft.contact_title}</h3>
+                          <span className="design-preview-button">
+                            Contactar
+                          </span>
                         </>
                       ) : s.id === "search" ? (
                         <>
@@ -467,7 +570,11 @@ export function DesignAdmin() {
                         </>
                       ) : s.id === "listings" ? (
                         <>
-                          <h3>El próximo lugar podría estar aquí.</h3>
+                          <h3>
+                            {broker
+                              ? draft.listings_title
+                              : "El próximo lugar podría estar aquí."}
+                          </h3>
                           <div className="design-preview-cards">
                             <span>Propiedad</span>
                             <span>Propiedad</span>
@@ -484,7 +591,7 @@ export function DesignAdmin() {
                     </div>
                   ))}
                 <div className="design-preview-footer">
-                  {settings.site_name} · Vista de ejemplo
+                  {displaySettings.site_name} · Vista de ejemplo
                 </div>
               </div>
               <p>
@@ -492,12 +599,16 @@ export function DesignAdmin() {
                 de las propiedades se carga en el sitio real.
               </p>
               <a
-                href="/"
+                href={
+                  broker && siteInfo?.advertiser
+                    ? `/anunciantes/${siteInfo.advertiser.slug}`
+                    : "/"
+                }
                 target="_blank"
                 rel="noreferrer"
                 className="text-link"
               >
-                Abrir sitio principal ↗
+                {broker ? "Abrir mi sitio web ↗" : "Abrir sitio principal ↗"}
               </a>
             </aside>
           </div>

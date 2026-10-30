@@ -13,6 +13,7 @@ import { randomUUID } from 'node:crypto';
 import * as bcrypt from 'bcrypt';
 import sharp from 'sharp';
 import { readDesign, validateDesign } from './site-design';
+import { readBrokerDesign, validateBrokerDesign } from './broker-site';
 import {
   Actor,
   admin,
@@ -404,11 +405,140 @@ export class EstateService {
   }
   async publicAdvertiser(slug: string) {
     const [a] = await this.db.query(
-      "SELECT a.id,a.slug,a.display_name,a.kind,a.description,a.phone,a.whatsapp,a.public_email,a.logo_media_id FROM advertisers a JOIN users u ON u.id=a.user_id AND u.isActive=1 WHERE a.slug=? AND a.status='approved'",
+      "SELECT a.* FROM advertisers a JOIN users u ON CONVERT(u.id USING utf8mb4) COLLATE utf8mb4_unicode_ci=a.user_id AND u.isActive=1 WHERE a.slug=? AND a.status='approved'",
       [text(slug, 180)],
     );
     if (!a) throw new NotFoundException('Anunciante no disponible.');
-    return a;
+    const { row } = await this.brokerSiteRecord(a.id);
+    return {
+      ...Object.fromEntries(
+        [
+          'id',
+          'slug',
+          'display_name',
+          'kind',
+          'description',
+          'phone',
+          'whatsapp',
+          'public_email',
+          'logo_media_id',
+        ].map((key) => [key, a[key]]),
+      ),
+      site: this.brokerSiteDesign(a, row),
+    };
+  }
+  private async brokerSiteRecord(
+    id: string,
+    manager: EntityManager | DataSource = this.db,
+  ) {
+    try {
+      const [row] = await manager.query(
+        'SELECT * FROM advertiser_sites WHERE advertiser_id=?',
+        [id],
+      );
+      return { ready: true, row };
+    } catch (e) {
+      if (e.code === 'ER_NO_SUCH_TABLE') return { ready: false, row: null };
+      throw e;
+    }
+  }
+  private brokerSiteDesign(a: any, row: any, actor?: Actor) {
+    const design = readBrokerDesign(row?.design_json, a);
+    return {
+      ...design,
+      logo_url: design.logo_media_id
+        ? this.mediaUrl(design.logo_media_id, actor)
+        : null,
+      hero_url: design.hero_media_id
+        ? this.mediaUrl(design.hero_media_id, actor)
+        : null,
+    };
+  }
+  async myBrokerSite(u: Actor) {
+    const a = await this.advertiser(u);
+    if (!a)
+      throw new BadRequestException(
+        'Primero completa tu perfil de anunciante.',
+      );
+    const { ready, row } = await this.brokerSiteRecord(a.id);
+    const design = this.brokerSiteDesign(a, row, u);
+    return {
+      site_name: a.display_name,
+      homepage_title: design.hero_title,
+      advertiser: { id: a.id, slug: a.slug, status: a.status },
+      design_ready: ready,
+      design_revision: Number(row?.revision || 0),
+      design,
+    };
+  }
+  async saveBrokerSite(u: Actor, b: any) {
+    const design = validateBrokerDesign(b.design);
+    await this.db.transaction(async (tx) => {
+      const [a] = await tx.query(
+        'SELECT * FROM advertisers WHERE user_id=? FOR UPDATE',
+        [u.id],
+      );
+      if (!a)
+        throw new ForbiddenException(
+          'Primero completa tu perfil de anunciante.',
+        );
+      const { ready, row } = await this.brokerSiteRecord(a.id, tx);
+      if (!ready)
+        throw new ServiceUnavailableException(
+          'Primero ejecuta database/005_sitios_corredores.sql en la BD propiedades.',
+        );
+      if (b.revision !== Number(row?.revision || 0))
+        throw new ConflictException(
+          'Otra sesión modificó tu sitio. Descarta los cambios para cargar la última versión.',
+        );
+      for (const id of [design.logo_media_id, design.hero_media_id].filter(
+        Boolean,
+      )) {
+        const [m] = await tx.query(
+          'SELECT owner_id FROM estate_media WHERE id=? FOR UPDATE',
+          [id],
+        );
+        if (!m || m.owner_id !== u.id)
+          throw new ForbiddenException(
+            'Selecciona imágenes de tu propia biblioteca.',
+          );
+      }
+      const values = [
+        JSON.stringify(design),
+        design.logo_media_id,
+        design.hero_media_id,
+        a.id,
+      ];
+      if (row)
+        await tx.query(
+          'UPDATE advertiser_sites SET design_json=?,logo_media_id=?,hero_media_id=?,revision=revision+1 WHERE advertiser_id=?',
+          values,
+        );
+      else
+        await tx.query(
+          'INSERT INTO advertiser_sites(design_json,logo_media_id,hero_media_id,advertiser_id) VALUES (?,?,?,?)',
+          values,
+        );
+    });
+    return this.myBrokerSite(u);
+  }
+  private async brokerMediaUsage(
+    id: string,
+    onlyPublic = false,
+    manager: EntityManager | DataSource = this.db,
+  ) {
+    try {
+      const [result] = await manager.query(
+        onlyPublic
+          ? "SELECT COUNT(*) n FROM advertiser_sites s JOIN advertisers a ON a.id=s.advertiser_id JOIN users u ON CONVERT(u.id USING utf8mb4) COLLATE utf8mb4_unicode_ci=a.user_id WHERE (s.logo_media_id=? OR s.hero_media_id=?) AND a.status='approved' AND u.isActive=1"
+          : 'SELECT COUNT(*) n FROM advertiser_sites WHERE logo_media_id=? OR hero_media_id=?',
+        [id, id],
+      );
+      return Number(result.n) > 0;
+    } catch (e) {
+      if (e.code === 'ER_NO_SUCH_TABLE') return false;
+      throw e;
+    }
   }
   async moderateAdvertiser(u: Actor, id: string, b: any) {
     admin(u);
@@ -1021,7 +1151,8 @@ export class EstateService {
     const site = await this.settings();
     const siteImage =
       site.design.logo_media_id === id || site.design.hero_media_id === id;
-    if (!pub && !logo && !siteImage) {
+    const brokerImage = await this.brokerMediaUsage(id, true);
+    if (!pub && !logo && !siteImage && !brokerImage) {
       let payload: any;
       try {
         payload = await this.jwt.verifyAsync(signature || '', {
@@ -1034,7 +1165,7 @@ export class EstateService {
       if (payload.mid !== id || (!isAdmin(actor) && m.owner_id !== actor.id))
         throw new NotFoundException();
     }
-    return { ...m, public: !!pub || !!logo || siteImage };
+    return { ...m, public: !!pub || !!logo || siteImage || brokerImage };
   }
   async removeMedia(u: Actor, id: string) {
     uuid(id);
@@ -1057,7 +1188,8 @@ export class EstateService {
       if (
         Number(used.n) ||
         design.logo_media_id === id ||
-        design.hero_media_id === id
+        design.hero_media_id === id ||
+        (await this.brokerMediaUsage(id, false, tx))
       )
         throw new ConflictException('La imagen está en uso.');
       await tx.query('DELETE FROM estate_media WHERE id=?', [id]);

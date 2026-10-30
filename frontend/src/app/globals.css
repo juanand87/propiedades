@@ -2639,3 +2639,116 @@ td select {
   margin-top: 35px;
   margin-bottom: 35px;
 }
+
+/* Independent public sites for each advertiser. */
+.broker-header .brand {
+  max-width: 340px;
+  min-width: 0;
+}
+.broker-header .brand > span:last-child {
+  overflow-wrap: anywhere;
+  line-height: 1.15;
+}
+.broker-header .main-nav {
+  gap: 20px;
+}
+.broker-home > div > section {
+  scroll-margin-top: 25px;
+}
+.broker-hero {
+  margin-bottom: 20px;
+  padding-top: 35px;
+}
+.broker-hero .hero-copy > .button {
+  margin-top: 20px;
+}
+.broker-about {
+  max-width: 1000px;
+  margin: 25px auto;
+}
+.broker-about h2,
+.broker-contact h2 {
+  font-size: clamp(32px, 4vw, 52px);
+  margin-bottom: 20px;
+}
+.broker-about p {
+  max-width: 800px;
+  font-size: 17px;
+  line-height: 1.9;
+}
+.broker-contact {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 45px;
+  border-top: 1px solid var(--line);
+  padding-top: 55px;
+  padding-bottom: 70px;
+}
+.broker-contact-links {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 15px;
+  justify-content: center;
+  min-width: 0;
+}
+.broker-contact-links a {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+.broker-footer {
+  grid-template-columns: 1fr 1fr;
+}
+.broker-footer > div:last-child {
+  justify-self: end;
+  align-self: center;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.broker-footer > div:last-child a:first-child {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.broker-site .catalog-page h2 {
+  font-size: clamp(30px, 3.5vw, 48px);
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+@media (max-width: 800px) {
+  .broker-contact {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+  .broker-header .brand {
+    max-width: 220px;
+  }
+  .broker-header .header-actions .button {
+    display: none;
+  }
+  .broker-footer {
+    grid-template-columns: 1fr;
+  }
+  .broker-footer > div:last-child {
+    justify-self: start;
+  }
+}
+@media (max-width: 520px) {
+  .broker-header .brand {
+    max-width: 260px;
+    font-size: 20px;
+  }
+  .broker-hero .hero-copy {
+    padding-top: 20px;
+  }
+}

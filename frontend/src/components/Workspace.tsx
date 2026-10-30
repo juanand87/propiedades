@@ -117,6 +117,7 @@ export function Workspace({ path }: { path: string[] }) {
     { href: "visitas", name: "Solicitudes de visita", icon: CalendarDays },
     { href: "biblioteca", name: "Biblioteca de imágenes", icon: Images },
     { href: "perfil", name: "Perfil de anunciante", icon: Building2 },
+    { href: "sitio", name: "Mi sitio web", icon: House },
     ...(isAdmin
       ? [
           { href: "anunciantes", name: "Anunciantes", icon: Users },
@@ -196,6 +197,16 @@ export function Workspace({ path }: { path: string[] }) {
           <UserAdmin />
         ) : section === "catalogos" && isAdmin ? (
           <CatalogAdmin />
+        ) : section === "sitio" ? (
+          user.advertiser_id ? (
+            <DesignAdmin key={`broker-${user.advertiser_id}`} broker />
+          ) : (
+            <Empty title="Primero, crea tu perfil de anunciante">
+              <Link className="button" href={`${root}/perfil`}>
+                Completar mi perfil
+              </Link>
+            </Empty>
+          )
         ) : section === "diseno" && isAdmin ? (
           <DesignAdmin />
         ) : section === "configuracion" && isAdmin ? (
@@ -1051,7 +1062,13 @@ function Profile() {
       {data && (
         <p>
           Estado: <span className="status-tag">{labels[data.status]}</span> ·{" "}
-          <Link href={`/anunciantes/${data.slug}`}>Ver perfil público</Link>
+          <Link href={`/anunciantes/${data.slug}`}>Ver mi sitio público</Link> ·{" "}
+          <Link
+            className="text-link"
+            href={user.role === "admin" ? "/panel/sitio" : "/dashboard/sitio"}
+          >
+            Personalizar mi sitio web
+          </Link>
         </p>
       )}
       <form

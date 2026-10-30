@@ -6,6 +6,7 @@ const files = [
   "002_ubicaciones.sql",
   "003_identidades.sql",
   "004_diseno_sitio.sql",
+  "005_sitios_corredores.sql",
 ];
 const sql = files
   .map((file) => fs.readFileSync(path.join(root, "database", file), "utf8"))

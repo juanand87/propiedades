@@ -25,10 +25,17 @@ import { assetUrl, labels, price, request, send } from "@/lib/estate-api";
 import { Empty, FavoriteButton, Notice, useEstate } from "./EstateApp";
 import { getSiteUrl } from "@/lib/siteUrl";
 
-export function PropertyCard({ p }: { p: any }) {
+export function PropertyCard({
+  p,
+  propertyBase = "/propiedades",
+}: {
+  p: any;
+  propertyBase?: string;
+}) {
+  const propertyHref = `${propertyBase}/${p.slug}`;
   return (
     <article className="property-card">
-      <Link className="property-image" href={`/propiedades/${p.slug}`}>
+      <Link className="property-image" href={propertyHref}>
         <img
           src={assetUrl(p.media?.[0]?.url)}
           alt={p.media?.[0]?.alt_text || p.title}
@@ -43,9 +50,7 @@ export function PropertyCard({ p }: { p: any }) {
           {labels[p.availability]}
         </span>
         <h3>
-          <Link href={`/propiedades/${p.slug}`}>
-            {p.title || "Nueva propiedad"}
-          </Link>
+          <Link href={propertyHref}>{p.title || "Nueva propiedad"}</Link>
         </h3>
         <p className="location">
           <MapPin size={14} />
@@ -77,7 +82,7 @@ export function PropertyCard({ p }: { p: any }) {
         </div>
         <div className="card-bottom">
           <span>{p.advertiser?.name}</span>
-          <Link href={`/propiedades/${p.slug}`} aria-label={`Ver ${p.title}`}>
+          <Link href={propertyHref} aria-label={`Ver ${p.title}`}>
             <ArrowUpRight size={20} />
           </Link>
         </div>
@@ -333,12 +338,18 @@ function Home() {
     </>
   );
 }
-function SearchView({
+export function SearchView({
   advertiserId,
   heading = "Encuentra tu próximo lugar",
+  propertyBase = "/propiedades",
+  homeHref = "/",
+  embedded = false,
 }: {
   advertiserId?: string;
   heading?: string;
+  propertyBase?: string;
+  homeHref?: string;
+  embedded?: boolean;
 }) {
   const { catalog } = useEstate();
   const [q, setQ] = useState<any>({ sort: "recent", page: "1" }),
@@ -400,17 +411,19 @@ function SearchView({
     for (const [k, v] of Object.entries(q)) if (v) params.set(k, String(v));
     history.replaceState(null, "", "?" + params.toString());
   };
+  const Container = embedded ? "section" : "main";
+  const Heading = embedded ? "h2" : "h1";
   return (
-    <main className="section catalog-page">
+    <Container className="section catalog-page">
       <div className="breadcrumbs">
-        <Link href="/">Inicio</Link>
+        <Link href={homeHref}>Inicio</Link>
         <ChevronRight size={13} />
         <span>Propiedades en venta</span>
       </div>
       <div className="section-heading">
         <div>
           <span className="eyebrow">ESPACIOS PARA UN NUEVO COMIENZO</span>
-          <h1>{heading}</h1>
+          <Heading>{heading}</Heading>
           <p>Explora propiedades en venta en Chile.</p>
         </div>
       </div>
@@ -649,7 +662,7 @@ function SearchView({
           ) : result.items.length ? (
             <div className="property-grid catalog-grid">
               {result.items.map((p: any) => (
-                <PropertyCard key={p.id} p={p} />
+                <PropertyCard key={p.id} p={p} propertyBase={propertyBase} />
               ))}
             </div>
           ) : (
@@ -680,15 +693,19 @@ function SearchView({
           )}
         </section>
       </div>
-    </main>
+    </Container>
   );
 }
-function Detail({
+export function Detail({
   identifier,
   initialProperty,
+  advertiserId,
+  listHref = "/propiedades",
 }: {
   identifier: string;
   initialProperty?: any;
+  advertiserId?: string;
+  listHref?: string;
 }) {
   const [p, setP] = useState<any>(initialProperty || null),
     [error, setError] = useState(""),
@@ -702,6 +719,10 @@ function Detail({
       initialProperty &&
       (initialProperty.id === identifier || initialProperty.slug === identifier)
     ) {
+      if (advertiserId && initialProperty.advertiser?.id !== advertiserId) {
+        setError("Propiedad no disponible en este sitio.");
+        return;
+      }
       setP(initialProperty);
       send(`/properties/${initialProperty.id}/view`, {}).catch(() => {});
       return;
@@ -710,16 +731,18 @@ function Detail({
     setError("");
     request("/properties/" + encodeURIComponent(identifier))
       .then((p) => {
+        if (advertiserId && p.advertiser?.id !== advertiserId)
+          throw new Error("Propiedad no disponible en este sitio.");
         setP(p);
         send(`/properties/${p.id}/view`, {}).catch(() => {});
       })
       .catch((e) => setError(e.message));
-  }, [identifier, initialProperty]);
+  }, [identifier, initialProperty, advertiserId]);
   if (error)
     return (
       <main className="section">
         <Notice error={error} />
-        <Link href="/propiedades" className="text-link">
+        <Link href={listHref} className="text-link">
           <ArrowLeft size={16} />
           Volver a buscar
         </Link>
@@ -771,7 +794,7 @@ function Detail({
         }}
       />
       <div className="breadcrumbs">
-        <Link href="/propiedades">Propiedades</Link>
+        <Link href={listHref}>Propiedades</Link>
         <ChevronRight size={13} />
         <span>{p.commune_name}</span>
         <ChevronRight size={13} />
