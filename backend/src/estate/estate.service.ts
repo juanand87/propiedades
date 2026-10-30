@@ -399,8 +399,8 @@ export class EstateService {
     if (u) admin(u);
     return this.db.query(
       u
-        ? 'SELECT a.*,u.email account_email FROM advertisers a JOIN users u ON u.id=a.user_id ORDER BY a.created_at DESC'
-        : "SELECT a.id,a.slug,a.display_name,a.kind,a.description,a.phone,a.whatsapp,a.public_email,a.logo_media_id FROM advertisers a JOIN users u ON u.id=a.user_id AND u.isActive=1 WHERE a.status='approved' ORDER BY a.display_name",
+        ? 'SELECT a.*,u.email account_email FROM advertisers a JOIN users u ON CONVERT(u.id USING utf8mb4) COLLATE utf8mb4_unicode_ci=a.user_id ORDER BY a.created_at DESC'
+        : "SELECT a.id,a.slug,a.display_name,a.kind,a.description,a.phone,a.whatsapp,a.public_email,a.logo_media_id FROM advertisers a JOIN users u ON CONVERT(u.id USING utf8mb4) COLLATE utf8mb4_unicode_ci=a.user_id AND u.isActive=1 WHERE a.status='approved' ORDER BY a.display_name",
     );
   }
   async publicAdvertiser(slug: string) {
@@ -1141,11 +1141,11 @@ export class EstateService {
     ]);
     if (!m) throw new NotFoundException();
     const [pub] = await this.db.query(
-      "SELECT 1 FROM property_media pm JOIN properties p ON p.id=pm.property_id JOIN advertisers a ON a.id=p.advertiser_id JOIN users u ON u.id=a.user_id WHERE pm.media_id=? AND p.publication_status='published' AND a.status='approved' AND u.isActive=1 LIMIT 1",
+      "SELECT 1 FROM property_media pm JOIN properties p ON p.id=pm.property_id JOIN advertisers a ON a.id=p.advertiser_id JOIN users u ON CONVERT(u.id USING utf8mb4) COLLATE utf8mb4_unicode_ci=a.user_id WHERE pm.media_id=? AND p.publication_status='published' AND a.status='approved' AND u.isActive=1 LIMIT 1",
       [id],
     );
     const [logo] = await this.db.query(
-      "SELECT 1 FROM advertisers a JOIN users u ON u.id=a.user_id WHERE a.logo_media_id=? AND a.status='approved' AND u.isActive=1 LIMIT 1",
+      "SELECT 1 FROM advertisers a JOIN users u ON CONVERT(u.id USING utf8mb4) COLLATE utf8mb4_unicode_ci=a.user_id WHERE a.logo_media_id=? AND a.status='approved' AND u.isActive=1 LIMIT 1",
       [id],
     );
     const site = await this.settings();

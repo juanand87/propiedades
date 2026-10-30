@@ -40,6 +40,7 @@ Esta entrega utiliza URLs dentro del dominio del marketplace; no configura domin
 - Compilación de producción de backend y frontend correcta; lint del frontend sin errores.
 - 23 pruebas unitarias y 135 comprobaciones de integración en una instancia de QA aislada, sin conexiones de pruebas a producción.
 - Dos anunciantes con colores, imágenes y propiedades distintos; rechazo de imágenes ajenas, revisión antigua, cuenta sin perfil y accesos sin sesión; ocultación por suspensión y conservación de diseños al repetir la migración.
+- Compatibilidad de perfiles e imágenes con una tabla de usuarios heredada que utiliza una intercalación distinta; solo se simuló esa diferencia en QA, sin cambiar el esquema remoto de usuarios.
 - Guardado desde el panel del corredor, vista previa, selección de imágenes, cambios de textos, orden y visibilidad; catálogo con una publicación propia y sin la del otro corredor; ficha dentro de la marca del corredor.
 - Verificación de HTML inicial, 404 para una ficha ajena bajo otra marca y conservación del diseño del marketplace.
 - Revisión visual de escritorio y móvil, menú propio y ausencia de desbordamiento horizontal. Evidencias en `docs/qa/corredor-*.png`, con datos ficticios.

@@ -40,6 +40,11 @@ async function main() {
       'utf8',
     );
     await db.query(migration);
+    // Simulate a compatible legacy users table with a different collation.
+    // This is exclusively the disposable instance validated by the guard above.
+    await db.query(
+      'ALTER TABLE propiedades.users CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci',
+    );
     const [[count]] = await db.query('SELECT COUNT(*) n FROM estate_regions');
     assert.equal(count.n, 16);
     const [[communes]] = await db.query(
