@@ -25,6 +25,8 @@ Preparación local realizada el 28 de octubre de 2026. No se realizaron conexion
 
 El inicializador genera tablas de las entidades heredadas mediante TypeORM. Es una base técnica del código actual, todavía orientada al comercio musical: **no es un modelo inmobiliario**. No debe sustituir una migración diseñada para propiedades, ubicaciones, operaciones de venta/arriendo, corredores y consultas. `synchronize` sigue desactivado durante el arranque normal. MySQL puede aplicar DDL parcialmente si hay un error: revisar el resultado antes de reintentar; el script rechaza una BD que dejó de estar vacía.
 
+Si MySQL devuelve `1146: Table propiedades.users doesn't exist`, inicializar primero el esquema completo. En el componente Web Service propiedades de DigitalOcean, abrir Console y ejecutar `cd /workspace/backend && node scripts/init-properties-db.cjs --apply` para el despliegue con buildpacks desde la raíz. En una imagen del Dockerfile de backend, el comando es `cd /app && node scripts/init-properties-db.cjs --apply`. Son comandos de consola del servidor, no SQL para Workbench. El inicializador reutiliza las variables y TLS del componente y permite solo una BD propiedades vacía. Prefiere los módulos y entidades de dist, por lo que no necesita ts-node en producción; en desarrollo admite src como alternativa. Después de crear el esquema se puede ejecutar por separado el SQL de alta del administrador. No crea esa cuenta automáticamente ni cambia el arranque normal del servidor.
+
 ## Vercel y backend
 
 ### Arranque en DigitalOcean App Platform

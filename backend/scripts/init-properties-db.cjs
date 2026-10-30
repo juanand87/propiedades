@@ -1,11 +1,15 @@
 // Run from backend: node scripts/init-properties-db.cjs [--apply]
 // Does not import legacy dumps, accounts, credentials or marketplace settings.
 const path = require('node:path');
+const { existsSync } = require('node:fs');
 require('dotenv').config({ path: path.join(__dirname, '../.env'), quiet: true });
-require('ts-node/register/transpile-only');
+// Production deployments have compiled entities and may omit ts-node.
+const useCompiled = existsSync(path.join(__dirname, '../dist/config/project-isolation.js'));
+if (!useCompiled) require('ts-node/register/transpile-only');
+const codeDirectory = useCompiled ? '../dist' : '../src';
 const { DataSource } = require('typeorm');
-const { validateProjectEnvironment, installNetworkIsolation } = require('../src/config/project-isolation');
-const { getDatabaseSsl } = require('../src/config/database-ssl');
+const { validateProjectEnvironment, installNetworkIsolation } = require(path.join(__dirname, codeDirectory, 'config/project-isolation'));
+const { getDatabaseSsl } = require(path.join(__dirname, codeDirectory, 'config/database-ssl'));
 
 async function main() {
   validateProjectEnvironment(process.env);
@@ -20,10 +24,11 @@ async function main() {
     username: process.env.DB_USERNAME, password: process.env.DB_PASSWORD,
     database: 'propiedades', charset: 'utf8mb4', synchronize: false,
     ssl: getDatabaseSsl(process.env),
-    entities: [path.join(__dirname, '../src/**/*.entity.ts')],
+    entities: [path.join(__dirname, codeDirectory, useCompiled ? '**/*.entity.js' : '**/*.entity.ts')],
   });
   await db.initialize();
   try {
+    if (!db.hasMetadata('users')) throw new Error('No se cargaron las entidades del backend. Compila el proyecto antes de inicializar.');
     const [row] = await db.query('SELECT COUNT(*) AS total FROM information_schema.tables WHERE table_schema = DATABASE()');
     if (Number(row.total) !== 0) throw new Error('BD no vacía: no se modifica. Usa migraciones revisadas para continuar.');
     await db.synchronize(false);

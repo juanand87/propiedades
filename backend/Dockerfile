@@ -26,6 +26,7 @@ COPY package*.json ./
 RUN npm ci --only=production && npm cache clean --force
 
 COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/scripts/init-properties-db.cjs ./scripts/init-properties-db.cjs
 
 # Create uploads directory
 RUN mkdir -p /app/uploads-propiedades
