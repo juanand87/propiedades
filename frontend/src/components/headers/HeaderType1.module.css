@@ -1,0 +1,27 @@
+/* Mobile First - Por defecto mostramos mobile */
+.headerMobile {
+  display: block;
+}
+
+.headerDesktop {
+  display: none;
+}
+
+.topBarDesktop {
+  display: none;
+}
+
+/* Desktop - 1024px en adelante */
+@media (min-width: 1024px) {
+  .headerMobile {
+    display: none !important;
+  }
+  
+  .headerDesktop {
+    display: block !important;
+  }
+  
+  .topBarDesktop {
+    display: block !important;
+  }
+}

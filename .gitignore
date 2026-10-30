@@ -1,0 +1,122 @@
+# Dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.pnpm-debug.log*
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env.*
+!.env.example
+.vercel/
+.codex-remote-attachments/
+.agents/
+.codex/
+backend/uploads-propiedades/
+*.tsbuildinfo
+legacy/
+
+# Build outputs
+dist/
+build/
+.next/
+.cache/
+out/
+
+# Logs
+*.log
+logs/
+backend.log
+frontend-dev.log
+backend-log.txt
+
+# Database
+*.sql
+!backend/sql/add-discounts.sql
+backup.sql
+*.db
+*.sqlite
+
+# Uploads (archivos subidos por usuarios)
+backend/uploads/
+uploads/
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.classpath
+.c9/
+*.launch
+.settings/
+*.sublime-workspace
+
+# Testing
+coverage/
+.nyc_output/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Docker
+docker-compose.override.yml
+
+# Archives
+*.zip
+*.rar
+*.tar.gz
+
+# Excel files (comunas)
+*.xlsx
+
+# Plugins descargados
+bluex-for-woocommerce/
+swastarkencl/
+swastarkencl4.8.7 CE/
+
+# Documentation markdown (opcional, comentar si quieres subirlos)
+# *.md
+
+# Nginx configs locales
+nginx/
+
+# Specific files
+vinilo.png
+test-save.html
+openapi-cl-es-v1.yaml
+
+# Legacy documentation and operational exports: keep local, do not publish.
+/*.md
+!/README.md
+!/SEPARACION.md
+/*.txt
+/*.csv
+/*.pdf
+/products_analysis.json
+/products_test.json
+/openapi-ve-es-v1.yaml
+/mundobeat-for-woocommerce.php
+/woocommerce-chile-format-snippet.php
+/backend/*-export.txt
+/backend/*-localhost.txt
+/backend/db-communes.txt
+/backend/starken-api-data.json
+/frontend/vercel-deploy.txt
+/frontend/scripts/fixtures/
+/backend/src/auth/ADMIN-RECOVERY.md

@@ -1,0 +1,11 @@
+tmp
+**/tmp
+**/.env*
+**/uploads*
+**/*.sql
+**/*.zip
+**/*.rar
+.git
+.codex
+.agents
+.codex-remote-attachments

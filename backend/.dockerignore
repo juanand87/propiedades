@@ -1,0 +1,11 @@
+node_modules
+dist
+.cache
+.env
+.env.*
+uploads-propiedades
+*.sql
+*.zip
+uploads
+coverage
+*.log
