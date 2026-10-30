@@ -1,6 +1,7 @@
 "use client";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
+import { siteDesign } from "@/lib/site-design";
 import {
   ArrowUpRight,
   MapPin,
@@ -132,6 +133,11 @@ function SearchBar() {
 }
 function Home() {
   const { settings } = useEstate();
+  const design = siteDesign(settings);
+  const visibleSections = design.sections.filter((s) => s.visible);
+  const searchIndex = visibleSections.findIndex((s) => s.id === "search");
+  const searchAfterHero =
+    searchIndex > 0 && visibleSections[searchIndex - 1].id === "hero";
   const [items, setItems] = useState<any[]>([]),
     [error, setError] = useState(""),
     [loading, setLoading] = useState(true);
@@ -141,8 +147,8 @@ function Home() {
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
   }, []);
-  return (
-    <>
+  const sections: Record<string, React.ReactNode> = {
+    hero: (
       <section className="hero">
         <div className="hero-copy">
           <span className="eyebrow">
@@ -177,20 +183,34 @@ function Home() {
             <span>Propiedades reales. Nuevos comienzos.</span>
           </div>
         </div>
-        <div className="hero-art">
+        <div className={`hero-art${design.hero_url ? " custom-hero" : ""}`}>
           <img
-            src="/architecture.svg"
-            alt="Ilustración de una casa contemporánea entre árboles"
+            src={
+              design.hero_url ? assetUrl(design.hero_url) : "/architecture.svg"
+            }
+            alt={
+              design.hero_url
+                ? design.hero_alt
+                : "Ilustración de una casa contemporánea entre árboles"
+            }
           />
-          <div className="hero-art-caption">
-            <span className="caption-dot" />
-            ESPACIOS PARA VIVIR MEJOR<span>01 / CHILE</span>
-          </div>
+          {!design.hero_url && (
+            <div className="hero-art-caption">
+              <span className="caption-dot" />
+              ESPACIOS PARA VIVIR MEJOR<span>01 / CHILE</span>
+            </div>
+          )}
         </div>
       </section>
-      <div className="search-wrap">
+    ),
+    search: (
+      <div
+        className={`search-wrap${searchAfterHero ? "" : " search-standalone"}`}
+      >
         <SearchBar />
       </div>
+    ),
+    types: (
       <section className="section">
         <div className="section-heading">
           <div>
@@ -239,6 +259,8 @@ function Home() {
           ))}
         </div>
       </section>
+    ),
+    listings: (
       <section className="section listings-section">
         <div className="section-heading">
           <div>
@@ -267,6 +289,8 @@ function Home() {
           </Empty>
         )}
       </section>
+    ),
+    publish: (
       <section className="publish-banner">
         <div>
           <span className="eyebrow">PARA PROPIETARIOS E INMOBILIARIAS</span>
@@ -299,6 +323,13 @@ function Home() {
           </div>
         </div>
       </section>
+    ),
+  };
+  return (
+    <>
+      {visibleSections.map((s) => (
+        <Fragment key={s.id}>{sections[s.id]}</Fragment>
+      ))}
     </>
   );
 }

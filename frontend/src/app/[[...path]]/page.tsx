@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import EstateApp from "@/components/EstateApp";
 import { getSiteUrl } from "@/lib/siteUrl";
-import { getServerProperty } from "@/lib/server-property";
+import { getServerProperty, getServerSettings } from "@/lib/server-property";
 export const dynamic = "force-dynamic";
 type Props = { params: Promise<{ path?: string[] }> };
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -59,10 +59,18 @@ export default async function Page({ params }: Props) {
     ].includes(path[0] || "")
   )
     notFound();
-  const initialProperty =
+  const [initialProperty, initialSettings] = await Promise.all([
     path[0] === "propiedades" && path[1]
-      ? await getServerProperty(path[1])
-      : undefined;
+      ? getServerProperty(path[1])
+      : undefined,
+    getServerSettings(),
+  ]);
   if (initialProperty === null) notFound();
-  return <EstateApp path={path} initialProperty={initialProperty} />;
+  return (
+    <EstateApp
+      path={path}
+      initialProperty={initialProperty}
+      initialSettings={initialSettings}
+    />
+  );
 }

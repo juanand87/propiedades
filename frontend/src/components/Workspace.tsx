@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { assetUrl, date, labels, price, request, send } from "@/lib/estate-api";
 import { Empty, Notice, useEstate } from "./EstateApp";
+import { DesignAdmin } from "./DesignAdmin";
 
 function useLoad(path: string) {
   const [data, setData] = useState<any>(null),
@@ -121,6 +122,7 @@ export function Workspace({ path }: { path: string[] }) {
           { href: "anunciantes", name: "Anunciantes", icon: Users },
           { href: "usuarios", name: "Usuarios", icon: Users },
           { href: "catalogos", name: "Tipos y ubicaciones", icon: ListFilter },
+          { href: "diseno", name: "Diseño del sitio", icon: Images },
           {
             href: "configuracion",
             name: "Configuración del sitio",
@@ -194,6 +196,8 @@ export function Workspace({ path }: { path: string[] }) {
           <UserAdmin />
         ) : section === "catalogos" && isAdmin ? (
           <CatalogAdmin />
+        ) : section === "diseno" && isAdmin ? (
+          <DesignAdmin />
         ) : section === "configuracion" && isAdmin ? (
           <SettingsAdmin />
         ) : section === "" ? (
@@ -1620,6 +1624,13 @@ function SettingsAdmin() {
   return (
     <>
       <h1>La identidad de tu marketplace</h1>
+      <p>
+        Para cambiar colores, logo, portada y orden de secciones, entra en{" "}
+        <Link className="text-link" href="/panel/diseno">
+          Diseño del sitio
+        </Link>
+        .
+      </p>
       <Notice error={error} success={success} />
       <form
         className="panel-card"

@@ -12,6 +12,7 @@ import { JwtService } from '@nestjs/jwt';
 import { randomUUID } from 'node:crypto';
 import * as bcrypt from 'bcrypt';
 import sharp from 'sharp';
+import { readDesign, validateDesign } from './site-design';
 import {
   Actor,
   admin,
@@ -222,7 +223,69 @@ export class EstateService {
     const [row] = await this.db.query(
       'SELECT * FROM estate_settings WHERE id=1',
     );
-    return row;
+    const design = readDesign(row?.design_json);
+    const { design_json, ...publicSettings } = row || {};
+    return {
+      ...publicSettings,
+      design_ready:
+        !!row &&
+        Object.hasOwn(row, 'design_json') &&
+        Object.hasOwn(row, 'design_revision'),
+      design_revision: Number(row?.design_revision || 1),
+      design: {
+        ...design,
+        logo_url: design.logo_media_id
+          ? this.mediaUrl(design.logo_media_id)
+          : null,
+        hero_url: design.hero_media_id
+          ? this.mediaUrl(design.hero_media_id)
+          : null,
+      },
+    };
+  }
+  async saveDesign(u: Actor, b: any) {
+    admin(u);
+    const design = validateDesign(b.design);
+    await this.db.transaction(async (tx) => {
+      const [row] = await tx.query(
+        'SELECT * FROM estate_settings WHERE id=1 FOR UPDATE',
+      );
+      if (
+        !row ||
+        !Object.hasOwn(row, 'design_json') ||
+        !Object.hasOwn(row, 'design_revision')
+      )
+        throw new ServiceUnavailableException(
+          'Primero ejecuta database/004_diseno_sitio.sql en la BD propiedades.',
+        );
+      if (b.revision !== Number(row.design_revision))
+        throw new ConflictException(
+          'Otra sesión modificó el diseño. Recarga el diseño guardado antes de continuar.',
+        );
+      const previousDesign = readDesign(row.design_json);
+      for (const id of [design.logo_media_id, design.hero_media_id].filter(
+        Boolean,
+      )) {
+        const [media] = await tx.query(
+          'SELECT owner_id FROM estate_media WHERE id=? FOR UPDATE',
+          [id],
+        );
+        if (
+          !media ||
+          (media.owner_id !== u.id &&
+            previousDesign.logo_media_id !== id &&
+            previousDesign.hero_media_id !== id)
+        )
+          throw new ForbiddenException(
+            'Selecciona imágenes de tu biblioteca de administrador.',
+          );
+      }
+      await tx.query(
+        'UPDATE estate_settings SET design_json=?,design_revision=design_revision+1 WHERE id=1',
+        [JSON.stringify(design)],
+      );
+    });
+    return this.settings();
   }
   async saveSettings(u: Actor, b: any) {
     admin(u);
@@ -955,7 +1018,10 @@ export class EstateService {
       "SELECT 1 FROM advertisers a JOIN users u ON u.id=a.user_id WHERE a.logo_media_id=? AND a.status='approved' AND u.isActive=1 LIMIT 1",
       [id],
     );
-    if (!pub && !logo) {
+    const site = await this.settings();
+    const siteImage =
+      site.design.logo_media_id === id || site.design.hero_media_id === id;
+    if (!pub && !logo && !siteImage) {
       let payload: any;
       try {
         payload = await this.jwt.verifyAsync(signature || '', {
@@ -968,21 +1034,34 @@ export class EstateService {
       if (payload.mid !== id || (!isAdmin(actor) && m.owner_id !== actor.id))
         throw new NotFoundException();
     }
-    return { ...m, public: !!pub || !!logo };
+    return { ...m, public: !!pub || !!logo || siteImage };
   }
   async removeMedia(u: Actor, id: string) {
-    const [m] = await this.db.query(
-      'SELECT owner_id FROM estate_media WHERE id=?',
-      [uuid(id)],
-    );
-    if (!m || (!isAdmin(u) && m.owner_id !== u.id))
-      throw new ForbiddenException();
-    const [used] = await this.db.query(
-      'SELECT (SELECT COUNT(*) FROM property_media WHERE media_id=?)+(SELECT COUNT(*) FROM advertisers WHERE logo_media_id=?) n',
-      [id, id],
-    );
-    if (Number(used.n)) throw new ConflictException('La imagen está en uso.');
-    await this.db.query('DELETE FROM estate_media WHERE id=?', [id]);
+    uuid(id);
+    await this.db.transaction(async (tx) => {
+      // Same lock order as saveDesign: prevent deletion while an image is published.
+      const [settings] = await tx.query(
+        'SELECT * FROM estate_settings WHERE id=1 FOR UPDATE',
+      );
+      const [m] = await tx.query(
+        'SELECT owner_id FROM estate_media WHERE id=? FOR UPDATE',
+        [id],
+      );
+      if (!m || (!isAdmin(u) && m.owner_id !== u.id))
+        throw new ForbiddenException();
+      const [used] = await tx.query(
+        'SELECT (SELECT COUNT(*) FROM property_media WHERE media_id=?)+(SELECT COUNT(*) FROM advertisers WHERE logo_media_id=?) n',
+        [id, id],
+      );
+      const design = readDesign(settings?.design_json);
+      if (
+        Number(used.n) ||
+        design.logo_media_id === id ||
+        design.hero_media_id === id
+      )
+        throw new ConflictException('La imagen está en uso.');
+      await tx.query('DELETE FROM estate_media WHERE id=?', [id]);
+    });
     return { success: true };
   }
   async favorite(u: Actor, id: string, remove = false) {

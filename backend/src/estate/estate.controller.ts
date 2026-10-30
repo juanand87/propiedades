@@ -253,6 +253,12 @@ export class EstateController {
   ) {
     return this.estate.saveSettings(req.user, b);
   }
+  @Patch('admin/design') @UseGuards(EstateGuard) saveDesign(
+    @Req() req: any,
+    @Body() b: any,
+  ) {
+    return this.estate.saveDesign(req.user, b);
+  }
   @Post('admin/catalog') @UseGuards(EstateGuard) saveCatalog(
     @Req() req: any,
     @Body() b: any,

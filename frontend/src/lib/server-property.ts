@@ -1,6 +1,18 @@
 import { cache } from "react";
 import { getServerApiUrl } from "./deployment";
 
+export const getServerSettings = cache(async () => {
+  try {
+    const response = await fetch(`${getServerApiUrl()}/settings`, {
+      cache: "no-store",
+      signal: AbortSignal.timeout(5000),
+    });
+    return response.ok ? await response.json() : undefined;
+  } catch {
+    return undefined;
+  }
+});
+
 export const getServerProperty = cache(async (identifier: string) => {
   const api = getServerApiUrl();
   try {

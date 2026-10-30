@@ -171,6 +171,25 @@ async function main() {
         201,
       )
     ).access_token;
+    const beforeDesign = await call('GET', '/settings');
+    assert.equal(beforeDesign.design_ready, false);
+    assertions++;
+    await call(
+      'PATCH',
+      '/admin/design',
+      { design: beforeDesign.design, revision: 1 },
+      admin,
+      503,
+    );
+    const designMigration = fs.readFileSync(
+      path.join(root, 'database/004_diseno_sitio.sql'),
+      'utf8',
+    );
+    await db.query(designMigration);
+    await db.query(designMigration);
+    const initialDesign = await call('GET', '/settings');
+    assert.equal(initialDesign.design_ready, true);
+    assertions++;
     const catalog = await call('GET', '/catalog');
     assert.equal(catalog.communes.length, 346);
     assertions++;
@@ -412,6 +431,81 @@ async function main() {
     const stats = await call('GET', '/manage/stats', null, admin);
     assert.equal(Number(stats.inquiries), 1);
     assertions++;
+    await call('PATCH', '/admin/design', {}, null, 401);
+    await call(
+      'PATCH',
+      '/admin/design',
+      { design: initialDesign.design, revision: 1 },
+      one.access_token,
+      403,
+    );
+    await call(
+      'PATCH',
+      '/admin/design',
+      {
+        design: { ...initialDesign.design, primary_color: '#ffffff' },
+        revision: 1,
+      },
+      admin,
+      400,
+    );
+    await call(
+      'PATCH',
+      '/admin/design',
+      {
+        design: { ...initialDesign.design, logo_media_id: media.id },
+        revision: 1,
+      },
+      admin,
+      403,
+    );
+    const adminMedia = await call('POST', '/manage/media', fd, admin, 201);
+    await call('GET', '/media/' + adminMedia.id, null, null, 404);
+    const designed = await call(
+      'PATCH',
+      '/admin/design',
+      {
+        revision: 1,
+        design: {
+          ...initialDesign.design,
+          primary_color: '#18436a',
+          logo_media_id: adminMedia.id,
+          hero_media_id: adminMedia.id,
+          sections: [...initialDesign.design.sections]
+            .reverse()
+            .map((s) => (s.id === 'types' ? { ...s, visible: false } : s)),
+        },
+      },
+      admin,
+    );
+    assert.equal(designed.design_revision, 2);
+    assert.equal(designed.design.primary_color, '#18436a');
+    assert.equal(designed.design.sections[0].id, 'publish');
+    assert.equal(
+      designed.design.sections.find((s) => s.id === 'types').visible,
+      false,
+    );
+    assert.equal(designed.design.logo_url, '/api/media/' + adminMedia.id);
+    assertions += 5;
+    await call('GET', '/media/' + adminMedia.id);
+    await call('DELETE', '/manage/media/' + adminMedia.id, null, admin, 409);
+    await call(
+      'PATCH',
+      '/admin/design',
+      { design: initialDesign.design, revision: 1 },
+      admin,
+      409,
+    );
+    const restored = await call(
+      'PATCH',
+      '/admin/design',
+      { design: initialDesign.design, revision: 2 },
+      admin,
+    );
+    assert.equal(restored.design.hero_media_id, null);
+    assertions++;
+    await call('GET', '/media/' + adminMedia.id, null, null, 404);
+    await call('DELETE', '/manage/media/' + adminMedia.id, null, admin);
     console.log(
       JSON.stringify({
         passed: true,

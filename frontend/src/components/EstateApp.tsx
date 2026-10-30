@@ -3,6 +3,8 @@ import Link from "next/link";
 import { createContext, useContext, useEffect, useState } from "react";
 import { House, Menu, X, ArrowUpRight, Heart } from "lucide-react";
 import { request } from "@/lib/estate-api";
+import { assetUrl } from "@/lib/estate-api";
+import { designStyle, siteDesign } from "@/lib/site-design";
 import { PublicView } from "./PublicView";
 import { Workspace } from "./Workspace";
 import { AuthView } from "./AuthView";
@@ -96,9 +98,11 @@ export function FavoriteButton({ id }: { id: string }) {
 export default function EstateApp({
   path,
   initialProperty,
+  initialSettings,
 }: {
   path: string[];
   initialProperty?: any;
+  initialSettings?: any;
 }) {
   const [user, setUser] = useState<any>(null),
     [loading, setLoading] = useState(true),
@@ -110,11 +114,13 @@ export default function EstateApp({
       regions: [],
       communes: [],
     }),
-    [settings, setSettings] = useState<any>({
-      site_name: "Propiedades",
-      tagline: "Encuentra tu próximo lugar",
-      homepage_title: "Un nuevo lugar para tu próxima historia.",
-    });
+    [settings, setSettings] = useState<any>(
+      initialSettings || {
+        site_name: "Propiedades",
+        tagline: "Encuentra tu próximo lugar",
+        homepage_title: "Un nuevo lugar para tu próxima historia.",
+      },
+    );
   const reload = async () => {
     const [c, s] = await Promise.all([
       request("/catalog"),
@@ -159,6 +165,18 @@ export default function EstateApp({
     (path[0] === "panel" || path[0] === "dashboard") && path[1] !== "login";
   const auth =
     path[0] === "login" || path[0] === "register" || path[1] === "login";
+  const design = siteDesign(settings);
+  const brand = design.logo_url ? (
+    <img
+      className="site-logo"
+      src={assetUrl(design.logo_url)}
+      alt={settings.site_name}
+    />
+  ) : (
+    <span className="brand-icon">
+      <House size={23} />
+    </span>
+  );
   return (
     <Context.Provider
       value={{
@@ -172,110 +190,122 @@ export default function EstateApp({
         setFavorites,
       }}
     >
-      <header className="site-header">
-        <Link href="/" className="brand" aria-label="Propiedades, inicio">
-          <span className="brand-icon">
-            <House size={23} />
-          </span>
-          {settings.site_name}
-          <span className="brand-dot">.</span>
-        </Link>
-        <nav
-          className={menu ? "main-nav open" : "main-nav"}
-          aria-label="Navegación principal"
-        >
+      <div className="estate-site" style={designStyle(design)}>
+        <header className="site-header">
           <Link
-            href="/propiedades"
-            className={path[0] === "propiedades" ? "active" : ""}
+            href="/"
+            className="brand"
+            aria-label={`${settings.site_name}, inicio`}
           >
-            Buscar propiedades
+            {brand}
+            {(!design.logo_url || design.show_site_name) && (
+              <>
+                {settings.site_name}
+                <span className="brand-dot">.</span>
+              </>
+            )}
           </Link>
-          <Link href="/anunciantes">Anunciantes</Link>
-          <Link href="/informacion">Nosotros</Link>
-        </nav>
-        <div className="header-actions">
-          <Link
-            href="/favoritos"
-            aria-label="Mis favoritos"
-            className="icon-link"
+          <nav
+            className={menu ? "main-nav open" : "main-nav"}
+            aria-label="Navegación principal"
           >
-            <Heart size={20} />
-          </Link>
-          <Link
-            className="account-link"
-            href={
-              user
-                ? user.role === "admin"
-                  ? "/panel"
-                  : "/dashboard"
-                : "/login"
-            }
-          >
-            {user ? "Mi panel" : "Ingresar"}
-          </Link>
-          <Link
-            className="button small publish-link"
-            href={user ? "/dashboard/perfil" : "/register"}
-          >
-            Publicar propiedad <ArrowUpRight size={16} />
-          </Link>
-          <button
-            className="mobile-toggle"
-            aria-label="Abrir navegación"
-            aria-expanded={menu}
-            onClick={() => setMenu(!menu)}
-          >
-            {menu ? <X /> : <Menu />}
-          </button>
-        </div>
-      </header>
-      {workspace ? (
-        <Workspace path={path} />
-      ) : auth ? (
-        <AuthView
-          register={path[0] === "register"}
-          panel={path[0] === "panel"}
-        />
-      ) : (
-        <PublicView path={path} initialProperty={initialProperty} />
-      )}
-      {!workspace && (
-        <footer className="site-footer">
-          <div>
-            <Link href="/" className="brand">
-              <House size={22} />
-              {settings.site_name}
-              <span className="brand-dot">.</span>
+            <Link
+              href="/propiedades"
+              className={path[0] === "propiedades" ? "active" : ""}
+            >
+              Buscar propiedades
             </Link>
-            <p>
-              Un lugar para comenzar algo nuevo.
-              <br />
-              Propiedades y personas, más cerca.
-            </p>
+            <Link href="/anunciantes">Anunciantes</Link>
+            <Link href="/informacion">Nosotros</Link>
+          </nav>
+          <div className="header-actions">
+            <Link
+              href="/favoritos"
+              aria-label="Mis favoritos"
+              className="icon-link"
+            >
+              <Heart size={20} />
+            </Link>
+            <Link
+              className="account-link"
+              href={
+                user
+                  ? user.role === "admin"
+                    ? "/panel"
+                    : "/dashboard"
+                  : "/login"
+              }
+            >
+              {user ? "Mi panel" : "Ingresar"}
+            </Link>
+            <Link
+              className="button small publish-link"
+              href={user ? "/dashboard/perfil" : "/register"}
+            >
+              Publicar propiedad <ArrowUpRight size={16} />
+            </Link>
+            <button
+              className="mobile-toggle"
+              aria-label="Abrir navegación"
+              aria-expanded={menu}
+              onClick={() => setMenu(!menu)}
+            >
+              {menu ? <X /> : <Menu />}
+            </button>
           </div>
-          <div>
-            <span className="eyebrow">EXPLORA</span>
-            <Link href="/propiedades">Propiedades en venta</Link>
-            <Link href="/anunciantes">Nuestros anunciantes</Link>
-            <Link href="/favoritos">Tus favoritos</Link>
-          </div>
-          <div>
-            <span className="eyebrow">PUBLICA</span>
-            <Link href="/dashboard/perfil">Propietarios y corredores</Link>
-            <Link href="/informacion">Acerca del marketplace</Link>
-            <Link href="/privacidad">Privacidad y contacto</Link>
-          </div>
-          <div className="footer-bottom">
-            <span>
-              © {new Date().getFullYear()} {settings.site_name}. Chile.
-            </span>
-            <span>
-              Las consultas y visitas se coordinan directamente con el
-              anunciante.
-            </span>
-          </div>
-        </footer>
-      )}
+        </header>
+        {workspace ? (
+          <Workspace path={path} />
+        ) : auth ? (
+          <AuthView
+            register={path[0] === "register"}
+            panel={path[0] === "panel"}
+          />
+        ) : (
+          <PublicView path={path} initialProperty={initialProperty} />
+        )}
+        {!workspace && (
+          <footer className="site-footer">
+            <div>
+              <Link href="/" className="brand">
+                {brand}
+                {(!design.logo_url || design.show_site_name) && (
+                  <>
+                    {settings.site_name}
+                    <span className="brand-dot">.</span>
+                  </>
+                )}
+              </Link>
+              <p>
+                Un lugar para comenzar algo nuevo.
+                <br />
+                Propiedades y personas, más cerca.
+              </p>
+            </div>
+            <div>
+              <span className="eyebrow">EXPLORA</span>
+              <Link href="/propiedades">Propiedades en venta</Link>
+              <Link href="/anunciantes">Nuestros anunciantes</Link>
+              <Link href="/favoritos">Tus favoritos</Link>
+            </div>
+            <div>
+              <span className="eyebrow">PUBLICA</span>
+              <Link href="/dashboard/perfil">Propietarios y corredores</Link>
+              <Link href="/informacion">Acerca del marketplace</Link>
+              <Link href="/privacidad">Privacidad y contacto</Link>
+            </div>
+            <div className="footer-bottom">
+              <span>
+                © {new Date().getFullYear()} {settings.site_name}. Chile.
+              </span>
+              <span>
+                Las consultas y visitas se coordinan directamente con el
+                anunciante.
+              </span>
+            </div>
+          </footer>
+        )}
+      </div>
     </Context.Provider>
   );
 }
