@@ -1,5 +1,6 @@
 import type { MetadataRoute } from "next";
 import { getSiteUrl } from "@/lib/siteUrl";
+import { getServerApiUrl } from "@/lib/deployment";
 export const dynamic = "force-dynamic";
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const site = getSiteUrl(),
@@ -8,11 +9,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       { url: `${site}/propiedades` },
       { url: `${site}/anunciantes` },
     ];
-  const base = (
-    process.env.API_URL ||
-    process.env.NEXT_PUBLIC_API_URL ||
-    "http://localhost:3001/api"
-  ).replace(/\/$/, "");
+  const base = getServerApiUrl();
   try {
     for (let page = 1; page <= 1000; page++) {
       const r = await fetch(`${base}/properties?limit=48&page=${page}`, {

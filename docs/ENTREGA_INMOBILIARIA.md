@@ -69,6 +69,8 @@ Conservar los flags de integraciones apagados y las variables de aislamiento MyS
 
 Variables del frontend: API_URL=https://BACKEND_PROPIO/api; NEXT_PUBLIC_API_URL=https://BACKEND_PROPIO/api o /api; NEXT_PUBLIC_SITE_URL=https://propiedades-eta.vercel.app. Si se usa /api en el navegador, API_URL debe apuntar al backend para el rewrite. CORS_ORIGINS del backend debe incluir el dominio del frontend. Nunca configurar DB_PASSWORD o JWT_SECRET en variables NEXT_PUBLIC.
 
+El backend público confirmado es `https://clownfish-app-2-bgbzm.ondigitalocean.app`. En Vercel, cuando falta una URL absoluta de API en las variables, el proyecto utiliza ese backend y enruta `/api/*` antes de resolver las páginas dinámicas. Las consultas del servidor y el sitemap comparten el mismo destino. El dominio canónico predeterminado de producción es `https://propiedades-eta.vercel.app`; las variables explícitas siguen teniendo prioridad. Estos valores públicos se definen en `frontend/src/lib/deployment.ts` y no contienen credenciales.
+
 SITE_INDEX_ENABLED=false es el valor conservador durante revisión. Habilitarlo en Vercel únicamente cuando el contenido real esté listo; controla robots y las cabeceras noindex. El SMTP y los mapas de terceros no son requisitos de funcionamiento. El mapa solo ofrece un enlace externo cuando el anunciante publica coordenadas exactas. La API no hace geocodificación ni llamadas de terceros.
 
 ## Administrador y migración desde consola
