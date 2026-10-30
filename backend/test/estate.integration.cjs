@@ -256,7 +256,7 @@ async function main() {
         ],
         { type: 'image/png' },
       ),
-      'qa.png',
+      'qa-fotografía.png',
     );
     const media = await call(
       'POST',
@@ -265,6 +265,8 @@ async function main() {
       one.access_token,
       201,
     );
+    assert.equal(media.name, 'qa-fotografía.png');
+    assertions++;
     const c = catalog.communes[0];
     const payload = {
       title: 'Casa de prueba inmobiliaria',
@@ -620,7 +622,7 @@ async function main() {
       two.access_token,
     );
     assert.equal(ownB.advertiser.id, b.id);
-    assert.equal(ownB.design.primary_color, '#285d50');
+    assert.equal(ownB.design.primary_color, '#075ce5');
     assert.equal(ownB.design_revision, 0);
     assert.equal(ownB.design.hero_media_id, null);
     assertions += 4;
@@ -746,6 +748,170 @@ async function main() {
     assert.equal(listB.items.length, 1);
     assert.equal(listB.items[0].id, pB.id);
     assertions += 4;
+    const sliderA1 = await call(
+      'POST',
+      '/manage/media',
+      fd,
+      one.access_token,
+      201,
+    );
+    const sliderA2 = await call(
+      'POST',
+      '/manage/media',
+      fd,
+      one.access_token,
+      201,
+    );
+    await call('GET', '/media/' + sliderA1.id, null, null, 404);
+    const currentBroker = await call('GET', '/me/site', null, one.access_token);
+    const brokerSlider = {
+      ...currentBroker.design,
+      hero_mode: 'slider',
+      hero_slides: [
+        { media_id: sliderA1.id, alt_text: 'Primera portada' },
+        { media_id: sliderA2.id, alt_text: 'Segunda portada' },
+      ],
+      hero_interval: 4,
+      hero_autoplay: true,
+    };
+    await call(
+      'PATCH',
+      '/me/site',
+      {
+        revision: currentBroker.design_revision,
+        design: {
+          ...brokerSlider,
+          hero_slides: [
+            brokerSlider.hero_slides[0],
+            { media_id: brokerMediaB.id, alt_text: 'Ajena' },
+          ],
+        },
+      },
+      one.access_token,
+      403,
+    );
+    const savedSlider = await call(
+      'PATCH',
+      '/me/site',
+      { revision: currentBroker.design_revision, design: brokerSlider },
+      one.access_token,
+    );
+    assert.equal(savedSlider.design.hero_mode, 'slider');
+    assert.equal(savedSlider.design.hero_slides.length, 2);
+    assert.ok(savedSlider.design.hero_slides[0].url.includes('signature='));
+    assertions += 3;
+    const publicSlider = await call('GET', '/advertisers/' + a.slug);
+    assert.equal(publicSlider.site.hero_slides[1].media_id, sliderA2.id);
+    assert.ok(!publicSlider.site.hero_slides[0].url.includes('signature='));
+    assertions += 2;
+    await call('GET', '/media/' + sliderA2.id);
+    await call(
+      'DELETE',
+      '/manage/media/' + sliderA2.id,
+      null,
+      one.access_token,
+      409,
+    );
+    await call(
+      'PATCH',
+      '/admin/advertisers/' + a.id,
+      { status: 'suspended' },
+      admin,
+    );
+    await call('GET', '/media/' + sliderA2.id, null, null, 404);
+    await call(
+      'PATCH',
+      '/admin/advertisers/' + a.id,
+      { status: 'approved' },
+      admin,
+    );
+    const clearedSlider = await call(
+      'PATCH',
+      '/me/site',
+      {
+        revision: savedSlider.design_revision,
+        design: { ...brokerSlider, hero_mode: 'image', hero_slides: [] },
+      },
+      one.access_token,
+    );
+    await call('GET', '/media/' + sliderA2.id, null, null, 404);
+    await call(
+      'DELETE',
+      '/manage/media/' + sliderA2.id,
+      null,
+      one.access_token,
+    );
+    await call(
+      'DELETE',
+      '/manage/media/' + sliderA1.id,
+      null,
+      one.access_token,
+    );
+    const global1 = await call('POST', '/manage/media', fd, admin, 201);
+    const global2 = await call('POST', '/manage/media', fd, admin, 201);
+    const currentGlobal = await call('GET', '/settings');
+    const globalSlider = {
+      ...currentGlobal.design,
+      hero_mode: 'slider',
+      hero_slides: [
+        { media_id: global1.id, alt_text: 'Global uno' },
+        { media_id: global2.id, alt_text: 'Global dos' },
+      ],
+    };
+    await call(
+      'PATCH',
+      '/admin/design',
+      {
+        revision: currentGlobal.design_revision,
+        design: {
+          ...globalSlider,
+          hero_slides: [
+            globalSlider.hero_slides[0],
+            { media_id: brokerMediaB.id, alt_text: 'Ajena' },
+          ],
+        },
+      },
+      admin,
+      403,
+    );
+    const savedGlobal = await call(
+      'PATCH',
+      '/admin/design',
+      { revision: currentGlobal.design_revision, design: globalSlider },
+      admin,
+    );
+    await call('GET', '/media/' + global2.id);
+    await call('DELETE', '/manage/media/' + global2.id, null, admin, 409);
+    const reorderedGlobal = await call(
+      'PATCH',
+      '/admin/design',
+      {
+        revision: savedGlobal.design_revision,
+        design: {
+          ...globalSlider,
+          hero_slides: [...globalSlider.hero_slides].reverse(),
+        },
+      },
+      admin,
+    );
+    assert.equal(reorderedGlobal.design.hero_slides[0].media_id, global2.id);
+    assertions++;
+    await call(
+      'PATCH',
+      '/admin/design',
+      {
+        revision: reorderedGlobal.design_revision,
+        design: {
+          ...currentGlobal.design,
+          hero_mode: 'image',
+          hero_slides: [],
+        },
+      },
+      admin,
+    );
+    await call('GET', '/media/' + global2.id, null, null, 404);
+    await call('DELETE', '/manage/media/' + global1.id, null, admin);
+    await call('DELETE', '/manage/media/' + global2.id, null, admin);
     console.log(
       JSON.stringify({
         passed: true,

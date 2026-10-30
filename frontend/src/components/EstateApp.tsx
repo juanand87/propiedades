@@ -201,7 +201,10 @@ export default function EstateApp({
           propertyIdentifier={path[2] === "propiedades" ? path[3] : undefined}
         />
       ) : (
-        <div className="estate-site" style={designStyle(design)}>
+        <div
+          className={`estate-site${path.length === 0 ? " modern-home" : ""}${path.length === 0 && design.sections.find((s) => s.visible)?.id === "hero" ? " has-cover-hero" : ""}`}
+          style={designStyle(design)}
+        >
           <header className="site-header">
             <Link
               href="/"

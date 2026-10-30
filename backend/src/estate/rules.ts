@@ -10,6 +10,14 @@ export type Actor = {
 };
 export const text = (v: unknown, max = 255) =>
   typeof v === 'string' ? v.trim().slice(0, max) : '';
+export function uploadName(value: unknown) {
+  const raw = text(value, 400);
+  if ([...raw].every((c) => c.charCodeAt(0) <= 255)) {
+    const decoded = Buffer.from(raw, 'latin1').toString('utf8');
+    if (!decoded.includes('\uFFFD')) return text(decoded, 180) || 'Fotografía';
+  }
+  return text(raw, 180) || 'Fotografía';
+}
 export const isAdmin = (u: Actor) => u.role === 'admin';
 export function admin(u: Actor) {
   if (!isAdmin(u))

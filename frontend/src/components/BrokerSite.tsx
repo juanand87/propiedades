@@ -6,6 +6,7 @@ import { assetUrl, labels, request } from "@/lib/estate-api";
 import { defaultBrokerDesign, designStyle } from "@/lib/site-design";
 import { Notice, useEstate } from "./EstateApp";
 import { Detail, SearchView } from "./PublicView";
+import { HeroMedia } from "./HeroMedia";
 
 const anchors: Record<string, string> = {
   hero: "inicio",
@@ -89,7 +90,8 @@ export function BrokerSite({
   );
   const sections: Record<string, React.ReactNode> = {
     hero: (
-      <section className="hero broker-hero" id="inicio">
+      <section className="portal-hero broker-hero" id="inicio">
+        <HeroMedia design={d} />
         <div className="hero-copy">
           <span className="eyebrow">
             {labels[a.kind]} · {a.display_name}
@@ -105,12 +107,6 @@ export function BrokerSite({
               <ArrowUpRight size={18} />
             </Link>
           )}
-        </div>
-        <div className={`hero-art${d.hero_url ? " custom-hero" : ""}`}>
-          <img
-            src={d.hero_url ? assetUrl(d.hero_url) : "/architecture.svg"}
-            alt={d.hero_url ? d.hero_alt : "Arquitectura residencial"}
-          />
         </div>
       </section>
     ),
@@ -185,7 +181,10 @@ export function BrokerSite({
     ),
   };
   return (
-    <div className="estate-site broker-site" style={designStyle(d)}>
+    <div
+      className={`estate-site broker-site${!propertyIdentifier && visible[0]?.id === "hero" ? " has-cover-hero" : ""}`}
+      style={designStyle(d)}
+    >
       <header className="site-header broker-header">
         <Link
           className="brand"

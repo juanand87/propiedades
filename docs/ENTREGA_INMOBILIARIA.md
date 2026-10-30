@@ -2,6 +2,8 @@
 
 ## Alcance
 
+La actualización de temas, sliders y diseño moderno está documentada en [TEMAS_Y_SLIDER.md](TEMAS_Y_SLIDER.md). Usa los JSON existentes y no requiere SQL adicional.
+
 El editor visual posterior a esta entrega se documenta en [DISENO_DEL_SITIO.md](DISENO_DEL_SITIO.md). Para activarlo sobre una base ya instalada se ejecuta únicamente `database/004_diseno_sitio.sql`.
 
 Los sitios independientes de anunciantes se documentan en [SITIOS_DE_CORREDORES.md](SITIOS_DE_CORREDORES.md). Se activan con `database/005_sitios_corredores.sql` y se configuran en **Mi sitio web**, sin modificar el diseño general.

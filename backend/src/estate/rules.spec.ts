@@ -1,4 +1,11 @@
-import { decimal, integer, ownership, transition, email } from './rules';
+import {
+  decimal,
+  integer,
+  ownership,
+  transition,
+  email,
+  uploadName,
+} from './rules';
 const owner = {
   id: 'owner',
   email: 'owner@example.test',
@@ -7,6 +14,13 @@ const owner = {
   advertiser_id: 'a',
 };
 describe('reglas inmobiliarias', () => {
+  it('conserva nombres de archivos Unicode y corrige UTF-8 recibido como latin1', () => {
+    expect(uploadName('Terraza panorÃ¡mica.png')).toBe(
+      'Terraza panorámica.png',
+    );
+    expect(uploadName('Fachada áé.png')).toBe('Fachada áé.png');
+    expect(uploadName('家.png')).toBe('家.png');
+  });
   it('mantiene precisión decimal y rechaza importes negativos o desbordados', () => {
     expect(decimal('12345.1234', 'precio')).toBe('12345.1234');
     expect(decimal('', 'precio')).toBeNull();

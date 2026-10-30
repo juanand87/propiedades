@@ -14,7 +14,7 @@ export function AuthView({
 }) {
   const [error, setError] = useState(""),
     [busy, setBusy] = useState(false);
-  const { setUser } = useEstate(),
+  const { setUser, loading } = useEstate(),
     router = useRouter();
   return (
     <main className="auth-page">
@@ -52,8 +52,10 @@ export function AuthView({
         </p>
         <Notice error={error} />
         <form
+          method="post"
           onSubmit={async (e) => {
             e.preventDefault();
+            if (loading || busy) return;
             setBusy(true);
             setError("");
             const b = Object.fromEntries(new FormData(e.currentTarget));
@@ -125,8 +127,14 @@ export function AuthView({
               bcrypt.
             </small>
           )}
-          <button disabled={busy} className="button">
-            {busy ? "Procesando…" : register ? "Crear cuenta" : "Ingresar"}{" "}
+          <button disabled={busy || loading} className="button">
+            {loading
+              ? "Preparando acceso…"
+              : busy
+                ? "Procesando…"
+                : register
+                  ? "Crear cuenta"
+                  : "Ingresar"}{" "}
             <ArrowUpRight size={18} />
           </button>
         </form>

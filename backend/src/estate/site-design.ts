@@ -3,13 +3,17 @@ import { uuid } from './rules';
 
 export const HOME_SECTIONS = ['hero', 'search', 'types', 'listings', 'publish'];
 export const defaultDesign = (sections = HOME_SECTIONS) => ({
-  primary_color: '#285d50',
-  accent_color: '#c9964e',
-  background_color: '#f8f8f3',
-  text_color: '#203e38',
+  primary_color: '#075ce5',
+  accent_color: '#d9a553',
+  background_color: '#f6f8fc',
+  text_color: '#102b50',
   logo_media_id: null as string | null,
   hero_media_id: null as string | null,
   hero_alt: 'Propiedad destacada en la portada',
+  hero_mode: 'image' as 'image' | 'slider',
+  hero_slides: [] as { media_id: string; alt_text: string }[],
+  hero_autoplay: true,
+  hero_interval: 6,
   show_site_name: true,
   sections: sections.map((id) => ({ id, visible: true })),
 });
@@ -58,6 +62,51 @@ export function validateDesign(b: any, sections = HOME_SECTIONS) {
       'La descripción de portada debe tener hasta 200 caracteres.',
     );
   d.hero_alt = b.hero_alt.trim() || defaultDesign().hero_alt;
+  if (b.hero_mode !== undefined && !['image', 'slider'].includes(b.hero_mode))
+    throw new BadRequestException(
+      'Selecciona imagen o slider para la portada.',
+    );
+  d.hero_mode = b.hero_mode || 'image';
+  if (b.hero_slides !== undefined) {
+    if (!Array.isArray(b.hero_slides) || b.hero_slides.length > 8)
+      throw new BadRequestException('El slider admite hasta 8 imágenes.');
+    d.hero_slides = b.hero_slides.map((s) => {
+      if (
+        !s ||
+        typeof s.alt_text !== 'string' ||
+        s.alt_text.trim().length > 200
+      )
+        throw new BadRequestException(
+          'Revisa los textos alternativos del slider.',
+        );
+      return {
+        media_id: uuid(s.media_id),
+        alt_text: s.alt_text.trim() || d.hero_alt,
+      };
+    });
+    if (
+      new Set(d.hero_slides.map((s) => s.media_id)).size !==
+      d.hero_slides.length
+    )
+      throw new BadRequestException('No repitas imágenes en el slider.');
+  }
+  if (d.hero_mode === 'slider' && d.hero_slides.length < 2)
+    throw new BadRequestException('Agrega al menos dos imágenes al slider.');
+  if (b.hero_autoplay !== undefined && typeof b.hero_autoplay !== 'boolean')
+    throw new BadRequestException(
+      'La reproducción automática debe ser sí o no.',
+    );
+  d.hero_autoplay = b.hero_autoplay ?? true;
+  if (
+    b.hero_interval !== undefined &&
+    (!Number.isInteger(b.hero_interval) ||
+      b.hero_interval < 4 ||
+      b.hero_interval > 12)
+  )
+    throw new BadRequestException(
+      'El intervalo debe estar entre 4 y 12 segundos.',
+    );
+  d.hero_interval = b.hero_interval ?? 6;
   if (typeof b.show_site_name !== 'boolean')
     throw new BadRequestException('Indica si se muestra el nombre de marca.');
   d.show_site_name = b.show_site_name;
@@ -75,6 +124,17 @@ export function validateDesign(b: any, sections = HOME_SECTIONS) {
     );
   d.sections = b.sections.map((s) => ({ id: s.id, visible: s.visible }));
   return d;
+}
+export function designMediaIds(d: ReturnType<typeof defaultDesign>) {
+  return [
+    ...new Set(
+      [
+        d.logo_media_id,
+        d.hero_media_id,
+        ...d.hero_slides.map((s) => s.media_id),
+      ].filter(Boolean),
+    ),
+  ] as string[];
 }
 export function readDesign(value: unknown) {
   try {

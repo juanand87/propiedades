@@ -1,7 +1,8 @@
 "use client";
 import Link from "next/link";
-import { Fragment, useEffect, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { siteDesign } from "@/lib/site-design";
+import { HeroMedia } from "./HeroMedia";
 import {
   ArrowUpRight,
   MapPin,
@@ -93,10 +94,37 @@ export function PropertyCard({
 function SearchBar() {
   const { catalog } = useEstate();
   const [region, setRegion] = useState("");
+  const [unit, setUnit] = useState("");
+  const [minimum, setMinimum] = useState(""),
+    [maximum, setMaximum] = useState(""),
+    [budgetOpen, setBudgetOpen] = useState(false);
+  const budgetRef = useRef<HTMLDivElement>(null),
+    budgetButton = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (!budgetOpen) return;
+    const outside = (e: PointerEvent) => {
+      if (!budgetRef.current?.contains(e.target as Node)) setBudgetOpen(false);
+    };
+    const escape = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setBudgetOpen(false);
+        budgetButton.current?.focus();
+      }
+    };
+    document.addEventListener("pointerdown", outside);
+    document.addEventListener("keydown", escape);
+    return () => {
+      document.removeEventListener("pointerdown", outside);
+      document.removeEventListener("keydown", escape);
+    };
+  }, [budgetOpen]);
   return (
     <form className="hero-search" action="/propiedades">
+      <input type="hidden" name="price_unit" value={unit} />
+      <input type="hidden" name="min_price" value={minimum} disabled={!unit} />
+      <input type="hidden" name="max_price" value={maximum} disabled={!unit} />
       <label>
-        <span>¿DÓNDE BUSCAS?</span>
+        <span>Ubicación</span>
         <select
           name="region_id"
           value={region}
@@ -111,7 +139,7 @@ function SearchBar() {
         </select>
       </label>
       <label>
-        <span>TIPO DE PROPIEDAD</span>
+        <span>Tipo de propiedad</span>
         <select name="type_id">
           <option value="">Todas las propiedades</option>
           {catalog.types
@@ -123,21 +151,104 @@ function SearchBar() {
             ))}
         </select>
       </label>
+      <div className="hero-budget" ref={budgetRef}>
+        <button
+          type="button"
+          className="hero-budget-trigger"
+          ref={budgetButton}
+          aria-label="Configurar presupuesto"
+          aria-expanded={budgetOpen}
+          aria-controls="hero-budget-panel"
+          onClick={() => setBudgetOpen((open) => !open)}
+        >
+          <span>Precio</span>
+          <strong>
+            {unit ? `Presupuesto en ${unit}` : "CLP o UF"} <ChevronDownIcon />
+          </strong>
+        </button>
+        {budgetOpen && (
+          <div
+            id="hero-budget-panel"
+            className="hero-budget-popover"
+            role="group"
+            aria-label="Presupuesto de compra"
+          >
+            <label>
+              Unidad del presupuesto
+              <select
+                value={unit}
+                onChange={(e) => {
+                  setUnit(e.target.value);
+                  setMinimum("");
+                  setMaximum("");
+                }}
+              >
+                <option value="">Todas las unidades</option>
+                <option value="CLP">Pesos chilenos · CLP</option>
+                <option value="UF">Unidad de Fomento · UF</option>
+              </select>
+            </label>
+            <label>
+              Precio desde
+              <input
+                type="number"
+                value={minimum}
+                onChange={(e) => setMinimum(e.target.value)}
+                min={unit === "CLP" ? "1" : "0.0001"}
+                step={unit === "CLP" ? "1" : "0.0001"}
+                disabled={!unit}
+                placeholder="Desde"
+              />
+            </label>
+            <label>
+              Precio hasta
+              <input
+                type="number"
+                value={maximum}
+                onChange={(e) => setMaximum(e.target.value)}
+                min={unit === "CLP" ? "1" : "0.0001"}
+                step={unit === "CLP" ? "1" : "0.0001"}
+                disabled={!unit}
+                placeholder="Hasta"
+              />
+            </label>
+            <small>Selecciona CLP o UF para comparar importes.</small>
+            <button
+              className="button small"
+              type="button"
+              onClick={() => {
+                setBudgetOpen(false);
+                budgetButton.current?.focus();
+              }}
+            >
+              Aplicar presupuesto
+            </button>
+          </div>
+        )}
+      </div>
       <label>
-        <span>ESTOY BUSCANDO</span>
-        <select name="operation_type">
-          <option value="sale">Comprar una propiedad</option>
+        <span>Dormitorios</span>
+        <select name="bedrooms">
+          <option value="">Todos</option>
+          {[1, 2, 3, 4, 5].map((n) => (
+            <option key={n} value={n}>
+              {n} o más
+            </option>
+          ))}
         </select>
       </label>
       <button className="button" type="submit">
         <Search size={18} />
-        Buscar
+        Buscar propiedades
       </button>
     </form>
   );
 }
+function ChevronDownIcon() {
+  return <span aria-hidden="true">⌄</span>;
+}
 function Home() {
-  const { settings } = useEstate();
+  const { settings, catalog } = useEstate();
   const design = siteDesign(settings);
   const visibleSections = design.sections.filter((s) => s.visible);
   const searchIndex = visibleSections.findIndex((s) => s.id === "search");
@@ -154,57 +265,22 @@ function Home() {
   }, []);
   const sections: Record<string, React.ReactNode> = {
     hero: (
-      <section className="hero">
+      <section className="portal-hero">
+        <HeroMedia design={design} />
         <div className="hero-copy">
-          <span className="eyebrow">
-            <span className="tiny-line" />
-            ENCUENTRA TU PRÓXIMO LUGAR
-          </span>
-          <h1>
-            {settings.homepage_title ===
-            "Un nuevo lugar para tu próxima historia." ? (
-              <>
-                Un nuevo lugar
-                <br />
-                para tu{" "}
-                <em>
-                  próxima
-                  <br className="desktop-break" /> historia.
-                </em>
-              </>
-            ) : (
-              settings.homepage_title
-            )}
-          </h1>
+          <span className="eyebrow">PROPIEDADES PARA TU PRÓXIMA HISTORIA</span>
+          <h1>{settings.homepage_title}</h1>
           <p>
-            Desde la primera búsqueda hasta encontrar las llaves.
+            Encuentra casas, departamentos y terrenos en Chile.
             <br />
-            Descubre propiedades y conecta con su anunciante.
+            Conecta con las personas que tienen las llaves.
           </p>
           <div className="hero-proof">
             <span className="round-icon">
               <ShieldCheck size={19} />
             </span>
-            <span>Propiedades reales. Nuevos comienzos.</span>
+            <span>Tu próximo lugar, a tu manera.</span>
           </div>
-        </div>
-        <div className={`hero-art${design.hero_url ? " custom-hero" : ""}`}>
-          <img
-            src={
-              design.hero_url ? assetUrl(design.hero_url) : "/architecture.svg"
-            }
-            alt={
-              design.hero_url
-                ? design.hero_alt
-                : "Ilustración de una casa contemporánea entre árboles"
-            }
-          />
-          {!design.hero_url && (
-            <div className="hero-art-caption">
-              <span className="caption-dot" />
-              ESPACIOS PARA VIVIR MEJOR<span>01 / CHILE</span>
-            </div>
-          )}
         </div>
       </section>
     ),
@@ -217,6 +293,36 @@ function Home() {
     ),
     types: (
       <section className="section">
+        <div className="benefit-strip">
+          <div>
+            <MapPin />
+            <span>
+              <strong>Encuentra tu zona</strong>
+              <small>Regiones y comunas de Chile</small>
+            </span>
+          </div>
+          <div>
+            <ShieldCheck />
+            <span>
+              <strong>Precios claros</strong>
+              <small>Filtra en CLP o UF</small>
+            </span>
+          </div>
+          <div>
+            <Building2 />
+            <span>
+              <strong>Personas detrás de cada lugar</strong>
+              <small>Propietarios, corredores e inmobiliarias</small>
+            </span>
+          </div>
+          <div>
+            <MessageSquare />
+            <span>
+              <strong>Contacto directo</strong>
+              <small>Consulta y coordina tu visita</small>
+            </span>
+          </div>
+        </div>
         <div className="section-heading">
           <div>
             <span className="eyebrow">EXPLORA A TU MANERA</span>
@@ -262,6 +368,33 @@ function Home() {
               <ArrowUpRight size={22} />
             </Link>
           ))}
+        </div>
+        <div className="explore-regions">
+          <div>
+            <span className="eyebrow">EXPLORA POR ZONA</span>
+            <h2>
+              El lugar que buscas
+              <br />
+              puede estar más cerca.
+            </h2>
+            <p>Descubre propiedades en las regiones que te interesan.</p>
+            <Link className="text-link" href="/propiedades">
+              Explorar todas las zonas <ArrowUpRight size={17} />
+            </Link>
+          </div>
+          <div className="region-chips">
+            {catalog.regions
+              .filter((r: any) => [4, 5, 6, 10, 11, 13].includes(r.id))
+              .map((r: any) => (
+                <Link key={r.id} href={`/propiedades?region_id=${r.id}`}>
+                  <span className="region-chip-icon">
+                    <MapPin size={20} />
+                  </span>
+                  {r.name.replace(/^Región (de |del |Metropolitana de )?/, "")}
+                  <ArrowUpRight size={16} />
+                </Link>
+              ))}
+          </div>
         </div>
       </section>
     ),

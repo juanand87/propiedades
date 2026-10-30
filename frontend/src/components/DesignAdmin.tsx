@@ -16,8 +16,12 @@ import {
   brokerSectionNames,
   defaultBrokerDesign,
   SiteDesign,
+  colorThemes,
 } from "@/lib/site-design";
 import { Notice, useEstate } from "./EstateApp";
+import { HeroMedia } from "./HeroMedia";
+
+type ImageSlot = "logo_media_id" | "hero_media_id" | "hero_slides";
 
 const colors = [
   ["primary_color", "Color principal", "Botones, enlaces y bloques destacados"],
@@ -44,9 +48,7 @@ export function DesignAdmin({ broker = false }: { broker?: boolean }) {
   const [success, setSuccess] = useState("");
   const [busy, setBusy] = useState(false);
   const [previews, setPreviews] = useState<Record<string, string>>({});
-  const [picker, setPicker] = useState<
-    "logo_media_id" | "hero_media_id" | null
-  >(null);
+  const [picker, setPicker] = useState<ImageSlot | null>(null);
   const [library, setLibrary] = useState<any[]>([]);
   const pickerPanel = useRef<HTMLElement>(null);
   const pickerButton = useRef<HTMLButtonElement | null>(null);
@@ -71,7 +73,7 @@ export function DesignAdmin({ broker = false }: { broker?: boolean }) {
       setSiteInfo(data);
       setDraft(design);
       setBaseline(JSON.stringify(design));
-      setRevision(data.design_revision || 1);
+      setRevision(data.design_revision ?? 1);
       setReady(data.design_ready === true);
       setPreviews({});
       setPicker(null);
@@ -125,31 +127,63 @@ export function DesignAdmin({ broker = false }: { broker?: boolean }) {
         )
       : "";
   }
-  async function upload(key: "logo_media_id" | "hero_media_id", file: File) {
+  function selectMedia(key: ImageSlot, media: any) {
+    setPreviews((p) => ({ ...p, [media.id]: media.url }));
+    if (key === "hero_slides") {
+      setDraft((p) =>
+        p
+          ? {
+              ...p,
+              hero_slides: [
+                ...(p.hero_slides || []),
+                {
+                  media_id: media.id,
+                  alt_text: media.name.slice(0, 200),
+                  url: media.url,
+                },
+              ],
+            }
+          : p,
+      );
+      setSuccess("");
+    } else update(key, media.id);
+  }
+  function moveSlide(index: number, offset: number) {
+    const slides = [...(draft?.hero_slides || [])];
+    [slides[index], slides[index + offset]] = [
+      slides[index + offset],
+      slides[index],
+    ];
+    update("hero_slides", slides);
+  }
+  async function upload(key: ImageSlot, files: File[]) {
     setBusy(true);
     setError("");
     setSuccess("");
     try {
-      if (file.size > 8 * 1024 * 1024)
-        throw new Error("La imagen no puede superar 8 MB.");
-      const data = new FormData();
-      data.set("file", file);
-      const media = await request("/manage/media", {
-        method: "POST",
-        body: data,
-      });
-      setPreviews((p) => ({ ...p, [media.id]: media.url }));
-      update(key, media.id);
+      if (
+        key === "hero_slides" &&
+        (draft?.hero_slides?.length || 0) + files.length > 8
+      )
+        throw new Error("El slider admite hasta 8 imágenes.");
+      for (const file of files) {
+        if (file.size > 8 * 1024 * 1024)
+          throw new Error("La imagen no puede superar 8 MB.");
+        const data = new FormData();
+        data.set("file", file);
+        const media = await request("/manage/media", {
+          method: "POST",
+          body: data,
+        });
+        selectMedia(key, media);
+      }
     } catch (e) {
       setError((e as Error).message);
     } finally {
       setBusy(false);
     }
   }
-  async function choose(
-    key: "logo_media_id" | "hero_media_id",
-    button: HTMLButtonElement,
-  ) {
+  async function choose(key: ImageSlot, button: HTMLButtonElement) {
     pickerButton.current = button;
     setBusy(true);
     setError("");
@@ -264,7 +298,16 @@ export function DesignAdmin({ broker = false }: { broker?: boolean }) {
               >
                 Descartar cambios
               </button>
-              <button className="button" disabled={busy || !ready || !dirty}>
+              <button
+                className="button"
+                disabled={
+                  busy ||
+                  !ready ||
+                  !dirty ||
+                  (draft.hero_mode === "slider" &&
+                    (draft.hero_slides?.length || 0) < 2)
+                }
+              >
                 <Save size={17} />{" "}
                 {broker ? "Guardar mi sitio" : "Guardar y publicar diseño"}
               </button>
@@ -317,35 +360,77 @@ export function DesignAdmin({ broker = false }: { broker?: boolean }) {
                   Usa un color principal oscuro y un texto legible sobre el
                   fondo.
                 </p>
-                <div className="design-color-grid">
-                  {colors.map(([key, label, help]) => (
-                    <label key={key}>
-                      {label}
-                      <div className="design-color-control">
-                        <input
-                          type="color"
-                          aria-label={`${label}: selector`}
-                          value={
-                            /^#[0-9a-f]{6}$/i.test(draft[key])
-                              ? draft[key]
-                              : "#000000"
-                          }
-                          onChange={(e) => update(key, e.target.value)}
-                        />
-                        <input
-                          aria-label={`${label}: hexadecimal`}
-                          type="text"
-                          maxLength={7}
-                          pattern="#[0-9a-fA-F]{6}"
-                          required
-                          value={draft[key]}
-                          onChange={(e) => update(key, e.target.value)}
-                        />
-                      </div>
-                      <small>{help}</small>
-                    </label>
-                  ))}
+                <div className="theme-grid" aria-label="Temas de colores">
+                  {colorThemes.map((theme) => {
+                    const active = colors.every(
+                      ([key]) => draft[key].toLowerCase() === theme[key],
+                    );
+                    return (
+                      <button
+                        key={theme.id}
+                        type="button"
+                        className={`theme-choice${active ? " selected" : ""}`}
+                        aria-label={`Tema ${theme.name}`}
+                        aria-pressed={active}
+                        onClick={() => {
+                          setDraft((p) =>
+                            p
+                              ? {
+                                  ...p,
+                                  primary_color: theme.primary_color,
+                                  accent_color: theme.accent_color,
+                                  background_color: theme.background_color,
+                                  text_color: theme.text_color,
+                                }
+                              : p,
+                          );
+                          setSuccess("");
+                          setError("");
+                        }}
+                      >
+                        <span className="theme-swatches" aria-hidden="true">
+                          <i style={{ background: theme.primary_color }} />
+                          <i style={{ background: theme.accent_color }} />
+                          <i style={{ background: theme.background_color }} />
+                        </span>
+                        <strong>{theme.name}</strong>
+                        <small>{theme.description}</small>
+                      </button>
+                    );
+                  })}
                 </div>
+                <details className="custom-colors">
+                  <summary>Ajustar colores individualmente</summary>
+                  <div className="design-color-grid">
+                    {colors.map(([key, label, help]) => (
+                      <label key={key}>
+                        {label}
+                        <div className="design-color-control">
+                          <input
+                            type="color"
+                            aria-label={`${label}: selector`}
+                            value={
+                              /^#[0-9a-f]{6}$/i.test(draft[key])
+                                ? draft[key]
+                                : "#000000"
+                            }
+                            onChange={(e) => update(key, e.target.value)}
+                          />
+                          <input
+                            aria-label={`${label}: hexadecimal`}
+                            type="text"
+                            maxLength={7}
+                            pattern="#[0-9a-fA-F]{6}"
+                            required
+                            value={draft[key]}
+                            onChange={(e) => update(key, e.target.value)}
+                          />
+                        </div>
+                        <small>{help}</small>
+                      </label>
+                    ))}
+                  </div>
+                </details>
               </section>
               <section className="panel-card">
                 <h2>Imágenes de marca</h2>
@@ -353,65 +438,214 @@ export function DesignAdmin({ broker = false }: { broker?: boolean }) {
                   JPG, PNG o WebP, hasta 8 MB. El logo puede tener fondo
                   transparente.
                 </p>
-                {(["logo_media_id", "hero_media_id"] as const).map((key) => (
-                  <div className="design-image-field" key={key}>
-                    <h3>
-                      {key === "logo_media_id"
-                        ? "Logo del sitio"
-                        : "Imagen de portada"}
-                    </h3>
-                    {imageUrl(key) && (
-                      <img
-                        className={
-                          key === "logo_media_id"
-                            ? "design-logo-image"
-                            : "design-cover-image"
-                        }
-                        src={imageUrl(key)}
-                        alt={
-                          key === "logo_media_id"
-                            ? "Logo seleccionado"
-                            : "Portada seleccionada"
-                        }
-                      />
-                    )}
+                <label>
+                  Tipo de portada
+                  <select
+                    value={draft.hero_mode || "image"}
+                    onChange={(e) => update("hero_mode", e.target.value)}
+                  >
+                    <option value="image">Una imagen</option>
+                    <option value="slider">Slider de imágenes</option>
+                  </select>
+                </label>
+                {(["logo_media_id", "hero_media_id"] as const)
+                  .filter(
+                    (key) =>
+                      key === "logo_media_id" || draft.hero_mode !== "slider",
+                  )
+                  .map((key) => (
+                    <div className="design-image-field" key={key}>
+                      <h3>
+                        {key === "logo_media_id"
+                          ? "Logo del sitio"
+                          : "Imagen de portada"}
+                      </h3>
+                      {imageUrl(key) && (
+                        <img
+                          className={
+                            key === "logo_media_id"
+                              ? "design-logo-image"
+                              : "design-cover-image"
+                          }
+                          src={imageUrl(key)}
+                          alt={
+                            key === "logo_media_id"
+                              ? "Logo seleccionado"
+                              : "Portada seleccionada"
+                          }
+                        />
+                      )}
+                      <label>
+                        Subir {key === "logo_media_id" ? "logo" : "portada"}
+                        <input
+                          type="file"
+                          accept="image/jpeg,image/png,image/webp"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            e.currentTarget.value = "";
+                            if (file) void upload(key, [file]);
+                          }}
+                        />
+                      </label>
+                      <div className="design-actions">
+                        <button
+                          type="button"
+                          className="button outline small"
+                          onClick={(e) => void choose(key, e.currentTarget)}
+                        >
+                          Elegir de mi biblioteca
+                        </button>
+                        {draft[key] && (
+                          <button
+                            type="button"
+                            className="text-button"
+                            onClick={() => update(key, null)}
+                          >
+                            Quitar imagen
+                          </button>
+                        )}
+                      </div>
+                      <small>
+                        {key === "logo_media_id"
+                          ? "Sin logo se muestra el icono de casa. Recomendado: horizontal, con margen y fondo transparente."
+                          : "Sin imagen se muestra la portada de ambientación. Recomendado: horizontal, de al menos 1600 px de ancho."}
+                      </small>
+                    </div>
+                  ))}
+                {draft.hero_mode === "slider" && (
+                  <div className="slider-editor">
+                    <h3>Imágenes del slider</h3>
+                    <p>
+                      De 2 a 8 imágenes. Ordénalas con las flechas. Al guardar
+                      serán públicas cuando tu sitio esté publicado.
+                    </p>
                     <label>
-                      Subir {key === "logo_media_id" ? "logo" : "portada"}
+                      Subir imágenes del slider
                       <input
                         type="file"
+                        multiple
                         accept="image/jpeg,image/png,image/webp"
                         onChange={(e) => {
-                          const file = e.target.files?.[0];
+                          const files = Array.from(e.target.files || []);
                           e.currentTarget.value = "";
-                          if (file) void upload(key, file);
+                          if (files.length) void upload("hero_slides", files);
                         }}
                       />
                     </label>
-                    <div className="design-actions">
-                      <button
-                        type="button"
-                        className="button outline small"
-                        onClick={(e) => void choose(key, e.currentTarget)}
+                    <button
+                      type="button"
+                      className="button outline small"
+                      disabled={(draft.hero_slides?.length || 0) >= 8}
+                      onClick={(e) =>
+                        void choose("hero_slides", e.currentTarget)
+                      }
+                    >
+                      Agregar desde mi biblioteca
+                    </button>
+                    {(draft.hero_slides || []).map((slide, index) => (
+                      <div className="slider-editor-row" key={slide.media_id}>
+                        <img
+                          src={assetUrl(
+                            previews[slide.media_id] ||
+                              slide.url ||
+                              `/api/media/${slide.media_id}`,
+                          )}
+                          alt={`Miniatura de imagen ${index + 1}`}
+                        />
+                        <div>
+                          <label>
+                            Descripción de imagen {index + 1}
+                            <input
+                              maxLength={200}
+                              value={slide.alt_text}
+                              onChange={(e) =>
+                                update(
+                                  "hero_slides",
+                                  (draft.hero_slides || []).map((s) =>
+                                    s.media_id === slide.media_id
+                                      ? { ...s, alt_text: e.target.value }
+                                      : s,
+                                  ),
+                                )
+                              }
+                            />
+                          </label>
+                          <div className="design-actions">
+                            <button
+                              type="button"
+                              aria-label={`Subir imagen ${index + 1}`}
+                              disabled={index === 0}
+                              onClick={() => moveSlide(index, -1)}
+                            >
+                              <ArrowUp size={16} />
+                            </button>
+                            <button
+                              type="button"
+                              aria-label={`Bajar imagen ${index + 1}`}
+                              disabled={
+                                index === (draft.hero_slides?.length || 0) - 1
+                              }
+                              onClick={() => moveSlide(index, 1)}
+                            >
+                              <ArrowDown size={16} />
+                            </button>
+                            <button
+                              type="button"
+                              className="text-button"
+                              aria-label={`Quitar imagen ${index + 1} del slider`}
+                              onClick={() =>
+                                update(
+                                  "hero_slides",
+                                  (draft.hero_slides || []).filter(
+                                    (s) => s.media_id !== slide.media_id,
+                                  ),
+                                )
+                              }
+                            >
+                              Quitar
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                    {(draft.hero_slides?.length || 0) < 2 && (
+                      <p className="notice">
+                        Agrega al menos dos imágenes para poder guardar el
+                        slider.
+                      </p>
+                    )}
+                    <label className="design-checkbox">
+                      <input
+                        type="checkbox"
+                        checked={draft.hero_autoplay ?? true}
+                        onChange={(e) =>
+                          update("hero_autoplay", e.target.checked)
+                        }
+                      />
+                      Reproducción automática
+                    </label>
+                    <label>
+                      Segundos entre imágenes
+                      <select
+                        value={draft.hero_interval || 6}
+                        onChange={(e) =>
+                          update("hero_interval", Number(e.target.value))
+                        }
                       >
-                        Elegir de mi biblioteca
-                      </button>
-                      {draft[key] && (
-                        <button
-                          type="button"
-                          className="text-button"
-                          onClick={() => update(key, null)}
-                        >
-                          Quitar imagen
-                        </button>
-                      )}
-                    </div>
+                        {[4, 5, 6, 8, 10, 12].map((n) => (
+                          <option key={n} value={n}>
+                            {n} segundos
+                          </option>
+                        ))}
+                      </select>
+                    </label>
                     <small>
-                      {key === "logo_media_id"
-                        ? "Sin logo se muestra el icono de casa. Recomendado: horizontal, con margen y fondo transparente."
-                        : "Sin imagen se muestra la ilustración original. Recomendado: horizontal, de al menos 1200 px de ancho."}
+                      El movimiento automático se pausa con el ratón, al usar el
+                      teclado y cuando el navegador solicita movimiento
+                      reducido.
                     </small>
                   </div>
-                ))}
+                )}
                 <label className="design-checkbox">
                   <input
                     type="checkbox"
@@ -532,11 +766,21 @@ export function DesignAdmin({ broker = false }: { broker?: boolean }) {
                             </h2>
                             {broker && <p>{draft.hero_subtitle}</p>}
                           </div>
-                          <img
-                            src={
-                              imageUrl("hero_media_id") || "/architecture.svg"
-                            }
-                            alt={draft.hero_alt}
+                          <HeroMedia
+                            preview
+                            design={{
+                              ...draft,
+                              hero_url: imageUrl("hero_media_id"),
+                              hero_slides: (draft.hero_slides || []).map(
+                                (s) => ({
+                                  ...s,
+                                  url:
+                                    previews[s.media_id] ||
+                                    s.url ||
+                                    `/api/media/${s.media_id}`,
+                                }),
+                              ),
+                            }}
                           />
                         </>
                       ) : s.id === "about" ? (
@@ -638,9 +882,13 @@ export function DesignAdmin({ broker = false }: { broker?: boolean }) {
               <button
                 key={media.id}
                 type="button"
+                disabled={
+                  picker === "hero_slides" &&
+                  ((draft?.hero_slides?.length || 0) >= 8 ||
+                    !!draft?.hero_slides?.some((s) => s.media_id === media.id))
+                }
                 onClick={() => {
-                  setPreviews((p) => ({ ...p, [media.id]: media.url }));
-                  update(picker, media.id);
+                  selectMedia(picker, media);
                   closePicker();
                 }}
               >

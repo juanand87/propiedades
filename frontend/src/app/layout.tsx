@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { getSiteUrl } from "@/lib/siteUrl";
 import "./globals.css";
+import "./modern.css";
 export const metadata: Metadata = {
   metadataBase: new URL(getSiteUrl()),
   title: {

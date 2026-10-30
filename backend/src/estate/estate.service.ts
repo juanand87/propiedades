@@ -12,7 +12,7 @@ import { JwtService } from '@nestjs/jwt';
 import { randomUUID } from 'node:crypto';
 import * as bcrypt from 'bcrypt';
 import sharp from 'sharp';
-import { readDesign, validateDesign } from './site-design';
+import { designMediaIds, readDesign, validateDesign } from './site-design';
 import { readBrokerDesign, validateBrokerDesign } from './broker-site';
 import {
   Actor,
@@ -27,6 +27,7 @@ import {
   text,
   transition,
   uuid,
+  uploadName,
 } from './rules';
 
 const selection = `SELECT p.*,a.display_name,a.slug advertiser_slug,a.phone,a.whatsapp,a.public_email,r.name region_name,c.name commune_name FROM properties p JOIN advertisers a ON a.id=p.advertiser_id JOIN users owner ON CONVERT(owner.id USING utf8mb4) COLLATE utf8mb4_unicode_ci=a.user_id AND owner.isActive=1 LEFT JOIN estate_regions r ON r.id=p.region_id LEFT JOIN estate_communes c ON c.id=p.commune_id`;
@@ -228,6 +229,7 @@ export class EstateService {
     const { design_json, ...publicSettings } = row || {};
     return {
       ...publicSettings,
+      design_version: 2,
       design_ready:
         !!row &&
         Object.hasOwn(row, 'design_json') &&
@@ -241,6 +243,10 @@ export class EstateService {
         hero_url: design.hero_media_id
           ? this.mediaUrl(design.hero_media_id)
           : null,
+        hero_slides: design.hero_slides.map((s) => ({
+          ...s,
+          url: this.mediaUrl(s.media_id),
+        })),
       },
     };
   }
@@ -264,9 +270,7 @@ export class EstateService {
           'Otra sesión modificó el diseño. Recarga el diseño guardado antes de continuar.',
         );
       const previousDesign = readDesign(row.design_json);
-      for (const id of [design.logo_media_id, design.hero_media_id].filter(
-        Boolean,
-      )) {
+      for (const id of designMediaIds(design)) {
         const [media] = await tx.query(
           'SELECT owner_id FROM estate_media WHERE id=? FOR UPDATE',
           [id],
@@ -274,8 +278,7 @@ export class EstateService {
         if (
           !media ||
           (media.owner_id !== u.id &&
-            previousDesign.logo_media_id !== id &&
-            previousDesign.hero_media_id !== id)
+            !designMediaIds(previousDesign).includes(id))
         )
           throw new ForbiddenException(
             'Selecciona imágenes de tu biblioteca de administrador.',
@@ -452,6 +455,10 @@ export class EstateService {
       hero_url: design.hero_media_id
         ? this.mediaUrl(design.hero_media_id, actor)
         : null,
+      hero_slides: design.hero_slides.map((s) => ({
+        ...s,
+        url: this.mediaUrl(s.media_id, actor),
+      })),
     };
   }
   async myBrokerSite(u: Actor) {
@@ -464,6 +471,7 @@ export class EstateService {
     const design = this.brokerSiteDesign(a, row, u);
     return {
       site_name: a.display_name,
+      design_version: 2,
       homepage_title: design.hero_title,
       advertiser: { id: a.id, slug: a.slug, status: a.status },
       design_ready: ready,
@@ -491,9 +499,7 @@ export class EstateService {
         throw new ConflictException(
           'Otra sesión modificó tu sitio. Descarta los cambios para cargar la última versión.',
         );
-      for (const id of [design.logo_media_id, design.hero_media_id].filter(
-        Boolean,
-      )) {
+      for (const id of designMediaIds(design)) {
         const [m] = await tx.query(
           'SELECT owner_id FROM estate_media WHERE id=? FOR UPDATE',
           [id],
@@ -530,9 +536,9 @@ export class EstateService {
     try {
       const [result] = await manager.query(
         onlyPublic
-          ? "SELECT COUNT(*) n FROM advertiser_sites s JOIN advertisers a ON a.id=s.advertiser_id JOIN users u ON CONVERT(u.id USING utf8mb4) COLLATE utf8mb4_unicode_ci=a.user_id WHERE (s.logo_media_id=? OR s.hero_media_id=?) AND a.status='approved' AND u.isActive=1"
-          : 'SELECT COUNT(*) n FROM advertiser_sites WHERE logo_media_id=? OR hero_media_id=?',
-        [id, id],
+          ? "SELECT COUNT(*) n FROM advertiser_sites s JOIN advertisers a ON a.id=s.advertiser_id JOIN users u ON CONVERT(u.id USING utf8mb4) COLLATE utf8mb4_unicode_ci=a.user_id WHERE (s.logo_media_id=? OR s.hero_media_id=? OR JSON_CONTAINS(CASE WHEN JSON_VALID(s.design_json) THEN JSON_EXTRACT(s.design_json,'$.hero_slides[*].media_id') ELSE JSON_ARRAY() END,JSON_QUOTE(?))) AND a.status='approved' AND u.isActive=1"
+          : "SELECT COUNT(*) n FROM advertiser_sites WHERE logo_media_id=? OR hero_media_id=? OR JSON_CONTAINS(CASE WHEN JSON_VALID(design_json) THEN JSON_EXTRACT(design_json,'$.hero_slides[*].media_id') ELSE JSON_ARRAY() END,JSON_QUOTE(?))",
+        [id, id, id],
       );
       return Number(result.n) > 0;
     } catch (e) {
@@ -1121,7 +1127,7 @@ export class EstateService {
     if (buffer.length > 2 * 1024 * 1024)
       throw new BadRequestException('La imagen procesada supera 2 MB.');
     const id = randomUUID(),
-      name = text(file.originalname, 180) || 'Fotografía';
+      name = uploadName(file.originalname);
     await this.db.query(
       'INSERT INTO estate_media(id,owner_id,name,content,size_bytes) VALUES (?,?,?,?,?)',
       [id, u.id, name, buffer, buffer.length],
@@ -1149,8 +1155,7 @@ export class EstateService {
       [id],
     );
     const site = await this.settings();
-    const siteImage =
-      site.design.logo_media_id === id || site.design.hero_media_id === id;
+    const siteImage = designMediaIds(site.design).includes(id);
     const brokerImage = await this.brokerMediaUsage(id, true);
     if (!pub && !logo && !siteImage && !brokerImage) {
       let payload: any;
@@ -1187,8 +1192,7 @@ export class EstateService {
       const design = readDesign(settings?.design_json);
       if (
         Number(used.n) ||
-        design.logo_media_id === id ||
-        design.hero_media_id === id ||
+        designMediaIds(design).includes(id) ||
         (await this.brokerMediaUsage(id, false, tx))
       )
         throw new ConflictException('La imagen está en uso.');
