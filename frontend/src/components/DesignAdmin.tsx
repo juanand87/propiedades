@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import {
   ArrowDown,
   ArrowUp,
@@ -7,6 +8,16 @@ import {
   Palette,
   RotateCcw,
   Save,
+  Monitor,
+  Smartphone,
+  Image as ImageIcon,
+  LayoutTemplate,
+  Menu,
+  Search,
+  FileText,
+  Building2,
+  PanelBottom,
+  Eye,
 } from "lucide-react";
 import { assetUrl, request, send } from "@/lib/estate-api";
 import {
@@ -20,6 +31,7 @@ import {
 } from "@/lib/site-design";
 import { Notice, useEstate } from "./EstateApp";
 import { HeroMedia } from "./HeroMedia";
+import { DesignPreview } from "./DesignPreview";
 
 type ImageSlot = "logo_media_id" | "hero_media_id" | "hero_slides";
 
@@ -50,6 +62,23 @@ export function DesignAdmin({ broker = false }: { broker?: boolean }) {
   const [previews, setPreviews] = useState<Record<string, string>>({});
   const [picker, setPicker] = useState<ImageSlot | null>(null);
   const [library, setLibrary] = useState<any[]>([]);
+  const [activeSection, setActiveSection] = useState("identity");
+  const [previewMode, setPreviewMode] = useState<"desktop" | "mobile">(
+    "desktop",
+  );
+  const editorSections = [
+    { id: "identity", label: "Identidad", Icon: House },
+    { id: "colors", label: "Colores y estilo", Icon: Palette },
+    { id: "header", label: "Cabecera", Icon: Menu },
+    { id: "hero", label: "Portada y slider", Icon: ImageIcon },
+    broker
+      ? { id: "about", label: "Presentación", Icon: FileText }
+      : { id: "search", label: "Buscador", Icon: Search },
+    { id: "sections", label: "Secciones de inicio", Icon: LayoutTemplate },
+    { id: "properties", label: "Propiedades", Icon: Building2 },
+    { id: "footer", label: "Contacto y pie", Icon: PanelBottom },
+    { id: "publish", label: "Revisar y publicar", Icon: Eye },
+  ];
   const pickerPanel = useRef<HTMLElement>(null);
   const pickerButton = useRef<HTMLButtonElement | null>(null);
   const dirty = !!draft && JSON.stringify(draft) !== baseline;
@@ -243,6 +272,18 @@ export function DesignAdmin({ broker = false }: { broker?: boolean }) {
         <p>Cargando el diseño guardado…</p>
       ) : (
         <form
+          className="sectioned-design-form"
+          onInvalidCapture={(e) => {
+            e.preventDefault();
+            const input = e.target as HTMLInputElement;
+            const panel = input.closest<HTMLElement>("[data-design-panel]");
+            if (panel?.dataset.designPanel)
+              setActiveSection(panel.dataset.designPanel);
+            setError(
+              input.validationMessage || "Revisa los campos del diseño.",
+            );
+            requestAnimationFrame(() => input.focus());
+          }}
           onSubmit={async (e) => {
             e.preventDefault();
             setBusy(true);
@@ -314,10 +355,153 @@ export function DesignAdmin({ broker = false }: { broker?: boolean }) {
             </div>
           </div>
           <div className="design-editor-grid">
-            <fieldset className="design-controls" disabled={busy}>
-              {broker && (
+            <nav
+              className="design-section-nav"
+              aria-label="Secciones del editor de diseño"
+            >
+              <span className="eyebrow">EDITAR SITIO</span>
+              {editorSections.map(({ id, label, Icon }) => (
+                <button
+                  key={id}
+                  type="button"
+                  aria-current={activeSection === id ? "true" : undefined}
+                  aria-controls="design-active-controls"
+                  disabled={busy}
+                  onClick={() => {
+                    setActiveSection(id);
+                    setPicker(null);
+                  }}
+                >
+                  <Icon size={17} aria-hidden="true" /> {label}
+                </button>
+              ))}
+            </nav>
+            <fieldset
+              className="design-controls"
+              id="design-active-controls"
+              disabled={busy}
+            >
+              <legend className="sr-only">
+                {editorSections.find((s) => s.id === activeSection)?.label}
+              </legend>
+              {activeSection === "identity" && (
+                <p className="design-section-help">
+                  {displaySettings.site_name} · El nombre y los datos de
+                  contacto se editan en{" "}
+                  {broker ? (
+                    <Link
+                      href="/dashboard/perfil"
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      tu perfil de anunciante ↗
+                    </Link>
+                  ) : (
+                    <Link
+                      href="/panel/configuracion"
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      Configuración del sitio ↗
+                    </Link>
+                  )}
+                  . Aquí puedes cambiar el logo.
+                </p>
+              )}
+              {activeSection === "header" && (
+                <p className="design-section-help">
+                  La cabecera utiliza tu logo y los enlaces del sitio. Se
+                  muestra flotante cuando la portada es la primera sección
+                  visible. Puedes elegir si acompañar el logo con el nombre.
+                </p>
+              )}
+              {(activeSection === "search" ||
+                activeSection === "properties" ||
+                activeSection === "footer" ||
+                activeSection === "about") && (
                 <section className="panel-card">
-                  <h2>Textos de tu sitio</h2>
+                  <h2>
+                    {editorSections.find((s) => s.id === activeSection)?.label}
+                  </h2>
+                  <p>
+                    {activeSection === "search"
+                      ? "El buscador ofrece ubicación, tipo, presupuesto en CLP o UF y dormitorios. Puedes mostrarlo u ocultarlo y cambiar su posición desde Secciones de inicio."
+                      : activeSection === "properties"
+                        ? broker
+                          ? "Se muestran exclusivamente tus propiedades publicadas. Los anuncios y sus fotografías se administran en Propiedades."
+                          : "Se muestran las últimas propiedades publicadas del marketplace. Los anuncios se administran en Propiedades."
+                        : activeSection === "about"
+                          ? "Presenta tus servicios y tu experiencia. Esta sección es exclusiva de tu sitio."
+                          : broker
+                            ? "Los datos de contacto provienen de tu perfil de anunciante. Puedes mostrar u ocultar el bloque de contacto."
+                            : "El pie utiliza el nombre del sitio y los enlaces de información, privacidad y contacto. El nombre y los textos generales se administran en Configuración del sitio."}
+                  </p>
+                  {draft.sections
+                    .filter(
+                      (s) =>
+                        s.id ===
+                        {
+                          search: "search",
+                          properties: "listings",
+                          footer: "contact",
+                          about: "about",
+                        }[activeSection],
+                    )
+                    .map((s) => (
+                      <label className="design-checkbox" key={s.id}>
+                        <input
+                          type="checkbox"
+                          checked={s.visible}
+                          onChange={(e) =>
+                            update(
+                              "sections",
+                              draft.sections.map((item) =>
+                                item.id === s.id
+                                  ? { ...item, visible: e.target.checked }
+                                  : item,
+                              ),
+                            )
+                          }
+                        />
+                        Mostrar {sectionNames[s.id]}
+                      </label>
+                    ))}
+                  {activeSection === "footer" && (
+                    <Link
+                      className="text-link"
+                      target="_blank"
+                      rel="noreferrer"
+                      href={
+                        broker ? "/dashboard/perfil" : "/panel/configuracion"
+                      }
+                    >
+                      {broker
+                        ? "Editar datos de contacto"
+                        : "Editar información del sitio"}{" "}
+                      ↗
+                    </Link>
+                  )}
+                </section>
+              )}
+              {broker && (
+                <section
+                  className="panel-card"
+                  hidden={
+                    !["hero", "about", "properties", "footer"].includes(
+                      activeSection,
+                    )
+                  }
+                >
+                  <h2>
+                    Textos de{" "}
+                    {activeSection === "hero"
+                      ? "portada"
+                      : activeSection === "about"
+                        ? "presentación"
+                        : activeSection === "properties"
+                          ? "propiedades"
+                          : "contacto"}
+                  </h2>
                   <p>
                     El nombre y los datos de contacto se administran en tu
                     perfil de anunciante.
@@ -331,7 +515,29 @@ export function DesignAdmin({ broker = false }: { broker?: boolean }) {
                       ["contact_title", "Título de contacto", 100],
                     ] as const
                   ).map(([key, label, max]) => (
-                    <label key={key}>
+                    <label
+                      key={key}
+                      hidden={
+                        !(
+                          {
+                            hero_title: "hero",
+                            hero_subtitle: "hero",
+                            about_title: "about",
+                            listings_title: "properties",
+                            contact_title: "footer",
+                          }[key] === activeSection
+                        )
+                      }
+                      data-design-panel={
+                        {
+                          hero_title: "hero",
+                          hero_subtitle: "hero",
+                          about_title: "about",
+                          listings_title: "properties",
+                          contact_title: "footer",
+                        }[key]
+                      }
+                    >
                       {label}
                       <input
                         required={key !== "hero_subtitle"}
@@ -341,7 +547,10 @@ export function DesignAdmin({ broker = false }: { broker?: boolean }) {
                       />
                     </label>
                   ))}
-                  <label>
+                  <label
+                    hidden={activeSection !== "about"}
+                    data-design-panel="about"
+                  >
                     Acerca de ti o de tu inmobiliaria
                     <textarea
                       maxLength={4000}
@@ -352,7 +561,11 @@ export function DesignAdmin({ broker = false }: { broker?: boolean }) {
                   </label>
                 </section>
               )}
-              <section className="panel-card">
+              <section
+                className="panel-card"
+                hidden={activeSection !== "colors"}
+                data-design-panel="colors"
+              >
                 <h2>
                   <Palette size={22} /> Colores
                 </h2>
@@ -432,13 +645,22 @@ export function DesignAdmin({ broker = false }: { broker?: boolean }) {
                   </div>
                 </details>
               </section>
-              <section className="panel-card">
-                <h2>Imágenes de marca</h2>
+              <section
+                className="panel-card"
+                hidden={!["identity", "hero", "header"].includes(activeSection)}
+              >
+                <h2>
+                  {activeSection === "identity"
+                    ? "Identidad del sitio"
+                    : activeSection === "header"
+                      ? "Cabecera del sitio"
+                      : "Portada y slider"}
+                </h2>
                 <p>
                   JPG, PNG o WebP, hasta 8 MB. El logo puede tener fondo
                   transparente.
                 </p>
-                <label>
+                <label hidden={activeSection !== "hero"}>
                   Tipo de portada
                   <select
                     value={draft.hero_mode || "image"}
@@ -454,7 +676,14 @@ export function DesignAdmin({ broker = false }: { broker?: boolean }) {
                       key === "logo_media_id" || draft.hero_mode !== "slider",
                   )
                   .map((key) => (
-                    <div className="design-image-field" key={key}>
+                    <div
+                      className="design-image-field"
+                      key={key}
+                      hidden={
+                        activeSection !==
+                        (key === "logo_media_id" ? "identity" : "hero")
+                      }
+                    >
                       <h3>
                         {key === "logo_media_id"
                           ? "Logo del sitio"
@@ -513,7 +742,10 @@ export function DesignAdmin({ broker = false }: { broker?: boolean }) {
                     </div>
                   ))}
                 {draft.hero_mode === "slider" && (
-                  <div className="slider-editor">
+                  <div
+                    className="slider-editor"
+                    hidden={activeSection !== "hero"}
+                  >
                     <h3>Imágenes del slider</h3>
                     <p>
                       De 2 a 8 imágenes. Ordénalas con las flechas. Al guardar
@@ -646,7 +878,10 @@ export function DesignAdmin({ broker = false }: { broker?: boolean }) {
                     </small>
                   </div>
                 )}
-                <label className="design-checkbox">
+                <label
+                  className="design-checkbox"
+                  hidden={activeSection !== "header"}
+                >
                   <input
                     type="checkbox"
                     checked={draft.show_site_name}
@@ -654,7 +889,10 @@ export function DesignAdmin({ broker = false }: { broker?: boolean }) {
                   />{" "}
                   Mostrar el nombre del sitio junto al logo
                 </label>
-                <label>
+                <label
+                  hidden={activeSection !== "hero"}
+                  data-design-panel="hero"
+                >
                   Descripción de la imagen de portada
                   <input
                     maxLength={200}
@@ -667,7 +905,10 @@ export function DesignAdmin({ broker = false }: { broker?: boolean }) {
                   </small>
                 </label>
               </section>
-              <section className="panel-card">
+              <section
+                className="panel-card"
+                hidden={activeSection !== "sections"}
+              >
                 <h2>Secciones de la página principal</h2>
                 <p>
                   Usa las flechas para ordenar y las casillas para mostrar u
@@ -715,136 +956,185 @@ export function DesignAdmin({ broker = false }: { broker?: boolean }) {
                   ))}
                 </ol>
               </section>
-              <button
-                className="button outline"
-                type="button"
-                onClick={() => {
-                  setDraft(makeDefault());
-                  setSuccess("");
-                }}
+              <section
+                className="panel-card"
+                hidden={activeSection !== "publish"}
               >
-                <RotateCcw size={17} /> Preparar diseño original
-              </button>
-              <p className="muted">
-                Restaurar el diseño original también requiere guardar. Las
-                fotografías permanecen en tu biblioteca.
-              </p>
+                <h2>Revisar y publicar</h2>
+                <p>
+                  Revisa el borrador en escritorio y móvil. Los cambios de todas
+                  las secciones se guardan juntos con el botón superior.
+                </p>
+                <p>
+                  <strong>
+                    {draft.sections.filter((s) => s.visible).length}
+                  </strong>{" "}
+                  secciones visibles ·{" "}
+                  {draft.hero_mode === "slider"
+                    ? `${draft.hero_slides?.length || 0} imágenes en el slider`
+                    : "Portada con una imagen"}
+                </p>
+                <button
+                  className="button outline"
+                  type="button"
+                  onClick={() => {
+                    setDraft(makeDefault());
+                    setSuccess("");
+                  }}
+                >
+                  <RotateCcw size={17} /> Preparar diseño original
+                </button>
+                <p className="muted">
+                  Restaurar el diseño original también requiere guardar. Las
+                  fotografías permanecen en tu biblioteca.
+                </p>
+              </section>
             </fieldset>
             <aside className="design-preview-column">
               <div className="design-preview-label">
                 <EyeLabel /> Vista previa · sin publicar
               </div>
               <div
-                className={`design-preview${draft.sections.find((s) => s.visible)?.id === "hero" ? " preview-cover-first" : ""}`}
-                style={designStyle(draft)}
+                className="design-device-switch"
+                role="group"
+                aria-label="Tamaño de la vista previa"
               >
-                <div className="design-preview-header">
-                  {imageUrl("logo_media_id") ? (
-                    <img
-                      src={imageUrl("logo_media_id")}
-                      alt="Vista previa del logo"
-                    />
-                  ) : (
-                    <House size={25} />
-                  )}
-                  {(!draft.logo_media_id || draft.show_site_name) && (
-                    <strong>{displaySettings.site_name}</strong>
-                  )}
-                </div>
-                {draft.sections
-                  .filter((s) => s.visible)
-                  .map((s) => (
-                    <div
-                      className={`design-preview-block preview-${s.id}`}
-                      key={s.id}
-                    >
-                      {s.id === "hero" ? (
-                        <>
-                          <div className="preview-hero-copy">
-                            <small>ENCUENTRA TU PRÓXIMO LUGAR</small>
-                            <h2>
-                              {broker
-                                ? draft.hero_title
-                                : settings.homepage_title}
-                            </h2>
-                            <p>
-                              {broker
-                                ? draft.hero_subtitle
-                                : "Descubre propiedades y conecta con su anunciante."}
-                            </p>
-                          </div>
-                          <HeroMedia
-                            preview
-                            design={{
-                              ...draft,
-                              hero_url: imageUrl("hero_media_id"),
-                              hero_slides: (draft.hero_slides || []).map(
-                                (s) => ({
-                                  ...s,
-                                  url:
-                                    previews[s.media_id] ||
-                                    s.url ||
-                                    `/api/media/${s.media_id}`,
-                                }),
-                              ),
-                            }}
-                          />
-                        </>
-                      ) : s.id === "about" ? (
-                        <>
-                          <h3>{draft.about_title}</h3>
-                          <p className="preserve-lines">
-                            {draft.about_text ||
-                              "Tu presentación aparecerá aquí."}
-                          </p>
-                        </>
-                      ) : s.id === "contact" ? (
-                        <>
-                          <h3>{draft.contact_title}</h3>
-                          <span className="design-preview-button">
-                            Contactar
-                          </span>
-                        </>
-                      ) : s.id === "search" ? (
-                        <>
-                          <span>¿Dónde buscas?</span>
-                          <span className="design-preview-button">Buscar</span>
-                        </>
-                      ) : s.id === "types" ? (
-                        <>
-                          <h3>Un espacio para cada proyecto.</h3>
-                          <div className="design-preview-cards">
-                            <span>Casas</span>
-                            <span>Departamentos</span>
-                            <span>Terrenos</span>
-                          </div>
-                        </>
-                      ) : s.id === "listings" ? (
-                        <>
-                          <h3>
-                            {broker
-                              ? draft.listings_title
-                              : "El próximo lugar podría estar aquí."}
-                          </h3>
-                          <div className="design-preview-cards">
-                            <span>Propiedad</span>
-                            <span>Propiedad</span>
-                          </div>
-                        </>
-                      ) : (
-                        <>
-                          <h2>Tu propiedad. Su próximo comienzo.</h2>
-                          <span className="design-preview-button">
-                            Comenzar a publicar
-                          </span>
-                        </>
-                      )}
-                    </div>
-                  ))}
-                <div className="design-preview-footer">
-                  {displaySettings.site_name} · Vista de ejemplo
-                </div>
+                <button
+                  type="button"
+                  aria-pressed={previewMode === "desktop"}
+                  onClick={() => setPreviewMode("desktop")}
+                >
+                  <Monitor size={17} /> Escritorio
+                </button>
+                <button
+                  type="button"
+                  aria-pressed={previewMode === "mobile"}
+                  onClick={() => setPreviewMode("mobile")}
+                >
+                  <Smartphone size={17} /> Móvil
+                </button>
+                <span>{previewMode === "desktop" ? "1120 px" : "390 px"}</span>
               </div>
+              <DesignPreview mode={previewMode}>
+                <div
+                  className={`design-preview${draft.sections.find((s) => s.visible)?.id === "hero" ? " preview-cover-first" : ""}`}
+                  style={designStyle(draft)}
+                >
+                  <div className="design-preview-header">
+                    {imageUrl("logo_media_id") ? (
+                      <img
+                        src={imageUrl("logo_media_id")}
+                        alt="Vista previa del logo"
+                      />
+                    ) : (
+                      <House size={25} />
+                    )}
+                    {(!draft.logo_media_id || draft.show_site_name) && (
+                      <strong>{displaySettings.site_name}</strong>
+                    )}
+                    <span className="preview-navigation" aria-hidden="true">
+                      {broker
+                        ? "Inicio · Propiedades · Contacto"
+                        : "Propiedades · Anunciantes · Publicar"}
+                    </span>
+                  </div>
+                  {draft.sections
+                    .filter((s) => s.visible)
+                    .map((s) => (
+                      <div
+                        className={`design-preview-block preview-${s.id}`}
+                        key={s.id}
+                      >
+                        {s.id === "hero" ? (
+                          <>
+                            <div className="preview-hero-copy">
+                              <small>ENCUENTRA TU PRÓXIMO LUGAR</small>
+                              <h2>
+                                {broker
+                                  ? draft.hero_title
+                                  : settings.homepage_title}
+                              </h2>
+                              <p>
+                                {broker
+                                  ? draft.hero_subtitle
+                                  : "Descubre propiedades y conecta con su anunciante."}
+                              </p>
+                            </div>
+                            <HeroMedia
+                              preview
+                              design={{
+                                ...draft,
+                                hero_url: imageUrl("hero_media_id"),
+                                hero_slides: (draft.hero_slides || []).map(
+                                  (s) => ({
+                                    ...s,
+                                    url:
+                                      previews[s.media_id] ||
+                                      s.url ||
+                                      `/api/media/${s.media_id}`,
+                                  }),
+                                ),
+                              }}
+                            />
+                          </>
+                        ) : s.id === "about" ? (
+                          <>
+                            <h3>{draft.about_title}</h3>
+                            <p className="preserve-lines">
+                              {draft.about_text ||
+                                "Tu presentación aparecerá aquí."}
+                            </p>
+                          </>
+                        ) : s.id === "contact" ? (
+                          <>
+                            <h3>{draft.contact_title}</h3>
+                            <span className="design-preview-button">
+                              Contactar
+                            </span>
+                          </>
+                        ) : s.id === "search" ? (
+                          <>
+                            <span>¿Dónde buscas?</span>
+                            <span className="design-preview-button">
+                              Buscar
+                            </span>
+                          </>
+                        ) : s.id === "types" ? (
+                          <>
+                            <h3>Un espacio para cada proyecto.</h3>
+                            <div className="design-preview-cards">
+                              <span>Casas</span>
+                              <span>Departamentos</span>
+                              <span>Terrenos</span>
+                            </div>
+                          </>
+                        ) : s.id === "listings" ? (
+                          <>
+                            <h3>
+                              {broker
+                                ? draft.listings_title
+                                : "El próximo lugar podría estar aquí."}
+                            </h3>
+                            <div className="design-preview-cards">
+                              <span>Propiedad</span>
+                              <span>Propiedad</span>
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <h2>Tu propiedad. Su próximo comienzo.</h2>
+                            <span className="design-preview-button">
+                              Comenzar a publicar
+                            </span>
+                          </>
+                        )}
+                      </div>
+                    ))}
+                  <div className="design-preview-footer">
+                    {displaySettings.site_name} · Vista de ejemplo
+                  </div>
+                </div>
+              </DesignPreview>
               <p>
                 La vista previa ilustra colores, imágenes y orden. El contenido
                 de las propiedades se carga en el sitio real.

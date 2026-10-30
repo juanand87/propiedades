@@ -1014,3 +1014,314 @@ body {
 .main-nav.open a {
   padding: 12px 16px;
 }
+/* Section navigation and independent desktop/mobile design canvases. */
+.sectioned-design-form [hidden] {
+  display: none !important;
+}
+.sectioned-design-form .design-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  padding: 14px 0;
+  background: var(--paper);
+  border-bottom: 1px solid var(--line);
+}
+.sectioned-design-form .design-editor-grid {
+  grid-template-columns: 170px minmax(280px, 1fr) minmax(300px, 1fr);
+  gap: 20px;
+}
+.design-section-nav {
+  position: sticky;
+  top: 105px;
+  display: grid;
+  gap: 5px;
+}
+.design-section-nav > .eyebrow {
+  padding: 10px 12px;
+}
+.design-section-nav button {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  text-align: left;
+  padding: 12px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--ink);
+  font-size: 13px;
+}
+.design-section-nav button:hover {
+  background: white;
+}
+.design-section-nav button[aria-current="true"] {
+  color: var(--green);
+  background: white;
+  border-color: var(--line);
+  font-weight: 700;
+}
+.design-section-nav button svg {
+  flex-shrink: 0;
+}
+.design-section-help {
+  font-size: 13px;
+  line-height: 1.7;
+  margin: 0 0 15px;
+}
+.design-section-help a {
+  color: var(--green);
+  text-decoration: underline;
+}
+.sectioned-design-form .design-controls .panel-card {
+  padding: 22px;
+}
+.sectioned-design-form .design-controls h2 {
+  font-size: 22px;
+}
+.sectioned-design-form .design-preview-column {
+  top: 105px;
+  min-width: 0;
+}
+.design-device-switch {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.design-device-switch button {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 9px 12px;
+  background: white;
+  color: var(--ink);
+  font-size: 12px;
+}
+.design-device-switch button[aria-pressed="true"] {
+  background: var(--green);
+  color: white;
+  border-color: var(--green);
+}
+.design-device-switch > span {
+  color: var(--muted);
+  font-size: 11px;
+  margin-left: auto;
+}
+.design-preview-stage {
+  width: 100%;
+  max-height: 650px;
+  overflow: auto;
+  overflow-x: hidden;
+  background: #e7ecf2;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+.design-preview-scaled-space {
+  position: relative;
+  min-height: 1px;
+}
+.design-preview-canvas {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform-origin: top center;
+  container: design-canvas / inline-size;
+}
+.design-preview-canvas .design-preview {
+  border: 0;
+  border-radius: 0;
+  font-size: 16px;
+}
+.design-preview-canvas .design-preview-header {
+  padding: 20px 28px;
+  gap: 12px;
+  font-size: 22px;
+}
+.design-preview-canvas .preview-cover-first .design-preview-header {
+  top: 18px;
+  left: 24px;
+  right: 24px;
+}
+.design-preview-canvas .design-preview-header img {
+  height: 40px;
+  max-width: 160px;
+}
+.preview-navigation {
+  margin-left: auto;
+  font-size: 14px;
+  font-weight: 500;
+}
+.design-preview-canvas .design-preview-block {
+  padding: 38px 45px;
+}
+.design-preview-canvas .design-preview-block.preview-hero {
+  min-height: 510px;
+  padding: 125px 45px 90px;
+}
+.design-preview-canvas .preview-hero-copy {
+  width: 58%;
+}
+.design-preview-canvas .design-preview-block h2 {
+  font-size: 44px;
+  line-height: 1.12;
+  margin: 18px 0;
+}
+.design-preview-canvas .design-preview-block h3 {
+  font-size: 28px;
+}
+.design-preview-canvas .design-preview-block p {
+  font-size: 16px;
+  line-height: 1.7;
+}
+.design-preview-canvas .design-preview-block small {
+  font-size: 11px;
+}
+.design-preview-canvas .design-preview-button {
+  padding: 14px 22px;
+  font-size: 15px;
+  border-radius: 9px;
+}
+.design-preview-canvas .preview-search {
+  margin: 20px 45px;
+  font-size: 16px;
+}
+.design-preview-canvas .preview-hero + .preview-search {
+  margin-top: -35px;
+}
+.design-preview-canvas .design-preview-cards {
+  gap: 18px;
+}
+.design-preview-canvas .design-preview-cards span {
+  padding: 35px 20px;
+  font-size: 16px;
+}
+.design-preview-canvas .design-preview-footer {
+  padding: 30px 45px;
+  font-size: 14px;
+}
+.design-preview-canvas .hero-media-preview .hero-media-controls > button {
+  width: 38px;
+  height: 38px;
+}
+.design-preview-canvas .hero-media-preview .hero-media-count {
+  display: inline;
+}
+.design-preview-canvas .hero-media-preview .hero-media-controls {
+  bottom: 20px;
+  right: 24px;
+}
+@container design-canvas (max-width: 600px) {
+  .design-preview-canvas .design-preview-header {
+    padding: 14px;
+    font-size: 18px;
+  }
+  .design-preview-canvas .preview-cover-first .design-preview-header {
+    left: 14px;
+    right: 14px;
+    top: 12px;
+  }
+  .preview-navigation {
+    font-size: 0;
+  }
+  .preview-navigation::after {
+    content: "☰";
+    font-size: 23px;
+  }
+  .design-preview-canvas .design-preview-block {
+    padding: 28px 24px;
+  }
+  .design-preview-canvas .design-preview-block.preview-hero {
+    min-height: 500px;
+    padding: 115px 24px 90px;
+  }
+  .design-preview-canvas .preview-hero-copy {
+    width: 94%;
+  }
+  .design-preview-canvas .design-preview-block h2 {
+    font-size: 34px;
+  }
+  .design-preview-canvas .design-preview-block h3 {
+    font-size: 25px;
+  }
+  .design-preview-canvas .preview-search {
+    margin-left: 18px;
+    margin-right: 18px;
+    padding: 22px 16px;
+  }
+  .design-preview-canvas .design-preview-cards {
+    flex-direction: column;
+    gap: 12px;
+  }
+  .design-preview-canvas .preview-hero::after {
+    background: linear-gradient(90deg, #f7fbfff5, #f7fbffcb 65%, #f7fbff35);
+  }
+  .design-preview-canvas .design-preview-footer {
+    padding: 25px;
+  }
+}
+@media (max-width: 1200px) {
+  .sectioned-design-form .design-editor-grid {
+    grid-template-columns: 160px minmax(0, 1fr);
+  }
+  .sectioned-design-form .design-preview-column {
+    grid-column: 2;
+    position: static;
+  }
+  .sectioned-design-form .design-section-nav {
+    grid-row: span 2;
+  }
+}
+@media (max-width: 800px) {
+  .sectioned-design-form .design-editor-grid {
+    display: flex;
+    flex-direction: column;
+  }
+  .design-section-nav {
+    position: static;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    width: 100%;
+  }
+  .design-section-nav > .eyebrow {
+    width: 100%;
+    padding: 0 0 5px;
+  }
+  .design-section-nav button {
+    width: auto;
+    padding: 9px 11px;
+    background: white;
+    font-size: 12px;
+  }
+  .sectioned-design-form .design-controls,
+  .sectioned-design-form .design-preview-column {
+    width: 100%;
+  }
+  .sectioned-design-form .design-toolbar {
+    top: 0;
+    gap: 8px;
+    padding: 10px 0;
+  }
+  .sectioned-design-form .design-toolbar .button {
+    font-size: 12px;
+    padding: 10px;
+  }
+}
+.sectioned-design-form .design-controls .design-checkbox {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  text-align: left;
+}
+.sectioned-design-form .design-controls input,
+.sectioned-design-form .design-controls textarea,
+.sectioned-design-form .design-controls select {
+  scroll-margin-top: 120px;
+}
+.sectioned-design-form .design-preview-stage {
+  max-height: clamp(180px, calc(100dvh - 300px), 650px);
+}
