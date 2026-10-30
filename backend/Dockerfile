@@ -28,10 +28,12 @@ RUN npm ci --only=production && npm cache clean --force
 COPY --from=builder /app/dist ./dist
 
 # Create uploads directory
-RUN mkdir -p /app/uploads
+RUN mkdir -p /app/uploads-propiedades
 
 # Expose port
-EXPOSE 3000
+ENV NODE_ENV=production
+ENV PORT=8080
+EXPOSE 8080
 
 # Use dumb-init to handle signals
 ENTRYPOINT ["dumb-init", "--"]

@@ -27,6 +27,18 @@ El inicializador genera tablas de las entidades heredadas mediante TypeORM. Es u
 
 ## Vercel y backend
 
+### Arranque en DigitalOcean App Platform
+
+El error `determine start command: when there is no default process a command is required` indica que no se detectó un comando de inicio. El health check con `connection refused` es una consecuencia posible de que ningún servidor haya arrancado; no demuestra un error de BD.
+
+Si el componente usa buildpacks con Source Directory `/`, usar Build Command `npm run build`, Run Command `npm start`, HTTP Port `8080` y PORT=8080. La raíz ahora instala/compila backend y su comando start ejecuta el servidor compilado desde backend. El Procfile raíz declara el proceso web. No despliega frontend; ese componente se aloja en Vercel.
+
+Si el componente usa Source Directory `backend`, usar Build Command `npm ci --include=dev && npm run build` y Run Command `npm run start:prod`. Si DigitalOcean detecta el Dockerfile de backend, sus instrucciones hacen la instalación y compilación y su CMD inicia `node dist/main.js`; no necesita build command adicional. El Dockerfile ahora expone 8080 y usa PORT=8080 por defecto. En todos los casos el puerto HTTP del componente y PORT deben coincidir. Usar `/api` para un health check HTTP.
+
+Configurar las variables del backend **en el componente de DigitalOcean**, porque los .env locales no se publican: PROJECT_ID=propiedades, DB_DATABASE=propiedades, DB_HOST/DB_PORT/DB_USERNAME/DB_PASSWORD propios y JWT_SECRET propio. Mantener INTEGRATIONS_ENABLED=false y SCHEDULED_JOBS_ENABLED=false. FRONTEND_URL y CORS_ORIGINS deben ser https://propiedades-eta.vercel.app. No eliminar las validaciones de aislamiento para intentar corregir el arranque.
+
+Estos cambios corrigen la ausencia de un proceso de inicio en la raíz. El despliegue remoto, la conectividad MySQL y los health checks deben verificarse nuevamente tras configurar el componente; no se han verificado mediante acceso a DigitalOcean.
+
 En el proyecto Vercel exclusivo, usar Root Directory `frontend`, framework Next.js y build `npm run build`. No se enlazó el CLI ni se tocaron proyectos remotos. Configurar por separado Production y Preview:
 
 | Variable | Valor requerido |

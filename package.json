@@ -1,4 +1,11 @@
 {
+  "name": "propiedades",
+  "private": true,
+  "scripts": {
+    "build": "npm --prefix backend ci --include=dev && npm --prefix backend run build",
+    "start": "npm --prefix backend run start:prod",
+    "start:prod": "npm --prefix backend run start:prod"
+  },
   "dependencies": {
     "mysql2": "^3.16.2"
   }
