@@ -1,56 +1,34 @@
 import { NestFactory } from '@nestjs/core';
-import { AppModule } from './app.module';
-import { ConfigService } from '@nestjs/config';
 import { NestExpressApplication } from '@nestjs/platform-express';
-import { ValidationPipe } from '@nestjs/common';
-import { join } from 'path';
+import { ConfigService } from '@nestjs/config';
+import { AppModule } from './app.module';
+import { SafeExceptionFilter } from './estate/estate.controller';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
-    rawBody: true,
+    bodyParser: true,
   });
-  const configService = app.get(ConfigService);
-  
+  const config = app.get(ConfigService);
   app.setGlobalPrefix('api');
+  app.useGlobalFilters(new SafeExceptionFilter());
   app.enableCors({
-    origin: configService.get<string>('CORS_ORIGINS', 'http://localhost:3000').split(',').map(origin => origin.trim()),
+    origin: config
+      .get<string>('CORS_ORIGINS', 'http://localhost:3000')
+      .split(',')
+      .map((v) => v.trim()),
     credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Pos-Token', 'X-Pos-Shift-Id'],
   });
-
-  // Log all HTTP requests
-  app.use((req, res, next) => {
-    console.log(`🌐 [HTTP] ${req.method} ${req.url} - ${new Date().toISOString()}`);
-    
-    // Log request body for POST/PATCH/PUT requests
-    if (['POST', 'PATCH', 'PUT'].includes(req.method) && req.url.includes('/orders')) {
-      console.log(`📝 [HTTP BODY] ${req.url}:`, JSON.stringify(req.body, null, 2));
-    }
-    
-    if (!req.url.startsWith('/uploads/')) {
-      res.setHeader('Content-Type', 'application/json; charset=utf-8');
-    }
+  app.use((_req, res, next) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
     next();
   });
-  
-  app.useGlobalPipes(
-    new ValidationPipe({
-      transform: true,
-      whitelist: true,
-    }),
-  );
-  
-  // Servir archivos estáticos desde la carpeta uploads
-  app.useStaticAssets(join(process.cwd(), configService.get('UPLOAD_DIR', './uploads-propiedades')), {
-    prefix: '/uploads/',
-  });
-  
-  const port = configService.get('PORT') || 3001;
-  await app.listen(port, '0.0.0.0');
-  
-  console.log(`🚀 Backend running on http://localhost:${port}/api`);
-  console.log(`🌐 Backend accessible on network at http://0.0.0.0:${port}/api`);
-  console.log(`📁 Static files served from /uploads`);
+  app.enableShutdownHooks();
+  await app.listen(Number(config.get('PORT', 3001)), '0.0.0.0');
 }
-bootstrap();
+bootstrap().catch(() => {
+  console.error(
+    'No se pudo iniciar Propiedades. Revisa configuración, TLS y conectividad MySQL.',
+  );
+  process.exitCode = 1;
+});

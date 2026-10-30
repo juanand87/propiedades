@@ -1,0 +1,433 @@
+// Runs ONLY against our isolated local QA server. Never accepts a remote hostname.
+const mysql = require('mysql2/promise'),
+  fs = require('fs'),
+  path = require('path'),
+  assert = require('assert/strict'),
+  crypto = require('crypto'),
+  { spawn } = require('child_process');
+const bcrypt = require('bcrypt'),
+  sharp = require('sharp');
+const root = path.resolve(__dirname, '../..');
+async function main() {
+  const db = await mysql.createConnection({
+    host: '127.0.0.1',
+    port: 3317,
+    user: 'root',
+    multipleStatements: true,
+    charset: 'utf8mb4',
+  });
+  let app;
+  try {
+    const [[instance]] = await db.query(
+      'SELECT @@datadir location,@@port port',
+    );
+    assert.equal(Number(instance.port), 3317);
+    assert.ok(
+      String(instance.location)
+        .replace(/\\/g, '/')
+        .toLowerCase()
+        .startsWith(
+          (root + '/tmp/qa-mysql-data').replace(/\\/g, '/').toLowerCase(),
+        ),
+      'Refusing to reset a non-QA database',
+    );
+    await db.query('DROP DATABASE IF EXISTS propiedades');
+    await db.query(
+      'CREATE DATABASE IF NOT EXISTS propiedades CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci',
+    );
+    const migration = fs.readFileSync(
+      path.join(root, 'database/ACTUALIZAR_PROPIEDADES.sql'),
+      'utf8',
+    );
+    await db.query(migration);
+    const [[count]] = await db.query('SELECT COUNT(*) n FROM estate_regions');
+    assert.equal(count.n, 16);
+    const [[communes]] = await db.query(
+      'SELECT COUNT(*) n FROM estate_communes',
+    );
+    assert.equal(communes.n, 346);
+    const adminId = crypto.randomUUID(),
+      password = 'QA-only-password-2026';
+    await db.query(
+      'INSERT INTO propiedades.users(id,email,password,firstName,lastName,role) VALUES (?,?,?,?,?,?)',
+      [
+        adminId,
+        'admin@qa.invalid',
+        await bcrypt.hash(password, 10),
+        'QA',
+        'Admin',
+        'admin',
+      ],
+    );
+    await db.query(
+      "CREATE TABLE IF NOT EXISTS propiedades.qa_legacy_sentinel(id int PRIMARY KEY,note varchar(100)); INSERT IGNORE INTO propiedades.qa_legacy_sentinel VALUES (1,'preserve')",
+    );
+    const legacyUser = crypto.randomUUID(),
+      legacyVendor = crypto.randomUUID();
+    await db.query(
+      "INSERT INTO propiedades.users(id,email,password,firstName,lastName,role) VALUES (?,?,?,'Legacy','QA','vendor')",
+      [legacyUser, 'legacy@qa.invalid', await bcrypt.hash(password, 10)],
+    );
+    await db.query(
+      'CREATE TABLE propiedades.vendors(id varchar(36) PRIMARY KEY,userId varchar(36),storeName varchar(255),slug varchar(255)) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci',
+    );
+    await db.query(
+      'INSERT INTO propiedades.vendors(id,userId,storeName,slug) VALUES (?,?,?,?)',
+      [legacyVendor, legacyUser, 'Cuenta heredada QA', 'legacy-qa'],
+    );
+    await db.query(migration);
+    const [[preservedAdvertiser]] = await db.query(
+      'SELECT user_id,status FROM advertisers WHERE legacy_vendor_id=?',
+      [legacyVendor],
+    );
+    assert.equal(preservedAdvertiser.user_id, legacyUser);
+    assert.equal(preservedAdvertiser.status, 'pending');
+    const [[saved]] = await db.query(
+      'SELECT COUNT(*) n FROM propiedades.users WHERE id=?',
+      [adminId],
+    );
+    assert.equal(saved.n, 1);
+    const [[sentinel]] = await db.query(
+      'SELECT note FROM propiedades.qa_legacy_sentinel WHERE id=1',
+    );
+    assert.equal(sentinel.note, 'preserve');
+    const dbPassword = crypto.randomBytes(24).toString('hex');
+    await db.query(
+      "CREATE USER IF NOT EXISTS 'propiedades_qa'@'127.0.0.1' IDENTIFIED BY ?",
+      [dbPassword],
+    );
+    await db.query("ALTER USER 'propiedades_qa'@'127.0.0.1' IDENTIFIED BY ?", [
+      dbPassword,
+    ]);
+    await db.query(
+      "GRANT SELECT,INSERT,UPDATE,DELETE ON propiedades.* TO 'propiedades_qa'@'127.0.0.1'",
+    );
+    const env = {
+      ...process.env,
+      NODE_ENV: 'test',
+      PROJECT_ID: 'propiedades',
+      DB_DATABASE: 'propiedades',
+      DB_HOST: '127.0.0.1',
+      DB_PORT: '3317',
+      DB_USERNAME: 'propiedades_qa',
+      DB_PASSWORD: dbPassword,
+      DB_SHARED_HOST: '',
+      DB_SHARED_USERNAME: '',
+      DB_SSL: 'false',
+      DB_SSL_CA: '',
+      JWT_SECRET: crypto.randomBytes(48).toString('hex'),
+      INTEGRATIONS_ENABLED: 'false',
+      SCHEDULED_JOBS_ENABLED: 'false',
+      ADMIN_RECOVERY_ENABLED: 'false',
+      PORT: '3318',
+    };
+    app = spawn(process.execPath, ['dist/main.js'], {
+      cwd: path.join(root, 'backend'),
+      env,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      windowsHide: true,
+    });
+    let startup = '';
+    app.stdout.on('data', (b) => (startup += b));
+    app.stderr.on('data', (b) => (startup += b));
+    let ready = false;
+    for (let i = 0; i < 70; i++) {
+      try {
+        const r = await fetch('http://127.0.0.1:3318/api/ready');
+        if (r.ok) {
+          ready = true;
+          break;
+        }
+      } catch {}
+      await new Promise((r) => setTimeout(r, 100));
+    }
+    assert.ok(ready, 'QA backend did not start: ' + startup);
+    let assertions = 0;
+    async function call(method, url, body, token, expected = 200) {
+      const isForm = body instanceof FormData;
+      const r = await fetch('http://127.0.0.1:3318/api' + url, {
+        method,
+        headers: {
+          ...(body && !isForm ? { 'Content-Type': 'application/json' } : {}),
+          ...(token ? { Authorization: 'Bearer ' + token } : {}),
+        },
+        body: body ? (isForm ? body : JSON.stringify(body)) : undefined,
+      });
+      const data = await r.json().catch(() => ({}));
+      assert.equal(
+        r.status,
+        expected,
+        `${method} ${url}: ${JSON.stringify(data)}`,
+      );
+      assertions++;
+      return data;
+    }
+    const admin = (
+      await call(
+        'POST',
+        '/auth/panel/login',
+        { email: 'admin@qa.invalid', password },
+        null,
+        201,
+      )
+    ).access_token;
+    const catalog = await call('GET', '/catalog');
+    assert.equal(catalog.communes.length, 346);
+    assertions++;
+    const one = await call(
+      'POST',
+      '/auth/register',
+      { email: 'one@qa.invalid', password, firstName: 'One', lastName: 'Test' },
+      null,
+      201,
+    );
+    const two = await call(
+      'POST',
+      '/auth/register',
+      { email: 'two@qa.invalid', password, firstName: 'Two', lastName: 'Test' },
+      null,
+      201,
+    );
+    const a = await call(
+      'POST',
+      '/me/advertiser',
+      { display_name: 'QA One', kind: 'owner' },
+      one.access_token,
+      201,
+    );
+    const b = await call(
+      'POST',
+      '/me/advertiser',
+      { display_name: 'QA Two', kind: 'broker' },
+      two.access_token,
+      201,
+    );
+    await call(
+      'PATCH',
+      '/admin/advertisers/' + a.id,
+      { status: 'approved' },
+      admin,
+    );
+    await call(
+      'PATCH',
+      '/admin/advertisers/' + b.id,
+      { status: 'approved' },
+      admin,
+    );
+    const fd = new FormData();
+    fd.set(
+      'file',
+      new Blob(
+        [
+          await sharp({
+            create: {
+              width: 300,
+              height: 200,
+              channels: 3,
+              background: '#abc',
+            },
+          })
+            .png()
+            .toBuffer(),
+        ],
+        { type: 'image/png' },
+      ),
+      'qa.png',
+    );
+    const media = await call(
+      'POST',
+      '/manage/media',
+      fd,
+      one.access_token,
+      201,
+    );
+    const c = catalog.communes[0];
+    const payload = {
+      title: 'Casa de prueba inmobiliaria',
+      description:
+        'Descripción suficientemente extensa para validar la publicación de esta casa de pruebas.',
+      type_id: 'house',
+      price_amount: '12000.1234',
+      price_unit: 'UF',
+      built_area: '120.5',
+      land_area: '400',
+      bedrooms: '3',
+      bathrooms: '2',
+      region_id: c.region_id,
+      commune_id: c.id,
+      address: 'Dirección privada QA',
+      latitude: '-33.4',
+      longitude: '-70.6',
+      show_exact_address: false,
+      amenity_ids: ['garden'],
+      media_ids: [media.id],
+    };
+    const p = await call(
+      'POST',
+      '/manage/properties',
+      payload,
+      one.access_token,
+      201,
+    );
+    const draft = await call(
+      'GET',
+      '/manage/properties/' + p.id,
+      null,
+      one.access_token,
+    );
+    await call(
+      'POST',
+      '/manage/properties',
+      { ...payload, price_unit: 'CLP', price_amount: '1000.1' },
+      one.access_token,
+      400,
+    );
+    await call('POST', '/manage/properties', payload, null, 401);
+    await call('POST', '/manage/properties', payload, two.access_token, 403);
+    await call(
+      'DELETE',
+      '/manage/media/' + media.id,
+      null,
+      one.access_token,
+      409,
+    );
+    await call('GET', '/properties/' + p.id, null, null, 404);
+    await call(
+      'GET',
+      '/manage/properties/' + p.id,
+      null,
+      two.access_token,
+      403,
+    );
+    await call(
+      'PATCH',
+      '/manage/properties/' + p.id,
+      { ...payload },
+      two.access_token,
+      403,
+    );
+    await call(
+      'PATCH',
+      `/manage/properties/${p.id}/status`,
+      { status: 'published' },
+      one.access_token,
+      400,
+    );
+    await call(
+      'PATCH',
+      `/manage/properties/${p.id}/status`,
+      { status: 'pending_review' },
+      one.access_token,
+    );
+    await call(
+      'PATCH',
+      `/manage/properties/${p.id}/status`,
+      { status: 'published' },
+      admin,
+    );
+    const pub = await call('GET', '/properties/' + p.id);
+    await call(
+      'PATCH',
+      '/manage/properties/' + p.id,
+      { title: 'Edición desactualizada', revision: draft.revision },
+      one.access_token,
+      409,
+    );
+    await call('GET', '/properties?sort=toString', null, null, 200);
+    assert.equal(pub.location, null);
+    assert.ok(!('moderation_reason' in pub));
+    assert.equal(pub.price_amount, '12000.1234');
+    assertions += 3;
+    const result = await call(
+      'GET',
+      '/properties?price_unit=UF&min_price=12000&sort=price_asc',
+    );
+    assert.ok(result.items.some((x) => x.id === p.id));
+    assertions++;
+    await call('GET', '/properties?sort=price_asc', null, null, 400);
+    await call('GET', '/properties?min_price=10', null, null, 400);
+    await call('POST', '/me/favorites/' + p.id, {}, two.access_token, 201);
+    assert.equal(
+      (await call('GET', '/me/favorites', null, two.access_token)).length,
+      1,
+    );
+    assertions++;
+    await call(
+      'POST',
+      `/properties/${p.id}/inquiries`,
+      {
+        name: 'Interesado',
+        email: 'lead@qa.invalid',
+        message: 'Me gustaría conocer la propiedad',
+        consent: true,
+        requested_at: new Date(Date.now() + 86400000).toISOString(),
+      },
+      null,
+      201,
+    );
+    const contacts = await call(
+      'GET',
+      '/manage/inquiries',
+      null,
+      one.access_token,
+    );
+    assert.equal(contacts.length, 1);
+    assertions++;
+    assert.equal(
+      (await call('GET', '/manage/inquiries', null, two.access_token)).length,
+      0,
+    );
+    assertions++;
+    await call(
+      'PATCH',
+      '/manage/inquiries/' + contacts[0].id,
+      {
+        status: 'contacted',
+        message: 'Nota interna QA',
+        visit_status: 'confirmed',
+      },
+      one.access_token,
+    );
+    await call(
+      'GET',
+      '/manage/inquiries/' + contacts[0].id + '/messages',
+      null,
+      two.access_token,
+      403,
+    );
+    const signature = new URL('http://qa' + media.url).searchParams.get(
+      'signature',
+    );
+    await call('GET', '/auth/profile', null, signature, 401);
+    await call(
+      'PATCH',
+      '/manage/properties/' + p.id,
+      { ...payload, description: payload.description + ' Edición.' },
+      one.access_token,
+    );
+    await call('GET', '/properties/' + p.id, null, null, 404);
+    await call('POST', '/products/download-discogs-images', {}, admin, 404);
+    await call('GET', '/orders', null, admin, 404);
+    await call('GET', '/vendors/any/discogs/search', null, admin, 404);
+    const stats = await call('GET', '/manage/stats', null, admin);
+    assert.equal(Number(stats.inquiries), 1);
+    assertions++;
+    console.log(
+      JSON.stringify({
+        passed: true,
+        assertions,
+        regions: 16,
+        communes: 346,
+        migration: 'applied twice; identity and sentinel preserved',
+        productionConnections: 0,
+      }),
+    );
+  } finally {
+    if (app) app.kill();
+    await db.end();
+  }
+}
+main().catch((e) => {
+  console.error(e.message);
+  process.exitCode = 1;
+});

@@ -13,6 +13,8 @@ tmp
 **/uploads*
 *.sql
 **/*.sql
+!backend/scripts/estate-schema.sql
+legacy
 *.zip
 *.rar
 .codex

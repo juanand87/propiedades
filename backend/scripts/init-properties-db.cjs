@@ -1,38 +1,67 @@
-// Run from backend: node scripts/init-properties-db.cjs [--apply]
-// Does not import legacy dumps, accounts, credentials or marketplace settings.
-const path = require('node:path');
-const { existsSync } = require('node:fs');
-require('dotenv').config({ path: path.join(__dirname, '../.env'), quiet: true });
-// Production deployments have compiled entities and may omit ts-node.
-const useCompiled = existsSync(path.join(__dirname, '../dist/config/project-isolation.js'));
-if (!useCompiled) require('ts-node/register/transpile-only');
-const codeDirectory = useCompiled ? '../dist' : '../src';
-const { DataSource } = require('typeorm');
-const { validateProjectEnvironment, installNetworkIsolation } = require(path.join(__dirname, codeDirectory, 'config/project-isolation'));
-const { getDatabaseSsl } = require(path.join(__dirname, codeDirectory, 'config/database-ssl'));
-
+// Explicit migration runner: normal application startup never executes DDL.
+const path = require('node:path'),
+  fs = require('node:fs');
+require('dotenv').config({
+  path: path.join(__dirname, '../.env'),
+  quiet: true,
+});
+const compiled = fs.existsSync(
+  path.join(__dirname, '../dist/config/project-isolation.js'),
+);
+if (!compiled) require('ts-node/register/transpile-only');
+const base = path.join(
+  __dirname,
+  compiled ? '../dist/config' : '../src/config',
+);
+const { validateProjectEnvironment, installNetworkIsolation } = require(
+  path.join(base, 'project-isolation'),
+);
+const { getDatabaseSsl } = require(path.join(base, 'database-ssl'));
 async function main() {
   validateProjectEnvironment(process.env);
-  if (process.env.INTEGRATIONS_ENABLED === 'true') throw new Error('Desactiva las integraciones antes de inicializar.');
+  if (process.env.INTEGRATIONS_ENABLED === 'true')
+    throw new Error('Apaga las integraciones antes de migrar.');
+  const files = ['estate-schema.sql'];
   if (!process.argv.includes('--apply')) {
-    console.log('Plan: crear únicamente tablas del código actual en propiedades, si está vacía. No se realizó ninguna conexión. Usa --apply para ejecutar.');
+    console.log(
+      'Plan: aplicar ' +
+        files.join(', ') +
+        ' solo en propiedades. No se realizó ninguna conexión. No se eliminan tablas ni cuentas.',
+    );
     return;
   }
   installNetworkIsolation(process.env);
-  const db = new DataSource({
-    type: 'mysql', host: process.env.DB_HOST, port: Number(process.env.DB_PORT || 3306),
-    username: process.env.DB_USERNAME, password: process.env.DB_PASSWORD,
-    database: 'propiedades', charset: 'utf8mb4', synchronize: false,
+  const mysql = require('mysql2/promise');
+  const db = await mysql.createConnection({
+    host: process.env.DB_HOST,
+    port: Number(process.env.DB_PORT || 3306),
+    user: process.env.DB_USERNAME,
+    password: process.env.DB_PASSWORD,
+    database: 'propiedades',
     ssl: getDatabaseSsl(process.env),
-    entities: [path.join(__dirname, codeDirectory, useCompiled ? '**/*.entity.js' : '**/*.entity.ts')],
+    multipleStatements: true,
   });
-  await db.initialize();
   try {
-    if (!db.hasMetadata('users')) throw new Error('No se cargaron las entidades del backend. Compila el proyecto antes de inicializar.');
-    const [row] = await db.query('SELECT COUNT(*) AS total FROM information_schema.tables WHERE table_schema = DATABASE()');
-    if (Number(row.total) !== 0) throw new Error('BD no vacía: no se modifica. Usa migraciones revisadas para continuar.');
-    await db.synchronize(false);
-    console.log('Esquema inicial creado. No se copiaron datos ni se crearon cuentas.');
-  } finally { await db.destroy(); }
+    const [[identity]] = await db.query('SELECT DATABASE() name');
+    if (identity.name !== 'propiedades') throw new Error('Esquema incorrecto.');
+    for (const file of files) {
+      const source = path.join(__dirname, file);
+      if (!fs.existsSync(source))
+        throw new Error(
+          'Falta ' +
+            file +
+            '. Usa el SQL entregado o copia database al despliegue.',
+        );
+      await db.query(fs.readFileSync(source, 'utf8'));
+    }
+    console.log(
+      'Esquema inmobiliario actualizado. No se copió información musical ni se crearon usuarios.',
+    );
+  } finally {
+    await db.end();
+  }
 }
-main().catch(error => { console.error(error.message); process.exitCode = 1; });
+main().catch((e) => {
+  console.error(e.code || e.message);
+  process.exitCode = 1;
+});

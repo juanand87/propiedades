@@ -1,5 +1,5 @@
 # Build stage
-FROM node:20-bookworm-slim AS builder
+FROM node:22-bookworm-slim AS builder
 
 WORKDIR /app
 
@@ -15,7 +15,7 @@ RUN chmod -R +x node_modules/.bin
 RUN npm run build
 
 # Production stage
-FROM node:20-bookworm-slim
+FROM node:22-bookworm-slim
 
 WORKDIR /app
 
@@ -26,7 +26,7 @@ COPY package*.json ./
 RUN npm ci --only=production && npm cache clean --force
 
 COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/scripts/init-properties-db.cjs ./scripts/init-properties-db.cjs
+COPY --from=builder /app/scripts ./scripts
 
 # Create uploads directory
 RUN mkdir -p /app/uploads-propiedades

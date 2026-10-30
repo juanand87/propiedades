@@ -5,6 +5,7 @@ dist
 .env.*
 uploads-propiedades
 *.sql
+!scripts/estate-schema.sql
 *.zip
 uploads
 coverage

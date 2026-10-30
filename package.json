@@ -6,7 +6,7 @@
     "start": "npm --prefix backend run start:prod",
     "start:prod": "npm --prefix backend run start:prod"
   },
-  "dependencies": {
-    "mysql2": "^3.16.2"
+  "engines": {
+    "node": ">=22"
   }
 }

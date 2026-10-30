@@ -1,15 +1,23 @@
 # Propiedades
 
-Copia local de MundoBeat en proceso de separación para un marketplace inmobiliario.
+Marketplace inmobiliario en Chile: catálogo, fichas, anunciantes, favoritos, consultas, solicitudes de visita y administración.
 
-La configuración activa usa únicamente recursos propios pendientes de completar. Las integraciones y tareas automáticas están desactivadas. Repositorio Git exclusivo: https://github.com/juanand87/propiedades.git. Se conserva el commit inicial remoto y el historial de MundoBeat queda únicamente en el respaldo local.
+- Frontend: Next.js/React, directorio `frontend`. En Vercel, Root Directory=`frontend`, preset Next.js.
+- Backend: NestJS/MySQL, directorio `backend`. En DigitalOcean, desde raíz: `npm run build` y `npm start`, puerto 8080.
+- Requiere Node.js 22 o posterior.
+- SQL de actualización: [database/ACTUALIZAR_PROPIEDADES.sql](database/ACTUALIZAR_PROPIEDADES.sql).
+- Entrega, migración, variables y pruebas: [docs/ENTREGA_INMOBILIARIA.md](docs/ENTREGA_INMOBILIARIA.md).
 
-Consulta [SEPARACION.md](SEPARACION.md) para el diagnóstico, variables, inicialización de la BD vacía, Vercel y pendientes. La documentación restante proviene del proyecto original: no ejecutar sus instrucciones de producción.
+## Desarrollo local
 
-- Backend: NestJS + TypeORM + MySQL, directorio backend.
-- Frontend: Next.js, directorio frontend.
-- Plantillas: backend/.env.example y frontend/.env.example.
-- Credenciales locales: backend/.env y frontend/.env.local, ignoradas por Git.
-- Respaldo privado: tmp/mundobeat-local-backup, ignorado por Git y empaquetados.
+Completar backend/.env y frontend/.env.local siguiendo sus plantillas sin secretos. Aplicar el SQL únicamente en una BD propiedades propia. Desde backend: `npm run start:dev`; desde frontend: `npm run dev`. El arranque normal nunca crea tablas.
 
-Falta completar el usuario exclusivo de la BD propiedades, preparar su esquema y definir URLs propias. No se conectó a MundoBeat ni se ejecutaron migraciones o despliegues.
+## Integraciones
+
+La aplicación activa no registra módulos musicales ni comercio físico. Discogs, Spotify, carrito, pedidos, pagos, envíos e inventario fueron retirados. El código anterior queda archivado solo en la carpeta local ignorada legacy. Los datos históricos de la BD se conservan; no se convierten discos en inmuebles.
+
+Las fotografías se guardan optimizadas en la propia BD de Propiedades. No hacen falta credenciales de almacenamiento o servicios de MundoBeat.
+
+## Publicación
+
+Primero aplicar el SQL, después desplegar backend y frontend. La conversión se prepara en una rama independiente: no desplegar código que requiera tablas pendientes. No copiar entornos, respaldos, datos o credenciales del proyecto original.

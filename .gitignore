@@ -39,6 +39,9 @@ backend-log.txt
 # Database
 *.sql
 !backend/sql/add-discounts.sql
+!database/*.sql
+!backend/scripts/estate-schema.sql
+!docs/*.md
 backup.sql
 *.db
 *.sqlite
