@@ -68,6 +68,7 @@ export function DesignAdmin({ broker = false }: { broker?: boolean }) {
   const [uploadProgress, setUploadProgress] = useState("");
   const [uploadError, setUploadError] = useState("");
   const [uploadMessage, setUploadMessage] = useState("");
+  const [selectedSlideId, setSelectedSlideId] = useState<string | undefined>();
   const [activeSection, setActiveSection] = useState("identity");
   const [previewMode, setPreviewMode] = useState<"desktop" | "mobile">(
     "desktop",
@@ -167,6 +168,7 @@ export function DesignAdmin({ broker = false }: { broker?: boolean }) {
     setUploadMessage("");
     setPreviews((p) => ({ ...p, [media.id]: media.url }));
     if (key === "hero_slides") {
+      setSelectedSlideId(media.id);
       setDraft((p) =>
         p
           ? {
@@ -269,6 +271,22 @@ export function DesignAdmin({ broker = false }: { broker?: boolean }) {
       setBusy(false);
     }
   }
+  const selectedSlide =
+    draft?.hero_slides?.find((slide) => slide.media_id === selectedSlideId) ||
+    draft?.hero_slides?.[0];
+  const previewDesign = draft
+    ? {
+        ...draft,
+        hero_url: imageUrl("hero_media_id"),
+        hero_slides: (draft.hero_slides || []).map((slide) => ({
+          ...slide,
+          url:
+            previews[slide.media_id] ||
+            slide.url ||
+            `/api/media/${slide.media_id}`,
+        })),
+      }
+    : null;
   return (
     <>
       <span className="eyebrow">TU MARCA, TU ESTILO</span>
@@ -868,6 +886,75 @@ export function DesignAdmin({ broker = false }: { broker?: boolean }) {
                     >
                       Agregar desde mi biblioteca
                     </button>
+                    <section
+                      className="slider-live-editor"
+                      aria-label="Vista previa inmediata del slider"
+                      style={designStyle(draft)}
+                    >
+                      <h3>Así va quedando tu portada</h3>
+                      <p role="status">
+                        {selectedSlide
+                          ? `Viendo foto ${(draft.hero_slides || []).findIndex((slide) => slide.media_id === selectedSlide.media_id) + 1} de ${draft.hero_slides?.length}. Cada foto nueva se muestra aquí al terminar de cargar.`
+                          : "Agrega tu primera foto para verla aquí, sin necesidad de guardar."}
+                      </p>
+                      {selectedSlide ? (
+                        <>
+                          <div className="slider-live-stage">
+                            <HeroMedia
+                              preview
+                              design={previewDesign!}
+                              selectedMediaId={selectedSlide.media_id}
+                              onSelectMedia={setSelectedSlideId}
+                            />
+                            <div className="slider-live-copy">
+                              <small>VISTA PREVIA · SIN PUBLICAR</small>
+                              <strong>
+                                {broker
+                                  ? draft.hero_title
+                                  : settings.homepage_title}
+                              </strong>
+                              <span>
+                                {broker
+                                  ? draft.hero_subtitle
+                                  : "Descubre propiedades y conecta con su anunciante."}
+                              </span>
+                            </div>
+                          </div>
+                          <div
+                            className="slider-live-thumbnails"
+                            role="group"
+                            aria-label="Seleccionar foto para la vista previa"
+                          >
+                            {(previewDesign?.hero_slides || []).map(
+                              (slide, index) => (
+                                <button
+                                  key={slide.media_id}
+                                  type="button"
+                                  aria-label={`Previsualizar foto ${index + 1}`}
+                                  aria-pressed={
+                                    selectedSlide.media_id === slide.media_id
+                                  }
+                                  onClick={() =>
+                                    setSelectedSlideId(slide.media_id)
+                                  }
+                                >
+                                  <img src={assetUrl(slide.url)} alt="" />
+                                  <span>{index + 1}</span>
+                                </button>
+                              ),
+                            )}
+                          </div>
+                        </>
+                      ) : (
+                        <div className="slider-live-empty">
+                          <ImageIcon size={36} />
+                          <strong>Tu portada aparecerá aquí</strong>
+                          <span>
+                            Elige fotos arriba o agrégalas desde tu biblioteca.
+                          </span>
+                        </div>
+                      )}
+                    </section>
                     <h3>2. Elige el orden</h3>
                     <p>
                       {draft.hero_slides?.length
@@ -875,7 +962,11 @@ export function DesignAdmin({ broker = false }: { broker?: boolean }) {
                         : "Tus fotos aparecerán aquí después de agregarlas."}
                     </p>
                     {(draft.hero_slides || []).map((slide, index) => (
-                      <div className="slider-editor-row" key={slide.media_id}>
+                      <div
+                        className="slider-editor-row slider-selected-settings"
+                        key={slide.media_id}
+                        hidden={selectedSlide?.media_id !== slide.media_id}
+                      >
                         <div className="slider-photo-preview">
                           <img
                             src={assetUrl(
@@ -1149,9 +1240,10 @@ export function DesignAdmin({ broker = false }: { broker?: boolean }) {
                 (draft.hero_slides?.length || 0) < 2 && (
                   <p className="preview-empty-slider" role="status">
                     {draft.hero_slides?.length
-                      ? "Falta agregar una foto más para ver tu slider."
+                      ? "Ya puedes ver tu primera foto. Agrega otra para poder guardar el slider."
                       : "Todavía no has agregado fotos al slider."}{" "}
-                    La imagen de abajo es solo de ejemplo.
+                    {!draft.hero_slides?.length &&
+                      "La imagen de abajo es solo de ejemplo."}
                   </p>
                 )}
               <DesignPreview mode={previewMode}>
@@ -1200,21 +1292,14 @@ export function DesignAdmin({ broker = false }: { broker?: boolean }) {
                               </p>
                             </div>
                             <HeroMedia
-                              key={`${draft.hero_mode}-${(draft.hero_slides || []).map((slide) => slide.media_id).join(",")}`}
                               preview
-                              design={{
-                                ...draft,
-                                hero_url: imageUrl("hero_media_id"),
-                                hero_slides: (draft.hero_slides || []).map(
-                                  (s) => ({
-                                    ...s,
-                                    url:
-                                      previews[s.media_id] ||
-                                      s.url ||
-                                      `/api/media/${s.media_id}`,
-                                  }),
-                                ),
-                              }}
+                              design={previewDesign!}
+                              selectedMediaId={
+                                draft.hero_mode === "slider"
+                                  ? selectedSlide?.media_id
+                                  : undefined
+                              }
+                              onSelectMedia={setSelectedSlideId}
                             />
                           </>
                         ) : s.id === "about" ? (

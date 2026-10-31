@@ -7,12 +7,17 @@ import type { SiteDesign } from "@/lib/site-design";
 export function HeroMedia({
   design,
   preview = false,
+  selectedMediaId,
+  onSelectMedia,
 }: {
   design: SiteDesign;
   preview?: boolean;
+  selectedMediaId?: string;
+  onSelectMedia?: (id: string) => void;
 }) {
   const slides =
-    design.hero_mode === "slider" && (design.hero_slides?.length || 0) >= 2
+    design.hero_mode === "slider" &&
+    (design.hero_slides?.length || 0) >= (preview ? 1 : 2)
       ? design.hero_slides!.map((s) => ({
           id: s.media_id,
           url: s.url || `/api/media/${s.media_id}`,
@@ -31,7 +36,17 @@ export function HeroMedia({
     [paused, setPaused] = useState(false),
     [hover, setHover] = useState(false),
     [focused, setFocused] = useState(false);
-  const active = index % slides.length;
+  const active = selectedMediaId
+    ? Math.max(
+        0,
+        slides.findIndex((slide) => slide.id === selectedMediaId),
+      )
+    : index % slides.length;
+  function showSlide(next: number) {
+    const position = (next + slides.length) % slides.length;
+    if (onSelectMedia) onSelectMedia(slides[position].id);
+    else setIndex(position);
+  }
   const interval = design.hero_interval || 6;
   const signature = slides.map((s) => s.id).join(",");
   useEffect(() => {
@@ -97,9 +112,7 @@ export function HeroMedia({
           <button
             type="button"
             aria-label="Imagen anterior"
-            onClick={() =>
-              setIndex((i) => (i + slides.length - 1) % slides.length)
-            }
+            onClick={() => showSlide(active - 1)}
           >
             <ChevronLeft size={18} />
           </button>
@@ -111,7 +124,7 @@ export function HeroMedia({
                 aria-label={`Ver imagen ${i + 1}`}
                 aria-pressed={i === active}
                 className={i === active ? "active" : ""}
-                onClick={() => setIndex(i)}
+                onClick={() => showSlide(i)}
               />
             ))}
           </div>
@@ -121,7 +134,7 @@ export function HeroMedia({
           <button
             type="button"
             aria-label="Imagen siguiente"
-            onClick={() => setIndex((i) => i + 1)}
+            onClick={() => showSlide(active + 1)}
           >
             <ChevronRight size={18} />
           </button>
