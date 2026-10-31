@@ -32,6 +32,7 @@ import {
 import { Notice, useEstate } from "./EstateApp";
 import { HeroMedia } from "./HeroMedia";
 import { DesignPreview } from "./DesignPreview";
+import { ImageUpload } from "./ImageUpload";
 
 type ImageSlot = "logo_media_id" | "hero_media_id" | "hero_slides";
 
@@ -62,6 +63,11 @@ export function DesignAdmin({ broker = false }: { broker?: boolean }) {
   const [previews, setPreviews] = useState<Record<string, string>>({});
   const [picker, setPicker] = useState<ImageSlot | null>(null);
   const [library, setLibrary] = useState<any[]>([]);
+  const uploading = useRef(false);
+  const [uploadSlot, setUploadSlot] = useState<ImageSlot | null>(null);
+  const [uploadProgress, setUploadProgress] = useState("");
+  const [uploadError, setUploadError] = useState("");
+  const [uploadMessage, setUploadMessage] = useState("");
   const [activeSection, setActiveSection] = useState("identity");
   const [previewMode, setPreviewMode] = useState<"desktop" | "mobile">(
     "desktop",
@@ -157,6 +163,8 @@ export function DesignAdmin({ broker = false }: { broker?: boolean }) {
       : "";
   }
   function selectMedia(key: ImageSlot, media: any) {
+    setUploadError("");
+    setUploadMessage("");
     setPreviews((p) => ({ ...p, [media.id]: media.url }));
     if (key === "hero_slides") {
       setDraft((p) =>
@@ -186,18 +194,47 @@ export function DesignAdmin({ broker = false }: { broker?: boolean }) {
     update("hero_slides", slides);
   }
   async function upload(key: ImageSlot, files: File[]) {
+    if (uploading.current || !files.length) return;
+    uploading.current = true;
+    setUploadSlot(key);
+    setUploadError("");
+    setUploadMessage("");
     setBusy(true);
     setError("");
     setSuccess("");
+    let completed = 0;
     try {
+      if (key !== "hero_slides" && files.length > 1)
+        throw new Error(
+          "Aquí va una sola imagen. Para varias fotos, elige Slider de imágenes.",
+        );
       if (
         key === "hero_slides" &&
         (draft?.hero_slides?.length || 0) + files.length > 8
       )
-        throw new Error("El slider admite hasta 8 imágenes.");
+        throw new Error(
+          `Puedes agregar ${8 - (draft?.hero_slides?.length || 0)} fotos más. Selecciona menos archivos; el máximo es 8.`,
+        );
       for (const file of files) {
+        if (
+          file.type
+            ? !["image/jpeg", "image/png", "image/webp"].includes(file.type)
+            : !/\.(jpe?g|png|webp)$/i.test(file.name)
+        )
+          throw new Error(
+            `«${file.name}» no es JPG, PNG o WebP. Elige otra imagen.`,
+          );
+        if (!file.size)
+          throw new Error(`«${file.name}» está vacío. Elige otra imagen.`);
         if (file.size > 8 * 1024 * 1024)
-          throw new Error("La imagen no puede superar 8 MB.");
+          throw new Error(
+            `«${file.name}» supera 8 MB. Reduce su tamaño o elige otra imagen.`,
+          );
+      }
+      for (const [index, file] of files.entries()) {
+        setUploadProgress(
+          `Subiendo ${index + 1} de ${files.length}: ${file.name}`,
+        );
         const data = new FormData();
         data.set("file", file);
         const media = await request("/manage/media", {
@@ -205,10 +242,17 @@ export function DesignAdmin({ broker = false }: { broker?: boolean }) {
           body: data,
         });
         selectMedia(key, media);
+        completed++;
       }
+      setUploadMessage(
+        `${completed === 1 ? "Imagen agregada" : `${completed} imágenes agregadas`}. Revisa la vista previa y guarda para publicar.`,
+      );
     } catch (e) {
-      setError((e as Error).message);
+      const message = `${completed ? `Se agregaron ${completed} de ${files.length} imágenes. Las demás no se cargaron. ` : ""}${(e as Error).message}`;
+      setUploadError(message);
     } finally {
+      uploading.current = false;
+      setUploadProgress("");
       setBusy(false);
     }
   }
@@ -657,19 +701,45 @@ export function DesignAdmin({ broker = false }: { broker?: boolean }) {
                       : "Portada y slider"}
                 </h2>
                 <p>
-                  JPG, PNG o WebP, hasta 8 MB. El logo puede tener fondo
-                  transparente.
+                  {activeSection === "identity"
+                    ? "Sube tu logo para que las personas reconozcan tu marca. Puede tener fondo transparente."
+                    : activeSection === "hero"
+                      ? "Elige una foto fija o varias fotos para dar la bienvenida a tu sitio."
+                      : "Decide cómo mostrar el nombre de tu sitio junto al logo."}
                 </p>
-                <label hidden={activeSection !== "hero"}>
-                  Tipo de portada
-                  <select
-                    value={draft.hero_mode || "image"}
-                    onChange={(e) => update("hero_mode", e.target.value)}
+                <div
+                  className="cover-mode-options"
+                  role="group"
+                  aria-label="Tipo de portada"
+                  hidden={activeSection !== "hero"}
+                >
+                  <button
+                    type="button"
+                    aria-label="Usar una sola imagen"
+                    aria-pressed={draft.hero_mode !== "slider"}
+                    onClick={() => update("hero_mode", "image")}
                   >
-                    <option value="image">Una imagen</option>
-                    <option value="slider">Slider de imágenes</option>
-                  </select>
-                </label>
+                    <ImageIcon size={24} />
+                    <strong>Una sola foto</strong>
+                    <span>Una portada fija, simple y directa.</span>
+                  </button>
+                  <button
+                    type="button"
+                    aria-label="Usar slider de imágenes"
+                    aria-pressed={draft.hero_mode === "slider"}
+                    onClick={() => update("hero_mode", "slider")}
+                  >
+                    <LayoutTemplate size={24} />
+                    <strong>Varias fotos · slider</strong>
+                    <span>Entre 2 y 8 fotos que van cambiando.</span>
+                  </button>
+                </div>
+                {activeSection === "hero" && (
+                  <p className="cover-mode-help">
+                    Puedes cambiar de opción sin perder las fotos elegidas. Nada
+                    se publica hasta que guardes.
+                  </p>
+                )}
                 {(["logo_media_id", "hero_media_id"] as const)
                   .filter(
                     (key) =>
@@ -704,18 +774,22 @@ export function DesignAdmin({ broker = false }: { broker?: boolean }) {
                           }
                         />
                       )}
-                      <label>
-                        Subir {key === "logo_media_id" ? "logo" : "portada"}
-                        <input
-                          type="file"
-                          accept="image/jpeg,image/png,image/webp"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            e.currentTarget.value = "";
-                            if (file) void upload(key, [file]);
-                          }}
-                        />
-                      </label>
+                      <ImageUpload
+                        label={
+                          key === "logo_media_id"
+                            ? "Elegir logo"
+                            : draft.hero_media_id
+                              ? "Cambiar foto de portada"
+                              : "Elegir foto de portada"
+                        }
+                        disabled={busy}
+                        progress={
+                          uploadSlot === key ? uploadProgress : undefined
+                        }
+                        error={uploadSlot === key ? uploadError : undefined}
+                        message={uploadSlot === key ? uploadMessage : undefined}
+                        onFiles={(files) => void upload(key, files)}
+                      />
                       <div className="design-actions">
                         <button
                           type="button"
@@ -746,24 +820,44 @@ export function DesignAdmin({ broker = false }: { broker?: boolean }) {
                     className="slider-editor"
                     hidden={activeSection !== "hero"}
                   >
-                    <h3>Imágenes del slider</h3>
+                    <div className="slider-checklist">
+                      <strong>
+                        {draft.hero_slides?.length || 0} de 8 fotos
+                      </strong>
+                      <span>
+                        {(draft.hero_slides?.length || 0) >= 2
+                          ? "Listo para guardar"
+                          : (draft.hero_slides?.length || 0) === 1
+                            ? "Falta una foto para activar el slider"
+                            : "Empieza eligiendo al menos 2 fotos"}
+                      </span>
+                    </div>
+                    <h3>1. Agrega tus fotos</h3>
                     <p>
-                      De 2 a 8 imágenes. Ordénalas con las flechas. Al guardar
-                      serán públicas cuando tu sitio esté publicado.
+                      Puedes elegir varias a la vez. Recomendamos fotos
+                      horizontales y de buena calidad.
                     </p>
-                    <label>
-                      Subir imágenes del slider
-                      <input
-                        type="file"
-                        multiple
-                        accept="image/jpeg,image/png,image/webp"
-                        onChange={(e) => {
-                          const files = Array.from(e.target.files || []);
-                          e.currentTarget.value = "";
-                          if (files.length) void upload("hero_slides", files);
-                        }}
-                      />
-                    </label>
+                    <ImageUpload
+                      label={
+                        (draft.hero_slides?.length || 0) >= 8
+                          ? "Ya tienes las 8 fotos"
+                          : "Elegir fotos del slider"
+                      }
+                      multiple
+                      disabled={busy || (draft.hero_slides?.length || 0) >= 8}
+                      progress={
+                        uploadSlot === "hero_slides"
+                          ? uploadProgress
+                          : undefined
+                      }
+                      error={
+                        uploadSlot === "hero_slides" ? uploadError : undefined
+                      }
+                      message={
+                        uploadSlot === "hero_slides" ? uploadMessage : undefined
+                      }
+                      onFiles={(files) => void upload("hero_slides", files)}
+                    />
                     <button
                       type="button"
                       className="button outline small"
@@ -774,21 +868,35 @@ export function DesignAdmin({ broker = false }: { broker?: boolean }) {
                     >
                       Agregar desde mi biblioteca
                     </button>
+                    <h3>2. Elige el orden</h3>
+                    <p>
+                      {draft.hero_slides?.length
+                        ? "La primera foto abre tu portada. Usa los botones para cambiar el orden."
+                        : "Tus fotos aparecerán aquí después de agregarlas."}
+                    </p>
                     {(draft.hero_slides || []).map((slide, index) => (
                       <div className="slider-editor-row" key={slide.media_id}>
-                        <img
-                          src={assetUrl(
-                            previews[slide.media_id] ||
-                              slide.url ||
-                              `/api/media/${slide.media_id}`,
-                          )}
-                          alt={`Miniatura de imagen ${index + 1}`}
-                        />
+                        <div className="slider-photo-preview">
+                          <img
+                            src={assetUrl(
+                              previews[slide.media_id] ||
+                                slide.url ||
+                                `/api/media/${slide.media_id}`,
+                            )}
+                            alt={`Miniatura de imagen ${index + 1}`}
+                          />
+                          <span>
+                            {index === 0
+                              ? "Primera foto · abre tu portada"
+                              : `Foto ${index + 1}`}
+                          </span>
+                        </div>
                         <div>
                           <label>
-                            Descripción de imagen {index + 1}
+                            Descripción de imagen {index + 1} (opcional)
                             <input
                               maxLength={200}
+                              placeholder="Ejemplo: Terraza con vista al jardín"
                               value={slide.alt_text}
                               onChange={(e) =>
                                 update(
@@ -803,13 +911,30 @@ export function DesignAdmin({ broker = false }: { broker?: boolean }) {
                             />
                           </label>
                           <div className="design-actions">
+                            {index > 0 && (
+                              <button
+                                type="button"
+                                className="text-button"
+                                onClick={() =>
+                                  update("hero_slides", [
+                                    slide,
+                                    ...(draft.hero_slides || []).filter(
+                                      (item) =>
+                                        item.media_id !== slide.media_id,
+                                    ),
+                                  ])
+                                }
+                              >
+                                Usar como primera foto
+                              </button>
+                            )}
                             <button
                               type="button"
                               aria-label={`Subir imagen ${index + 1}`}
                               disabled={index === 0}
                               onClick={() => moveSlide(index, -1)}
                             >
-                              <ArrowUp size={16} />
+                              <ArrowUp size={16} /> Subir
                             </button>
                             <button
                               type="button"
@@ -819,7 +944,7 @@ export function DesignAdmin({ broker = false }: { broker?: boolean }) {
                               }
                               onClick={() => moveSlide(index, 1)}
                             >
-                              <ArrowDown size={16} />
+                              <ArrowDown size={16} /> Bajar
                             </button>
                             <button
                               type="button"
@@ -846,36 +971,39 @@ export function DesignAdmin({ broker = false }: { broker?: boolean }) {
                         slider.
                       </p>
                     )}
-                    <label className="design-checkbox">
-                      <input
-                        type="checkbox"
-                        checked={draft.hero_autoplay ?? true}
-                        onChange={(e) =>
-                          update("hero_autoplay", e.target.checked)
-                        }
-                      />
-                      Reproducción automática
-                    </label>
-                    <label>
-                      Segundos entre imágenes
-                      <select
-                        value={draft.hero_interval || 6}
-                        onChange={(e) =>
-                          update("hero_interval", Number(e.target.value))
-                        }
-                      >
-                        {[4, 5, 6, 8, 10, 12].map((n) => (
-                          <option key={n} value={n}>
-                            {n} segundos
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <small>
-                      El movimiento automático se pausa con el ratón, al usar el
-                      teclado y cuando el navegador solicita movimiento
-                      reducido.
-                    </small>
+                    <details className="slider-playback-settings">
+                      <summary>3. Ajustar reproducción del slider</summary>
+                      <label className="design-checkbox">
+                        <input
+                          type="checkbox"
+                          checked={draft.hero_autoplay ?? true}
+                          onChange={(e) =>
+                            update("hero_autoplay", e.target.checked)
+                          }
+                        />
+                        Reproducción automática
+                      </label>
+                      <label>
+                        Segundos entre imágenes
+                        <select
+                          value={draft.hero_interval || 6}
+                          onChange={(e) =>
+                            update("hero_interval", Number(e.target.value))
+                          }
+                        >
+                          {[4, 5, 6, 8, 10, 12].map((n) => (
+                            <option key={n} value={n}>
+                              {n} segundos
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <small>
+                        El movimiento automático se pausa con el ratón, al usar
+                        el teclado y cuando el navegador solicita movimiento
+                        reducido.
+                      </small>
+                    </details>
                   </div>
                 )}
                 <label
@@ -890,7 +1018,9 @@ export function DesignAdmin({ broker = false }: { broker?: boolean }) {
                   Mostrar el nombre del sitio junto al logo
                 </label>
                 <label
-                  hidden={activeSection !== "hero"}
+                  hidden={
+                    activeSection !== "hero" || draft.hero_mode === "slider"
+                  }
                   data-design-panel="hero"
                 >
                   Descripción de la imagen de portada
@@ -1015,6 +1145,15 @@ export function DesignAdmin({ broker = false }: { broker?: boolean }) {
                 </button>
                 <span>{previewMode === "desktop" ? "1120 px" : "390 px"}</span>
               </div>
+              {draft.hero_mode === "slider" &&
+                (draft.hero_slides?.length || 0) < 2 && (
+                  <p className="preview-empty-slider" role="status">
+                    {draft.hero_slides?.length
+                      ? "Falta agregar una foto más para ver tu slider."
+                      : "Todavía no has agregado fotos al slider."}{" "}
+                    La imagen de abajo es solo de ejemplo.
+                  </p>
+                )}
               <DesignPreview mode={previewMode}>
                 <div
                   className={`design-preview${draft.sections.find((s) => s.visible)?.id === "hero" ? " preview-cover-first" : ""}`}
@@ -1061,6 +1200,7 @@ export function DesignAdmin({ broker = false }: { broker?: boolean }) {
                               </p>
                             </div>
                             <HeroMedia
+                              key={`${draft.hero_mode}-${(draft.hero_slides || []).map((slide) => slide.media_id).join(",")}`}
                               preview
                               design={{
                                 ...draft,
