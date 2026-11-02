@@ -1355,7 +1355,17 @@ export function DesignAdmin({ broker = false }: { broker?: boolean }) {
                         )}
                       </div>
                     ))}
-                  <div className="design-preview-footer">
+                  <div
+                    className={`design-preview-footer${broker ? " preview-broker-footer" : ""}`}
+                  >
+                    {broker && (
+                      <>
+                        <strong>{displaySettings.site_name}</strong>
+                        <p>Tu próximo lugar comienza con una conversación.</p>
+                        <span>Propiedades · Contacto</span>
+                        <hr />
+                      </>
+                    )}
                     {displaySettings.site_name} · Vista de ejemplo
                   </div>
                 </div>

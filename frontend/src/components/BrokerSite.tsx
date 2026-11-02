@@ -1,7 +1,18 @@
 "use client";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { ArrowUpRight, House, Mail, Menu, Phone, X } from "lucide-react";
+import {
+  ArrowUpRight,
+  ArrowUp,
+  CalendarDays,
+  House,
+  Mail,
+  Menu,
+  MessageCircle,
+  Phone,
+  UsersRound,
+  X,
+} from "lucide-react";
 import { assetUrl, labels, request } from "@/lib/estate-api";
 import { defaultBrokerDesign, designStyle } from "@/lib/site-design";
 import { Notice, useEstate } from "./EstateApp";
@@ -142,8 +153,19 @@ export function BrokerSite({
             Consulta por una propiedad o coordina una visita con{" "}
             {a.display_name}.
           </p>
+          <div className="broker-contact-benefits">
+            <span>
+              <UsersRound size={23} aria-hidden="true" /> Contacto directo
+            </span>
+            <span>
+              <House size={23} aria-hidden="true" /> Consulta por propiedades
+            </span>
+            <span>
+              <CalendarDays size={23} aria-hidden="true" /> Coordina tu visita
+            </span>
+          </div>
         </div>
-        <div className="broker-contact-links">
+        <div className="broker-contact-links" aria-label="Canales de contacto">
           {a.phone && (
             <a
               className="button outline"
@@ -160,6 +182,7 @@ export function BrokerSite({
               target="_blank"
               rel="noreferrer"
             >
+              <MessageCircle size={21} aria-hidden="true" />
               Conversar por WhatsApp
               <ArrowUpRight size={18} />
             </a>
@@ -182,6 +205,7 @@ export function BrokerSite({
   };
   return (
     <div
+      id="sitio-inmobiliaria"
       className={`estate-site broker-site${!propertyIdentifier && visible[0]?.id === "hero" ? " has-cover-hero" : ""}`}
       style={designStyle(d)}
     >
@@ -249,21 +273,82 @@ export function BrokerSite({
           ))}
         </main>
       )}
-      <footer className="site-footer broker-footer">
-        <div>
-          <Link className="brand" href={base}>
-            {brand}
-          </Link>
-          <p>
-            © {new Date().getFullYear()} {a.display_name}
-          </p>
+      <footer className="site-footer broker-footer broker-footer-modern">
+        <div className="broker-footer-main">
+          <div className="broker-footer-brand">
+            <Link
+              className="brand"
+              href={base}
+              aria-label={`${a.display_name}, inicio`}
+            >
+              {brand}
+            </Link>
+            <p>
+              Un nuevo lugar comienza con una buena conversación. Encuentra tu
+              próxima propiedad con {a.display_name}.
+            </p>
+            <span className="broker-footer-kind">
+              {labels[a.kind] || "Anunciante inmobiliario"}
+            </span>
+          </div>
+          <nav
+            className="broker-footer-navigation"
+            aria-label="Enlaces del pie de página"
+          >
+            <h2>Explora nuestro sitio</h2>
+            {visible.map((section: any) => (
+              <Link key={section.id} href={`${base}#${anchors[section.id]}`}>
+                {navNames[section.id]}
+                <ArrowUpRight size={14} aria-hidden="true" />
+              </Link>
+            ))}
+          </nav>
+          <div className="broker-footer-contact">
+            <h2>Hablemos de tu próximo lugar</h2>
+            {a.phone && (
+              <a href={`tel:${a.phone.replace(/[^+\d]/g, "")}`}>
+                <Phone size={18} aria-hidden="true" />
+                <span>{a.phone}</span>
+              </a>
+            )}
+            {a.public_email && (
+              <a href={`mailto:${a.public_email}`}>
+                <Mail size={18} aria-hidden="true" />
+                <span>{a.public_email}</span>
+              </a>
+            )}
+            {a.whatsapp && (
+              <a
+                className="broker-footer-whatsapp"
+                href={`https://wa.me/${a.whatsapp.replace(/\D/g, "")}`}
+                target="_blank"
+                rel="noreferrer"
+              >
+                <MessageCircle size={19} aria-hidden="true" />
+                <span>Conversemos por WhatsApp</span>
+                <ArrowUpRight size={17} aria-hidden="true" />
+              </a>
+            )}
+            {!a.phone && !a.whatsapp && !a.public_email && (
+              <p>
+                Puedes consultar desde la ficha de una de nuestras propiedades.
+              </p>
+            )}
+          </div>
         </div>
-        <div>
-          <Link href="/">
-            Explorar el marketplace Propiedades
-            <ArrowUpRight size={16} />
+        <div className="broker-footer-bottom">
+          <span>
+            © {new Date().getFullYear()} {a.display_name}
+          </span>
+          <div>
+            <Link href="/privacidad">Privacidad y contacto</Link>
+            <Link href="/">
+              En Propiedades <ArrowUpRight size={14} aria-hidden="true" />
+            </Link>
+          </div>
+          <Link className="broker-back-top" href="#sitio-inmobiliaria">
+            Volver arriba <ArrowUp size={16} aria-hidden="true" />
           </Link>
-          <Link href="/privacidad">Privacidad y contacto</Link>
         </div>
       </footer>
     </div>
