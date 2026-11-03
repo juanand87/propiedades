@@ -5,9 +5,11 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 export function DesignPreview({
   mode,
   children,
+  focusFooter = false,
 }: {
   mode: "desktop" | "mobile";
   children: ReactNode;
+  focusFooter?: boolean;
 }) {
   const stage = useRef<HTMLDivElement>(null);
   const canvas = useRef<HTMLDivElement>(null);
@@ -26,6 +28,10 @@ export function DesignPreview({
     measure();
     return () => observer.disconnect();
   }, []);
+  useEffect(() => {
+    if (focusFooter && stage.current)
+      stage.current.scrollTop = stage.current.scrollHeight;
+  }, [focusFooter, size.height, size.width, mode]);
   const scale = size.width ? Math.min(1, size.width / width) : 0;
   return (
     <div className="design-preview-stage" ref={stage}>

@@ -1936,3 +1936,67 @@ body {
     gap: 18px;
   }
 }
+.broker-footer-editor > fieldset {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+.broker-footer-editor h3 {
+  margin-top: 28px;
+}
+.broker-footer-editor textarea,
+.broker-footer-editor input {
+  width: 100%;
+}
+.broker-footer-editor small {
+  display: block;
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.broker-footer-socials {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 20px 0;
+}
+.broker-footer-socials > a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  line-height: 1.4;
+  padding: 8px 10px;
+  border: 1px solid #ffffff40;
+  border-radius: 7px;
+  color: white;
+}
+.broker-footer-modern .broker-footer-note {
+  max-width: none;
+  border-top: 1px solid #ffffff30;
+  padding-top: 20px;
+  margin-top: 30px;
+}
+.preview-footer-socials {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 20px 0;
+}
+.preview-footer-socials span {
+  border: 1px solid #ffffff40;
+  border-radius: 6px;
+  padding: 8px;
+  font-size: 13px;
+}
+.preview-broker-footer .preview-footer-contact-title {
+  display: block;
+  font-size: 17px;
+  margin-top: 20px;
+}
+.broker-footer-modern p,
+.broker-footer-modern h2,
+.preview-broker-footer {
+  overflow-wrap: anywhere;
+}

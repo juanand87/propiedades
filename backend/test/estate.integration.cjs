@@ -560,6 +560,16 @@ async function main() {
       ...baseBroker.design,
       primary_color: '#18436a',
       hero_title: 'Corredor Azul · Tu próximo lugar',
+      footer_text: 'Equipo Azul, asesoría inmobiliaria local.',
+      footer_note: 'Atención con cita previa.',
+      footer_contact: {
+        phone: '+56 9 1111 1111',
+        whatsapp: '+56 9 1111 1111',
+        email: 'sitio-azul@qa.invalid',
+      },
+      footer_socials: [
+        { network: 'instagram', url: 'https://www.instagram.com/qa-azul/' },
+      ],
       hero_media_id: brokerMediaA.id,
       logo_media_id: brokerMediaA.id,
       sections: [...baseBroker.design.sections].reverse(),
@@ -595,6 +605,44 @@ async function main() {
       403,
     );
     const publicSiteA = await call('GET', '/advertisers/' + a.slug);
+    assert.equal(publicSiteA.site.footer_text, designA.footer_text);
+    assert.equal(
+      publicSiteA.site.footer_contact.email,
+      designA.footer_contact.email,
+    );
+    assert.deepEqual(publicSiteA.site.footer_socials, designA.footer_socials);
+    assert.equal(baseBroker.design_version, 3);
+    const profileAfterFooter = await call(
+      'GET',
+      '/me/advertiser',
+      null,
+      one.access_token,
+    );
+    assert.notEqual(
+      profileAfterFooter.public_email,
+      designA.footer_contact.email,
+    );
+    assertions += 5;
+    await call(
+      'PATCH',
+      '/me/site',
+      {
+        design: {
+          ...designA,
+          footer_socials: [
+            { network: 'instagram', url: 'javascript:alert(1)' },
+          ],
+        },
+        revision: 1,
+      },
+      one.access_token,
+      400,
+    );
+    assert.equal(
+      (await call('GET', '/me/site', null, one.access_token)).design_revision,
+      1,
+    );
+    assertions++;
     assert.equal(publicSiteA.site.hero_title, designA.hero_title);
     assert.equal(publicSiteA.site.sections[0].id, 'contact');
     for (const key of ['user_id', 'tax_id', 'legal_name', 'password'])
@@ -623,6 +671,9 @@ async function main() {
     );
     assert.equal(ownB.advertiser.id, b.id);
     assert.equal(ownB.design.primary_color, '#075ce5');
+    assert.equal(ownB.design.footer_contact, null);
+    assert.deepEqual(ownB.design.footer_socials, []);
+    assertions += 2;
     assert.equal(ownB.design_revision, 0);
     assert.equal(ownB.design.hero_media_id, null);
     assertions += 4;

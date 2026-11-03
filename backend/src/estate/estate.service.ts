@@ -471,9 +471,14 @@ export class EstateService {
     const design = this.brokerSiteDesign(a, row, u);
     return {
       site_name: a.display_name,
-      design_version: 2,
+      design_version: 3,
       homepage_title: design.hero_title,
       advertiser: { id: a.id, slug: a.slug, status: a.status },
+      profile_contact: {
+        phone: a.phone || '',
+        whatsapp: a.whatsapp || '',
+        email: a.public_email || '',
+      },
       design_ready: ready,
       design_revision: Number(row?.revision || 0),
       design,

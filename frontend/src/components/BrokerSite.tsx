@@ -14,7 +14,13 @@ import {
   X,
 } from "lucide-react";
 import { assetUrl, labels, request } from "@/lib/estate-api";
-import { defaultBrokerDesign, designStyle } from "@/lib/site-design";
+import {
+  defaultBrokerDesign,
+  designStyle,
+  brokerContact,
+  brokerFooterText,
+  socialNetworks,
+} from "@/lib/site-design";
 import { Notice, useEstate } from "./EstateApp";
 import { Detail, SearchView } from "./PublicView";
 import { HeroMedia } from "./HeroMedia";
@@ -75,13 +81,14 @@ export function BrokerSite({
     ...defaultBrokerDesign(a),
     logo_url: a.logo_media_id ? `/api/media/${a.logo_media_id}` : null,
   };
+  const contact = brokerContact(d, a);
   const base = `/anunciantes/${a.slug}`;
   const visible = d.sections.filter((s: any) => s.visible);
   const shows = (id: string) => visible.some((s: any) => s.id === id);
   const contactHref = shows("contact")
     ? `${base}#contacto`
-    : a.phone
-      ? `tel:${a.phone.replace(/[^+\d]/g, "")}`
+    : contact.phone
+      ? `tel:${contact.phone.replace(/[^+\d]/g, "")}`
       : base;
   const brand = (
     <>
@@ -166,19 +173,19 @@ export function BrokerSite({
           </div>
         </div>
         <div className="broker-contact-links" aria-label="Canales de contacto">
-          {a.phone && (
+          {contact.phone && (
             <a
               className="button outline"
-              href={`tel:${a.phone.replace(/[^+\d]/g, "")}`}
+              href={`tel:${contact.phone.replace(/[^+\d]/g, "")}`}
             >
               <Phone size={18} />
-              {a.phone}
+              {contact.phone}
             </a>
           )}
-          {a.whatsapp && (
+          {contact.whatsapp && (
             <a
               className="button"
-              href={`https://wa.me/${a.whatsapp.replace(/\D/g, "")}`}
+              href={`https://wa.me/${contact.whatsapp.replace(/\D/g, "")}`}
               target="_blank"
               rel="noreferrer"
             >
@@ -187,13 +194,13 @@ export function BrokerSite({
               <ArrowUpRight size={18} />
             </a>
           )}
-          {a.public_email && (
-            <a className="button outline" href={`mailto:${a.public_email}`}>
+          {contact.email && (
+            <a className="button outline" href={`mailto:${contact.email}`}>
               <Mail size={18} />
-              {a.public_email}
+              {contact.email}
             </a>
           )}
-          {!a.phone && !a.whatsapp && !a.public_email && (
+          {!contact.phone && !contact.whatsapp && !contact.email && (
             <p>
               Puedes enviar tu consulta desde la ficha de cualquiera de nuestras
               propiedades.
@@ -240,7 +247,7 @@ export function BrokerSite({
               Editar mi sitio
             </Link>
           ) : (
-            (shows("contact") || a.phone) && (
+            (shows("contact") || contact.phone) && (
               <Link className="button small" href={contactHref}>
                 Contactar
                 <ArrowUpRight size={16} />
@@ -283,10 +290,31 @@ export function BrokerSite({
             >
               {brand}
             </Link>
-            <p>
-              Un nuevo lugar comienza con una buena conversación. Encuentra tu
-              próxima propiedad con {a.display_name}.
-            </p>
+            {brokerFooterText(d, a.display_name) && (
+              <p className="preserve-lines">
+                {brokerFooterText(d, a.display_name)}
+              </p>
+            )}
+            {!!d.footer_socials?.length && (
+              <div
+                className="broker-footer-socials"
+                aria-label="Redes sociales"
+              >
+                {d.footer_socials.map((social: any) => (
+                  <a
+                    key={social.network}
+                    href={social.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    {socialNetworks.find(
+                      (network) => network.id === social.network,
+                    )?.name || social.network}
+                    <ArrowUpRight size={14} aria-hidden="true" />
+                  </a>
+                ))}
+              </div>
+            )}
             <span className="broker-footer-kind">
               {labels[a.kind] || "Anunciante inmobiliario"}
             </span>
@@ -304,23 +332,27 @@ export function BrokerSite({
             ))}
           </nav>
           <div className="broker-footer-contact">
-            <h2>Hablemos de tu próximo lugar</h2>
-            {a.phone && (
-              <a href={`tel:${a.phone.replace(/[^+\d]/g, "")}`}>
+            {(d.footer_contact_title ?? "Hablemos de tu próximo lugar") && (
+              <h2>
+                {d.footer_contact_title ?? "Hablemos de tu próximo lugar"}
+              </h2>
+            )}
+            {contact.phone && (
+              <a href={`tel:${contact.phone.replace(/[^+\d]/g, "")}`}>
                 <Phone size={18} aria-hidden="true" />
-                <span>{a.phone}</span>
+                <span>{contact.phone}</span>
               </a>
             )}
-            {a.public_email && (
-              <a href={`mailto:${a.public_email}`}>
+            {contact.email && (
+              <a href={`mailto:${contact.email}`}>
                 <Mail size={18} aria-hidden="true" />
-                <span>{a.public_email}</span>
+                <span>{contact.email}</span>
               </a>
             )}
-            {a.whatsapp && (
+            {contact.whatsapp && (
               <a
                 className="broker-footer-whatsapp"
-                href={`https://wa.me/${a.whatsapp.replace(/\D/g, "")}`}
+                href={`https://wa.me/${contact.whatsapp.replace(/\D/g, "")}`}
                 target="_blank"
                 rel="noreferrer"
               >
@@ -329,13 +361,16 @@ export function BrokerSite({
                 <ArrowUpRight size={17} aria-hidden="true" />
               </a>
             )}
-            {!a.phone && !a.whatsapp && !a.public_email && (
+            {!contact.phone && !contact.whatsapp && !contact.email && (
               <p>
                 Puedes consultar desde la ficha de una de nuestras propiedades.
               </p>
             )}
           </div>
         </div>
+        {d.footer_note && (
+          <p className="broker-footer-note preserve-lines">{d.footer_note}</p>
+        )}
         <div className="broker-footer-bottom">
           <span>
             © {new Date().getFullYear()} {a.display_name}

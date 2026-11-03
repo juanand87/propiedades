@@ -1,10 +1,12 @@
 import { BadRequestException } from '@nestjs/common';
 import { defaultDesign, validateDesign } from './site-design';
+import { defaultBrokerFooter, validateBrokerFooter } from './broker-footer';
 
 export const BROKER_SECTIONS = ['hero', 'about', 'listings', 'contact'];
 export function defaultBrokerDesign(profile: any = {}) {
   return {
     ...defaultDesign(BROKER_SECTIONS),
+    ...defaultBrokerFooter(),
     logo_media_id: profile.logo_media_id || null,
     hero_title: profile.display_name || 'Tu próximo lugar comienza aquí.',
     hero_subtitle: 'Propiedades, asesoría y atención personalizada.',
@@ -36,6 +38,7 @@ export function validateBrokerDesign(b: any) {
   }
   return {
     ...core,
+    ...validateBrokerFooter(b),
     hero_title: content.hero_title,
     hero_subtitle: content.hero_subtitle,
     about_title: content.about_title,

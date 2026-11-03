@@ -28,11 +28,14 @@ import {
   defaultBrokerDesign,
   SiteDesign,
   colorThemes,
+  brokerFooterText,
+  socialNetworks,
 } from "@/lib/site-design";
 import { Notice, useEstate } from "./EstateApp";
 import { HeroMedia } from "./HeroMedia";
 import { DesignPreview } from "./DesignPreview";
 import { ImageUpload } from "./ImageUpload";
+import { BrokerFooterEditor } from "./BrokerFooterEditor";
 
 type ImageSlot = "logo_media_id" | "hero_media_id" | "hero_slides";
 
@@ -367,7 +370,14 @@ export function DesignAdmin({ broker = false }: { broker?: boolean }) {
                   : "Diseño publicado. Ya está disponible en el sitio principal.",
               );
             } catch (e) {
-              setError((e as Error).message);
+              const message = (e as Error).message;
+              setError(message);
+              if (
+                broker &&
+                /footer|red(es)? social|correo|teléfono|contacto/i.test(message)
+              )
+                setActiveSection("footer");
+              window.scrollTo({ top: 0, behavior: "smooth" });
             } finally {
               setBusy(false);
             }
@@ -495,7 +505,7 @@ export function DesignAdmin({ broker = false }: { broker?: boolean }) {
                         : activeSection === "about"
                           ? "Presenta tus servicios y tu experiencia. Esta sección es exclusiva de tu sitio."
                           : broker
-                            ? "Los datos de contacto provienen de tu perfil de anunciante. Puedes mostrar u ocultar el bloque de contacto."
+                            ? "Personaliza el texto, las redes sociales y los datos de contacto de tu sitio. Puedes mostrar u ocultar el bloque de contacto."
                             : "El pie utiliza el nombre del sitio y los enlaces de información, privacidad y contacto. El nombre y los textos generales se administran en Configuración del sitio."}
                   </p>
                   {draft.sections
@@ -528,7 +538,7 @@ export function DesignAdmin({ broker = false }: { broker?: boolean }) {
                         Mostrar {sectionNames[s.id]}
                       </label>
                     ))}
-                  {activeSection === "footer" && (
+                  {activeSection === "footer" && !broker && (
                     <Link
                       className="text-link"
                       target="_blank"
@@ -544,6 +554,26 @@ export function DesignAdmin({ broker = false }: { broker?: boolean }) {
                     </Link>
                   )}
                 </section>
+              )}
+              {broker && (
+                <div
+                  hidden={activeSection !== "footer"}
+                  data-design-panel="footer"
+                >
+                  <BrokerFooterEditor
+                    draft={draft}
+                    update={update}
+                    profileContact={
+                      siteInfo?.profile_contact || {
+                        phone: "",
+                        whatsapp: "",
+                        email: "",
+                      }
+                    }
+                    siteName={displaySettings.site_name}
+                    ready={ready && siteInfo?.design_version >= 3}
+                  />
+                </div>
               )}
               {broker && (
                 <section
@@ -564,10 +594,7 @@ export function DesignAdmin({ broker = false }: { broker?: boolean }) {
                           ? "propiedades"
                           : "contacto"}
                   </h2>
-                  <p>
-                    El nombre y los datos de contacto se administran en tu
-                    perfil de anunciante.
-                  </p>
+                  <p>El nombre se administra en tu perfil de anunciante.</p>
                   {(
                     [
                       ["hero_title", "Título de la portada", 180],
@@ -1246,7 +1273,10 @@ export function DesignAdmin({ broker = false }: { broker?: boolean }) {
                       "La imagen de abajo es solo de ejemplo."}
                   </p>
                 )}
-              <DesignPreview mode={previewMode}>
+              <DesignPreview
+                mode={previewMode}
+                focusFooter={broker && activeSection === "footer"}
+              >
                 <div
                   className={`design-preview${draft.sections.find((s) => s.visible)?.id === "hero" ? " preview-cover-first" : ""}`}
                   style={designStyle(draft)}
@@ -1361,8 +1391,53 @@ export function DesignAdmin({ broker = false }: { broker?: boolean }) {
                     {broker && (
                       <>
                         <strong>{displaySettings.site_name}</strong>
-                        <p>Tu próximo lugar comienza con una conversación.</p>
+                        {brokerFooterText(draft, displaySettings.site_name) && (
+                          <p className="preserve-lines">
+                            {brokerFooterText(draft, displaySettings.site_name)}
+                          </p>
+                        )}
                         <span>Propiedades · Contacto</span>
+                        {(draft.footer_contact_title ??
+                          "Hablemos de tu próximo lugar") && (
+                          <strong className="preview-footer-contact-title">
+                            {draft.footer_contact_title ??
+                              "Hablemos de tu próximo lugar"}
+                          </strong>
+                        )}
+                        {Object.entries(
+                          draft.footer_contact ??
+                            siteInfo?.profile_contact ??
+                            {},
+                        ).map(([key, value]) =>
+                          value ? (
+                            <span key={key}>
+                              {(
+                                {
+                                  phone: "Teléfono",
+                                  whatsapp: "WhatsApp",
+                                  email: "Correo",
+                                } as Record<string, string>
+                              )[key] || key}
+                              : {String(value)}
+                            </span>
+                          ) : null,
+                        )}
+                        {!!draft.footer_socials?.length && (
+                          <div className="preview-footer-socials">
+                            {draft.footer_socials.map((social) => (
+                              <span key={social.network}>
+                                {
+                                  socialNetworks.find(
+                                    (network) => network.id === social.network,
+                                  )?.name
+                                }
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                        {draft.footer_note && (
+                          <p className="preserve-lines">{draft.footer_note}</p>
+                        )}
                         <hr />
                       </>
                     )}

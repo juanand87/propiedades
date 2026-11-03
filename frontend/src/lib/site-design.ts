@@ -13,7 +13,56 @@ export const brokerSectionNames: Record<string, string> = {
   listings: "Mis propiedades",
   contact: "Contacto",
 };
+export type SiteContact = { phone: string; whatsapp: string; email: string };
+export const socialNetworks = [
+  {
+    id: "instagram",
+    name: "Instagram",
+    placeholder: "https://www.instagram.com/tuinmobiliaria",
+  },
+  {
+    id: "facebook",
+    name: "Facebook",
+    placeholder: "https://www.facebook.com/tuinmobiliaria",
+  },
+  {
+    id: "linkedin",
+    name: "LinkedIn",
+    placeholder: "https://www.linkedin.com/company/tuinmobiliaria",
+  },
+  {
+    id: "youtube",
+    name: "YouTube",
+    placeholder: "https://www.youtube.com/@tuinmobiliaria",
+  },
+  {
+    id: "tiktok",
+    name: "TikTok",
+    placeholder: "https://www.tiktok.com/@tuinmobiliaria",
+  },
+  { id: "x", name: "X / Twitter", placeholder: "https://x.com/tuinmobiliaria" },
+];
+export function brokerFooterText(d: SiteDesign, name: string) {
+  return (
+    d.footer_text ??
+    `Un nuevo lugar comienza con una buena conversación. Encuentra tu próxima propiedad con ${name}.`
+  );
+}
+export function brokerContact(d: SiteDesign, profile: any): SiteContact {
+  return (
+    d.footer_contact ?? {
+      phone: profile.phone || "",
+      whatsapp: profile.whatsapp || "",
+      email: profile.public_email || "",
+    }
+  );
+}
 export type SiteDesign = {
+  footer_text?: string | null;
+  footer_contact_title?: string;
+  footer_note?: string;
+  footer_contact?: SiteContact | null;
+  footer_socials?: { network: string; url: string }[];
   primary_color: string;
   accent_color: string;
   background_color: string;
