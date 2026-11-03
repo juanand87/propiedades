@@ -42,6 +42,12 @@ export const socialNetworks = [
   },
   { id: "x", name: "X / Twitter", placeholder: "https://x.com/tuinmobiliaria" },
 ];
+export function marketplaceFooterText(d: SiteDesign) {
+  return (
+    d.footer_text ??
+    "Un lugar para comenzar algo nuevo.\nPropiedades y personas, más cerca."
+  );
+}
 export function brokerFooterText(d: SiteDesign, name: string) {
   return (
     d.footer_text ??
@@ -87,6 +93,12 @@ export type SiteDesign = {
 };
 export function defaultDesign(): SiteDesign {
   return {
+    footer_text: null,
+    footer_contact_title: "Hablemos de tu próximo lugar",
+    footer_note:
+      "Las consultas y visitas se coordinan directamente con el anunciante.",
+    footer_contact: null,
+    footer_socials: [],
     primary_color: "#075ce5",
     accent_color: "#d9a553",
     background_color: "#f6f8fc",
@@ -215,6 +227,7 @@ export const colorThemes = [
 export function defaultBrokerDesign(profile: any = {}): SiteDesign {
   return {
     ...defaultDesign(),
+    footer_note: "",
     logo_media_id: profile.logo_media_id || null,
     hero_title: profile.display_name || "Tu próximo lugar comienza aquí.",
     hero_subtitle: "Propiedades, asesoría y atención personalizada.",

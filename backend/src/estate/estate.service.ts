@@ -229,7 +229,7 @@ export class EstateService {
     const { design_json, ...publicSettings } = row || {};
     return {
       ...publicSettings,
-      design_version: 2,
+      design_version: 4,
       design_ready:
         !!row &&
         Object.hasOwn(row, 'design_json') &&

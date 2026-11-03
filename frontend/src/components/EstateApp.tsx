@@ -9,6 +9,7 @@ import { PublicView } from "./PublicView";
 import { Workspace } from "./Workspace";
 import { AuthView } from "./AuthView";
 import { BrokerSite } from "./BrokerSite";
+import { MarketplaceFooter } from "./MarketplaceFooter";
 
 type State = {
   user: any;
@@ -279,45 +280,11 @@ export default function EstateApp({
             <PublicView path={path} initialProperty={initialProperty} />
           )}
           {!workspace && (
-            <footer className="site-footer">
-              <div>
-                <Link href="/" className="brand">
-                  {brand}
-                  {(!design.logo_url || design.show_site_name) && (
-                    <>
-                      {settings.site_name}
-                      <span className="brand-dot">.</span>
-                    </>
-                  )}
-                </Link>
-                <p>
-                  Un lugar para comenzar algo nuevo.
-                  <br />
-                  Propiedades y personas, más cerca.
-                </p>
-              </div>
-              <div>
-                <span className="eyebrow">EXPLORA</span>
-                <Link href="/propiedades">Propiedades en venta</Link>
-                <Link href="/anunciantes">Nuestros anunciantes</Link>
-                <Link href="/favoritos">Tus favoritos</Link>
-              </div>
-              <div>
-                <span className="eyebrow">PUBLICA</span>
-                <Link href="/dashboard/perfil">Propietarios y corredores</Link>
-                <Link href="/informacion">Acerca del marketplace</Link>
-                <Link href="/privacidad">Privacidad y contacto</Link>
-              </div>
-              <div className="footer-bottom">
-                <span>
-                  © {new Date().getFullYear()} {settings.site_name}. Chile.
-                </span>
-                <span>
-                  Las consultas y visitas se coordinan directamente con el
-                  anunciante.
-                </span>
-              </div>
-            </footer>
+            <MarketplaceFooter
+              settings={settings}
+              design={design}
+              brand={brand}
+            />
           )}
         </div>
       )}

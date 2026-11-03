@@ -476,6 +476,15 @@ async function main() {
         design: {
           ...initialDesign.design,
           primary_color: '#18436a',
+          footer_text: 'Portal principal independiente.',
+          footer_contact: {
+            phone: '+56 9 4444 4444',
+            whatsapp: '+56 9 4444 4444',
+            email: 'portal@qa.invalid',
+          },
+          footer_socials: [
+            { network: 'facebook', url: 'https://www.facebook.com/qa-portal/' },
+          ],
           logo_media_id: adminMedia.id,
           hero_media_id: adminMedia.id,
           sections: [...initialDesign.design.sections]
@@ -485,6 +494,35 @@ async function main() {
       },
       admin,
     );
+    assert.equal(designed.design_version, 4);
+    const publicMainFooter = await call('GET', '/settings');
+    assert.equal(
+      publicMainFooter.design.footer_text,
+      'Portal principal independiente.',
+    );
+    assert.equal(
+      publicMainFooter.design.footer_contact.email,
+      'portal@qa.invalid',
+    );
+    assert.equal(publicMainFooter.design.footer_socials[0].network, 'facebook');
+    assertions += 4;
+    await call(
+      'PATCH',
+      '/admin/design',
+      {
+        design: {
+          ...designed.design,
+          footer_socials: [
+            { network: 'facebook', url: 'https://instagram.com/qa/' },
+          ],
+        },
+        revision: 2,
+      },
+      admin,
+      400,
+    );
+    assert.equal((await call('GET', '/settings')).design_revision, 2);
+    assertions++;
     assert.equal(designed.design_revision, 2);
     assert.equal(designed.design.primary_color, '#18436a');
     assert.equal(designed.design.sections[0].id, 'publish');
@@ -672,6 +710,9 @@ async function main() {
     assert.equal(ownB.advertiser.id, b.id);
     assert.equal(ownB.design.primary_color, '#075ce5');
     assert.equal(ownB.design.footer_contact, null);
+    assert.notEqual(ownB.design.footer_text, 'Portal principal independiente.');
+    assert.equal(ownB.design.footer_note, '');
+    assertions += 2;
     assert.deepEqual(ownB.design.footer_socials, []);
     assertions += 2;
     assert.equal(ownB.design_revision, 0);

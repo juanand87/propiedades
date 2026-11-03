@@ -29,6 +29,7 @@ import {
   SiteDesign,
   colorThemes,
   brokerFooterText,
+  marketplaceFooterText,
   socialNetworks,
 } from "@/lib/site-design";
 import { Notice, useEstate } from "./EstateApp";
@@ -506,7 +507,7 @@ export function DesignAdmin({ broker = false }: { broker?: boolean }) {
                           ? "Presenta tus servicios y tu experiencia. Esta sección es exclusiva de tu sitio."
                           : broker
                             ? "Personaliza el texto, las redes sociales y los datos de contacto de tu sitio. Puedes mostrar u ocultar el bloque de contacto."
-                            : "El pie utiliza el nombre del sitio y los enlaces de información, privacidad y contacto. El nombre y los textos generales se administran en Configuración del sitio."}
+                            : "Personaliza aquí los textos, las redes sociales y los contactos del footer principal. El nombre del sitio se administra en Configuración del sitio."}
                   </p>
                   {draft.sections
                     .filter(
@@ -555,26 +556,35 @@ export function DesignAdmin({ broker = false }: { broker?: boolean }) {
                   )}
                 </section>
               )}
-              {broker && (
+              {
                 <div
                   hidden={activeSection !== "footer"}
                   data-design-panel="footer"
                 >
                   <BrokerFooterEditor
                     draft={draft}
+                    marketplace={!broker}
                     update={update}
                     profileContact={
-                      siteInfo?.profile_contact || {
+                      (broker
+                        ? siteInfo?.profile_contact
+                        : {
+                            phone: "",
+                            whatsapp: "",
+                            email: settings.contact_email || "",
+                          }) || {
                         phone: "",
                         whatsapp: "",
                         email: "",
                       }
                     }
                     siteName={displaySettings.site_name}
-                    ready={ready && siteInfo?.design_version >= 3}
+                    ready={
+                      ready && siteInfo?.design_version >= (broker ? 3 : 4)
+                    }
                   />
                 </div>
-              )}
+              }
               {broker && (
                 <section
                   className="panel-card"
@@ -1275,7 +1285,7 @@ export function DesignAdmin({ broker = false }: { broker?: boolean }) {
                 )}
               <DesignPreview
                 mode={previewMode}
-                focusFooter={broker && activeSection === "footer"}
+                focusFooter={activeSection === "footer"}
               >
                 <div
                   className={`design-preview${draft.sections.find((s) => s.visible)?.id === "hero" ? " preview-cover-first" : ""}`}
@@ -1388,12 +1398,19 @@ export function DesignAdmin({ broker = false }: { broker?: boolean }) {
                   <div
                     className={`design-preview-footer${broker ? " preview-broker-footer" : ""}`}
                   >
-                    {broker && (
+                    {
                       <>
                         <strong>{displaySettings.site_name}</strong>
-                        {brokerFooterText(draft, displaySettings.site_name) && (
+                        {(broker
+                          ? brokerFooterText(draft, displaySettings.site_name)
+                          : marketplaceFooterText(draft)) && (
                           <p className="preserve-lines">
-                            {brokerFooterText(draft, displaySettings.site_name)}
+                            {broker
+                              ? brokerFooterText(
+                                  draft,
+                                  displaySettings.site_name,
+                                )
+                              : marketplaceFooterText(draft)}
                           </p>
                         )}
                         <span>Propiedades · Contacto</span>
@@ -1406,7 +1423,9 @@ export function DesignAdmin({ broker = false }: { broker?: boolean }) {
                         )}
                         {Object.entries(
                           draft.footer_contact ??
-                            siteInfo?.profile_contact ??
+                            (broker
+                              ? siteInfo?.profile_contact
+                              : { email: settings.contact_email || "" }) ??
                             {},
                         ).map(([key, value]) =>
                           value ? (
@@ -1440,7 +1459,7 @@ export function DesignAdmin({ broker = false }: { broker?: boolean }) {
                         )}
                         <hr />
                       </>
-                    )}
+                    }
                     {displaySettings.site_name} · Vista de ejemplo
                   </div>
                 </div>

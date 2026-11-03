@@ -2000,3 +2000,73 @@ body {
 .preview-broker-footer {
   overflow-wrap: anywhere;
 }
+.marketplace-footer.has-contact {
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 0.8fr) minmax(
+      0,
+      0.8fr
+    ) minmax(0, 1fr);
+}
+.marketplace-footer p,
+.marketplace-footer h2,
+.marketplace-footer span {
+  overflow-wrap: anywhere;
+}
+.marketplace-socials {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 20px;
+}
+.marketplace-socials a {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  padding: 8px 10px;
+  color: var(--green);
+  font-size: 12px;
+}
+.marketplace-footer-contact h2 {
+  font-size: 14px;
+  letter-spacing: 0;
+  line-height: 1.5;
+  margin: 0 0 8px;
+}
+.marketplace-footer-contact > a {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 12px;
+  line-height: 1.6;
+  padding: 4px 0;
+  min-width: 0;
+}
+.marketplace-footer-contact svg {
+  flex-shrink: 0;
+  color: var(--green);
+}
+.marketplace-footer .footer-bottom {
+  flex-wrap: wrap;
+  gap: 15px;
+}
+.design-preview-footer:not(.preview-broker-footer)
+  .preview-footer-socials
+  span {
+  border-color: var(--line);
+}
+.design-preview-footer .preview-footer-contact-title {
+  display: block;
+  font-size: 17px;
+  margin-top: 20px;
+}
+@media (max-width: 1000px) {
+  .marketplace-footer.has-contact {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+}
+@media (max-width: 650px) {
+  .marketplace-footer.has-contact {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

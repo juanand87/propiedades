@@ -1,6 +1,7 @@
 "use client";
 import {
   brokerFooterText,
+  marketplaceFooterText,
   socialNetworks,
   type SiteDesign,
   type SiteContact,
@@ -12,12 +13,14 @@ export function BrokerFooterEditor({
   profileContact,
   siteName,
   ready,
+  marketplace = false,
 }: {
   draft: SiteDesign;
   update: (key: keyof SiteDesign, value: unknown) => void;
   profileContact: SiteContact;
   siteName: string;
   ready: boolean;
+  marketplace?: boolean;
 }) {
   const contact = draft.footer_contact ?? profileContact;
   function changeSocial(network: string, url: string) {
@@ -43,7 +46,11 @@ export function BrokerFooterEditor({
           <textarea
             maxLength={600}
             rows={4}
-            value={brokerFooterText(draft, siteName)}
+            value={
+              marketplace
+                ? marketplaceFooterText(draft)
+                : brokerFooterText(draft, siteName)
+            }
             onChange={(e) => update("footer_text", e.target.value)}
           />
           <small>Hasta 600 caracteres. Déjalo vacío para ocultarlo.</small>
@@ -75,13 +82,16 @@ export function BrokerFooterEditor({
         </label>
         <h3>Datos de contacto de tu sitio</h3>
         <p>
-          Se muestran en el bloque de contacto, la cabecera y el footer de tu
-          sitio. No modifican los datos de tu perfil en el marketplace.
+          {marketplace
+            ? "Se muestran en el footer del sitio principal. No modifican los contactos de las inmobiliarias."
+            : "Se muestran en el bloque de contacto, la cabecera y el footer de tu sitio. No modifican los datos de tu perfil en el marketplace."}
         </p>
         <p className="notice">
           {draft.footer_contact
             ? "Usas datos personalizados para este sitio."
-            : "Usas los datos públicos de tu perfil."}
+            : marketplace
+              ? "Usas el correo general de Configuración del sitio."
+              : "Usas los datos públicos de tu perfil."}
         </p>
         {(
           [
@@ -114,7 +124,9 @@ export function BrokerFooterEditor({
           disabled={!draft.footer_contact}
           onClick={() => update("footer_contact", null)}
         >
-          Volver a usar los datos del perfil
+          {marketplace
+            ? "Volver al correo general del sitio"
+            : "Volver a usar los datos del perfil"}
         </button>
         <h3>Redes sociales</h3>
         <p>
@@ -143,8 +155,10 @@ export function BrokerFooterEditor({
           </label>
         ))}
         <p className="muted">
-          Los cambios se publican con “Guardar mi sitio”. Los enlaces deben
-          pertenecer a la red social indicada.
+          {marketplace
+            ? "Publica los cambios con Guardar y publicar diseño."
+            : "Los cambios se publican con Guardar mi sitio."}{" "}
+          Los enlaces deben pertenecer a la red social indicada.
         </p>
       </fieldset>
     </section>
