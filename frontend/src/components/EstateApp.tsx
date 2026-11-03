@@ -4,7 +4,12 @@ import { createContext, useContext, useEffect, useState } from "react";
 import { House, Menu, X, ArrowUpRight, Heart } from "lucide-react";
 import { request } from "@/lib/estate-api";
 import { assetUrl } from "@/lib/estate-api";
-import { designStyle, siteDesign } from "@/lib/site-design";
+import {
+  designStyle,
+  siteDesign,
+  headerLinks,
+  headerHref,
+} from "@/lib/site-design";
 import { PublicView } from "./PublicView";
 import { Workspace } from "./Workspace";
 import { AuthView } from "./AuthView";
@@ -170,6 +175,16 @@ export default function EstateApp({
   const auth =
     path[0] === "login" || path[0] === "register" || path[1] === "login";
   const design = siteDesign(settings);
+  const mainHeaderLinks = headerLinks(design);
+  const customHeader =
+    design.header_links != null || design.header_button != null;
+  const primary = design.header_button;
+  const primaryHref = primary
+    ? headerHref(primary.href)
+    : user
+      ? "/dashboard/perfil"
+      : "/register";
+  const primaryLabel = primary?.label || "Publicar propiedad";
   const brand = design.logo_url ? (
     <img
       className="site-logo"
@@ -206,7 +221,9 @@ export default function EstateApp({
           className={`estate-site${path.length === 0 ? " modern-home" : ""}${path.length === 0 && design.sections.find((s) => s.visible)?.id === "hero" ? " has-cover-hero" : ""}`}
           style={designStyle(design)}
         >
-          <header className="site-header">
+          <header
+            className={`site-header${customHeader ? " custom-header" : ""}`}
+          >
             <Link
               href="/"
               className="brand"
@@ -222,16 +239,37 @@ export default function EstateApp({
             </Link>
             <nav
               className={menu ? "main-nav open" : "main-nav"}
+              id="main-site-menu"
               aria-label="Navegación principal"
             >
-              <Link
-                href="/propiedades"
-                className={path[0] === "propiedades" ? "active" : ""}
-              >
-                Buscar propiedades
-              </Link>
-              <Link href="/anunciantes">Anunciantes</Link>
-              <Link href="/informacion">Nosotros</Link>
+              {mainHeaderLinks.map((item, index) => (
+                <Link
+                  key={index}
+                  className={
+                    item.href === "/propiedades" && path[0] === "propiedades"
+                      ? "active"
+                      : undefined
+                  }
+                  href={headerHref(item.href)}
+                  target={item.new_tab ? "_blank" : undefined}
+                  rel={item.new_tab ? "noopener noreferrer" : undefined}
+                  onClick={() => setMenu(false)}
+                >
+                  {item.label}
+                </Link>
+              ))}
+              {customHeader && (primary == null || primary.visible) && (
+                <Link
+                  className="button small header-mobile-cta"
+                  href={primaryHref}
+                  target={primary?.new_tab ? "_blank" : undefined}
+                  rel={primary?.new_tab ? "noopener noreferrer" : undefined}
+                  onClick={() => setMenu(false)}
+                >
+                  {primaryLabel}
+                  <ArrowUpRight size={16} />
+                </Link>
+              )}
             </nav>
             <div className="header-actions">
               <Link
@@ -253,14 +291,20 @@ export default function EstateApp({
               >
                 {user ? "Mi panel" : "Ingresar"}
               </Link>
-              <Link
-                className="button small publish-link"
-                href={user ? "/dashboard/perfil" : "/register"}
-              >
-                Publicar propiedad <ArrowUpRight size={16} />
-              </Link>
+              {(primary == null || primary.visible) && (
+                <Link
+                  className="button small publish-link"
+                  href={primaryHref}
+                  target={primary?.new_tab ? "_blank" : undefined}
+                  rel={primary?.new_tab ? "noopener noreferrer" : undefined}
+                >
+                  {primaryLabel}
+                  <ArrowUpRight size={16} />
+                </Link>
+              )}
               <button
                 className="mobile-toggle"
+                aria-controls="main-site-menu"
                 aria-label="Abrir navegación"
                 aria-expanded={menu}
                 onClick={() => setMenu(!menu)}

@@ -20,6 +20,8 @@ import {
   brokerContact,
   brokerFooterText,
   socialNetworks,
+  headerLinks,
+  headerHref,
 } from "@/lib/site-design";
 import { Notice, useEstate } from "./EstateApp";
 import { Detail, SearchView } from "./PublicView";
@@ -83,6 +85,10 @@ export function BrokerSite({
   };
   const contact = brokerContact(d, a);
   const base = `/anunciantes/${a.slug}`;
+  const menuLinks = headerLinks(d, true);
+  const customHeader = d.header_links != null || d.header_button != null;
+  const primary = d.header_button;
+  const isOwner = user?.advertiser_id === a.id;
   const visible = d.sections.filter((s: any) => s.visible);
   const shows = (id: string) => visible.some((s: any) => s.id === id);
   const contactHref = shows("contact")
@@ -216,7 +222,9 @@ export function BrokerSite({
       className={`estate-site broker-site${!propertyIdentifier && visible[0]?.id === "hero" ? " has-cover-hero" : ""}`}
       style={designStyle(d)}
     >
-      <header className="site-header broker-header">
+      <header
+        className={`site-header broker-header${customHeader ? " custom-header" : ""}`}
+      >
         <Link
           className="brand"
           href={base}
@@ -226,36 +234,67 @@ export function BrokerSite({
         </Link>
         <nav
           className={`main-nav${menu ? " open" : ""}`}
+          id="broker-site-menu"
           aria-label="Navegación del sitio del anunciante"
         >
-          {visible.map((s: any) => (
+          {menuLinks.map((item, index) => (
             <Link
-              key={s.id}
-              href={`${base}#${anchors[s.id]}`}
+              key={index}
+              href={headerHref(item.href, base)}
+              target={item.new_tab ? "_blank" : undefined}
+              rel={item.new_tab ? "noopener noreferrer" : undefined}
               onClick={() => setMenu(false)}
             >
-              {navNames[s.id]}
+              {item.label}
             </Link>
           ))}
+          {customHeader &&
+            (primary
+              ? primary.visible
+              : shows("contact") || !!contact.phone) && (
+              <Link
+                className="button small header-mobile-cta"
+                href={primary ? headerHref(primary.href, base) : contactHref}
+                target={primary?.new_tab ? "_blank" : undefined}
+                rel={primary?.new_tab ? "noopener noreferrer" : undefined}
+                onClick={() => setMenu(false)}
+              >
+                {primary?.label || "Contactar"}
+                <ArrowUpRight size={16} />
+              </Link>
+            )}
         </nav>
         <div className="header-actions">
-          {user?.advertiser_id === a.id ? (
+          {isOwner && (
             <Link
-              className="button small"
+              className={customHeader ? "account-link" : "button small"}
               href={user.role === "admin" ? "/panel/sitio" : "/dashboard/sitio"}
             >
               Editar mi sitio
             </Link>
-          ) : (
-            (shows("contact") || contact.phone) && (
-              <Link className="button small" href={contactHref}>
-                Contactar
-                <ArrowUpRight size={16} />
-              </Link>
-            )
           )}
+          {primary != null
+            ? primary.visible && (
+                <Link
+                  className="button small"
+                  href={headerHref(primary.href, base)}
+                  target={primary.new_tab ? "_blank" : undefined}
+                  rel={primary.new_tab ? "noopener noreferrer" : undefined}
+                >
+                  {primary.label}
+                  <ArrowUpRight size={16} />
+                </Link>
+              )
+            : !isOwner &&
+              (shows("contact") || contact.phone) && (
+                <Link className="button small" href={contactHref}>
+                  Contactar
+                  <ArrowUpRight size={16} />
+                </Link>
+              )}
           <button
             className="mobile-toggle"
+            aria-controls="broker-site-menu"
             aria-label="Abrir menú del anunciante"
             aria-expanded={menu}
             onClick={() => setMenu(!menu)}

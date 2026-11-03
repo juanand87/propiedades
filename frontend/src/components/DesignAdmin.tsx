@@ -37,6 +37,8 @@ import { HeroMedia } from "./HeroMedia";
 import { DesignPreview } from "./DesignPreview";
 import { ImageUpload } from "./ImageUpload";
 import { BrokerFooterEditor } from "./BrokerFooterEditor";
+import { HeaderEditor } from "./HeaderEditor";
+import { HeaderPreview } from "./HeaderPreview";
 
 type ImageSlot = "logo_media_id" | "hero_media_id" | "hero_slides";
 
@@ -372,6 +374,7 @@ export function DesignAdmin({ broker = false }: { broker?: boolean }) {
               );
             } catch (e) {
               const message = (e as Error).message;
+              if (/cabecera/i.test(message)) setActiveSection("header");
               setError(message);
               if (
                 broker &&
@@ -483,11 +486,22 @@ export function DesignAdmin({ broker = false }: { broker?: boolean }) {
               )}
               {activeSection === "header" && (
                 <p className="design-section-help">
-                  La cabecera utiliza tu logo y los enlaces del sitio. Se
+                  Personaliza los enlaces, su orden y el botón principal. Se
                   muestra flotante cuando la portada es la primera sección
-                  visible. Puedes elegir si acompañar el logo con el nombre.
+                  visible.
                 </p>
               )}
+              <div
+                hidden={activeSection !== "header"}
+                data-design-panel="header"
+              >
+                <HeaderEditor
+                  draft={draft}
+                  update={update}
+                  broker={broker}
+                  ready={ready && siteInfo?.design_version >= 5}
+                />
+              </div>
               {(activeSection === "search" ||
                 activeSection === "properties" ||
                 activeSection === "footer" ||
@@ -1286,12 +1300,13 @@ export function DesignAdmin({ broker = false }: { broker?: boolean }) {
               <DesignPreview
                 mode={previewMode}
                 focusFooter={activeSection === "footer"}
+                focusHeader={activeSection === "header"}
               >
                 <div
                   className={`design-preview${draft.sections.find((s) => s.visible)?.id === "hero" ? " preview-cover-first" : ""}`}
                   style={designStyle(draft)}
                 >
-                  <div className="design-preview-header">
+                  <HeaderPreview design={draft} broker={broker}>
                     {imageUrl("logo_media_id") ? (
                       <img
                         src={imageUrl("logo_media_id")}
@@ -1303,12 +1318,7 @@ export function DesignAdmin({ broker = false }: { broker?: boolean }) {
                     {(!draft.logo_media_id || draft.show_site_name) && (
                       <strong>{displaySettings.site_name}</strong>
                     )}
-                    <span className="preview-navigation" aria-hidden="true">
-                      {broker
-                        ? "Inicio · Propiedades · Contacto"
-                        : "Propiedades · Anunciantes · Publicar"}
-                    </span>
-                  </div>
+                  </HeaderPreview>
                   {draft.sections
                     .filter((s) => s.visible)
                     .map((s) => (

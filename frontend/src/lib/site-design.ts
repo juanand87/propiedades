@@ -63,7 +63,10 @@ export function brokerContact(d: SiteDesign, profile: any): SiteContact {
     }
   );
 }
+export type HeaderLink = { label: string; href: string; new_tab: boolean };
 export type SiteDesign = {
+  header_links?: HeaderLink[] | null;
+  header_button?: (HeaderLink & { visible: boolean }) | null;
   footer_text?: string | null;
   footer_contact_title?: string;
   footer_note?: string;
@@ -93,6 +96,8 @@ export type SiteDesign = {
 };
 export function defaultDesign(): SiteDesign {
   return {
+    header_links: null,
+    header_button: null,
     footer_text: null,
     footer_contact_title: "Hablemos de tu próximo lugar",
     footer_note:
@@ -252,4 +257,55 @@ export function designStyle(d: SiteDesign): CSSProperties {
     "--ink": d.text_color,
     "--muted": `color-mix(in srgb, ${d.text_color} 80%, ${d.background_color})`,
   } as CSSProperties;
+}
+
+export const brokerAnchors: Record<string, string> = {
+  hero: "inicio",
+  about: "nosotros",
+  listings: "propiedades",
+  contact: "contacto",
+};
+export function headerPresets(broker: boolean, d: SiteDesign): HeaderLink[] {
+  if (broker)
+    return d.sections
+      .filter((section) => section.visible)
+      .map((section) => ({
+        label: (
+          {
+            hero: "Inicio",
+            about: "Nosotros",
+            listings: "Propiedades",
+            contact: "Contacto",
+          } as Record<string, string>
+        )[section.id],
+        href: "#" + brokerAnchors[section.id],
+        new_tab: false,
+      }));
+  return [
+    { label: "Inicio", href: "/", new_tab: false },
+    { label: "Buscar propiedades", href: "/propiedades", new_tab: false },
+    { label: "Anunciantes", href: "/anunciantes", new_tab: false },
+    { label: "Nosotros", href: "/informacion", new_tab: false },
+    { label: "Publicar propiedad", href: "/register", new_tab: false },
+    { label: "Ingresar", href: "/login", new_tab: false },
+  ];
+}
+export function headerLinks(d: SiteDesign, broker = false): HeaderLink[] {
+  const defaults = broker
+    ? headerPresets(true, d)
+    : headerPresets(false, d).slice(1, 4);
+  const links = d.header_links ?? defaults;
+  return broker
+    ? links.filter((item) => {
+        const section = Object.entries(brokerAnchors).find(
+          ([, anchor]) => item.href === "#" + anchor,
+        )?.[0];
+        return (
+          !section || d.sections.some((s) => s.id === section && s.visible)
+        );
+      })
+    : links;
+}
+export function headerHref(href: string, base = "/") {
+  return href.startsWith("#") ? base + href : href;
 }

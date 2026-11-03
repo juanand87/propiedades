@@ -1,10 +1,12 @@
 import { BadRequestException } from '@nestjs/common';
 import { uuid } from './rules';
+import { defaultHeader, validateHeader } from './site-header';
 import { defaultBrokerFooter, validateBrokerFooter } from './broker-footer';
 
 export const HOME_SECTIONS = ['hero', 'search', 'types', 'listings', 'publish'];
 export const defaultDesign = (sections = HOME_SECTIONS) => ({
   ...defaultBrokerFooter(),
+  ...defaultHeader(),
   footer_note:
     'Las consultas y visitas se coordinan directamente con el anunciante.',
   primary_color: '#075ce5',
@@ -129,6 +131,7 @@ export function validateDesign(b: any, sections = HOME_SECTIONS) {
   d.sections = b.sections.map((s) => ({ id: s.id, visible: s.visible }));
   return {
     ...d,
+    ...validateHeader(b),
     ...validateBrokerFooter({
       ...b,
       footer_note: b.footer_note === undefined ? d.footer_note : b.footer_note,
