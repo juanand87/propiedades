@@ -1,5 +1,11 @@
 import { BadRequestException } from '@nestjs/common';
 export type HeaderLink = { label: string; href: string; new_tab: boolean };
+export type HeaderOverlay = {
+  enabled: boolean;
+  cover_text_color: string;
+  scroll_background_color: string;
+  scroll_text_color: string;
+};
 export type HeaderStyle = {
   logo_height: number;
   height: number;
@@ -12,6 +18,7 @@ export type HeaderStyle = {
 export function defaultHeader() {
   return {
     header_sticky: false,
+    header_overlay: null as HeaderOverlay | null,
     header_shrink: false,
     header_shrink_percent: 75,
     header_style: null as HeaderStyle | null,
@@ -93,6 +100,33 @@ export function validateHeader(b: any) {
       'Indica si la cabecera queda fija al desplazarse.',
     );
   d.header_sticky = b.header_sticky ?? false;
+  if (b.header_overlay != null) {
+    const o = b.header_overlay;
+    if (
+      typeof o !== 'object' ||
+      Array.isArray(o) ||
+      typeof o.enabled !== 'boolean'
+    )
+      throw new BadRequestException('Revisa la transparencia de la cabecera.');
+    const colors: Record<string, string> = {};
+    for (const key of [
+      'cover_text_color',
+      'scroll_background_color',
+      'scroll_text_color',
+    ] as const) {
+      if (typeof o[key] !== 'string' || !/^#[0-9a-f]{6}$/i.test(o[key]))
+        throw new BadRequestException(
+          'Usa colores de seis dígitos para la cabecera transparente.',
+        );
+      colors[key] = o[key].toLowerCase();
+    }
+    d.header_overlay = {
+      enabled: o.enabled,
+      cover_text_color: colors.cover_text_color,
+      scroll_background_color: colors.scroll_background_color,
+      scroll_text_color: colors.scroll_text_color,
+    };
+  }
   if (b.header_shrink !== undefined && typeof b.header_shrink !== 'boolean')
     throw new BadRequestException(
       'Indica si la cabecera se reduce al desplazarse.',

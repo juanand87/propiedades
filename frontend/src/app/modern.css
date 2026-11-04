@@ -2600,3 +2600,75 @@ body {
     transition: none;
   }
 }
+:is(.has-cover-hero, .preview-cover-first)
+  > .sticky-header-wrap.overlay-enabled {
+  --header-text: var(--header-cover-text, var(--ink));
+  --header-hover: var(--header-cover-text, var(--ink));
+}
+:is(.has-cover-hero, .preview-cover-first)
+  > .sticky-header-wrap.overlay-enabled.is-scrolled {
+  --header-text: var(--header-scroll-text, var(--ink));
+  --header-hover: var(--header-scroll-text, var(--ink));
+}
+:is(.has-cover-hero, .preview-cover-first)
+  > .sticky-header-wrap.overlay-enabled
+  > :is(.site-header, .design-preview-header) {
+  color: var(--header-text);
+  transition:
+    background-color 180ms ease,
+    color 180ms ease,
+    box-shadow 180ms ease,
+    min-height 180ms ease,
+    padding 180ms ease;
+}
+:is(.has-cover-hero, .preview-cover-first)
+  > .sticky-header-wrap.overlay-enabled:not(.is-scrolled)
+  > :is(.site-header, .design-preview-header) {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+:is(.has-cover-hero, .preview-cover-first)
+  > .sticky-header-wrap.overlay-enabled.is-scrolled
+  > :is(.site-header, .design-preview-header) {
+  background: var(--header-scroll-background, white);
+  border-color: var(--line);
+  box-shadow: 0 8px 28px #102b501a;
+  backdrop-filter: none;
+}
+:is(.has-cover-hero, .preview-cover-first)
+  > .overlay-enabled
+  :is(
+    .main-nav > a:not(.button),
+    .account-link,
+    .icon-link,
+    .mobile-toggle,
+    .preview-header-links,
+    .preview-header-toggle
+  ) {
+  color: var(--header-text);
+}
+:is(.has-cover-hero, .preview-cover-first)
+  > .overlay-enabled
+  .main-nav
+  > a:not(.button):is(:hover, :focus-visible) {
+  color: var(--header-text);
+  text-decoration: underline;
+  text-underline-offset: 5px;
+}
+:is(.has-cover-hero, .preview-cover-first)
+  > .overlay-enabled
+  :is(.main-nav.open, .preview-header-menu.open) {
+  --header-text: var(--header-scroll-text, var(--ink));
+  --header-hover: var(--header-scroll-text, var(--ink));
+  background: var(--header-scroll-background, white);
+  color: var(--header-text);
+}
+@media (prefers-reduced-motion: reduce) {
+  :is(.has-cover-hero, .preview-cover-first)
+    > .sticky-header-wrap.overlay-enabled
+    > :is(.site-header, .design-preview-header) {
+    transition: none;
+  }
+}

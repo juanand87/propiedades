@@ -225,7 +225,11 @@ export function BrokerSite({
       className={`estate-site broker-site${d.header_style ? " styled-header-site" : ""}${!propertyIdentifier && visible[0]?.id === "hero" ? " has-cover-hero" : ""}`}
       style={designStyle(d)}
     >
-      <SiteHeaderFrame sticky={d.header_sticky} shrink={d.header_shrink}>
+      <SiteHeaderFrame
+        overlay={d.header_overlay?.enabled}
+        sticky={d.header_sticky}
+        shrink={d.header_shrink}
+      >
         <header
           className={`site-header broker-header${d.header_style ? " styled-header" : ""}${customHeader ? " custom-header" : ""}`}
         >

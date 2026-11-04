@@ -14,7 +14,7 @@ No requiere SQL: se usan los JSON existentes de estate_settings y advertiser_sit
 
 ## Verificación
 
-65 pruebas unitarias y 217 comprobaciones de integración en la base local aislada, con cero conexiones a producción. Se verificaron compatibilidad, límites, destinos inseguros, persistencia, revisiones, permisos e independencia entre sitios. Compilaciones de backend y frontend correctas y lint sin errores.
+66 pruebas unitarias y 223 comprobaciones de integración en la base local aislada, con cero conexiones a producción. Se verificaron compatibilidad, límites, destinos inseguros, persistencia, revisiones, permisos e independencia entre sitios. Compilaciones de backend y frontend correctas y lint sin errores.
 
 En navegador, con cuentas ficticias de administrador y corredor: edición de textos y destinos, agregado y orden de enlaces, rechazo de JavaScript, botón personalizado y oculto, persistencia tras recargar, menú interactivo de la vista previa móvil, enlaces externos seguros, acceso del propietario y navegación de los menús publicados a 390 × 844 sin desbordamiento horizontal.
 
@@ -43,3 +43,13 @@ Activa la cabecera fija y después Hacer la cabecera más pequeña al hacer scro
 El ajuste nuevo está desactivado en diseños anteriores y requiere design_version 8. Si se desactiva la cabecera fija, la reducción queda inactiva sin perder la preferencia. No requiere SQL ni variables nuevas.
 
 La vista previa usa su propio desplazamiento. La cabecera pública mantiene el espacio reservado en páginas sin portada para evitar saltos; utiliza distintos umbrales de entrada y salida para evitar parpadeos y respeta movimiento reducido. Verificado con datos ficticios: guardado y recarga, porcentajes diferentes por sitio, reducción y recuperación, navegación móvil, desactivación y altura del documento estable. Capturas: [panel](qa/cabecera-compacta-panel.png), [menú móvil](qa/cabecera-compacta-inmobiliaria-movil.png).
+
+## Transparencia sobre la portada
+
+En Cabecera → Comportamiento de la cabecera, activa la cabecera fija y Cabecera transparente sobre la portada. Configura el texto sobre la imagen, el fondo después de hacer scroll y el texto sobre ese fondo, mediante selector visual o hexadecimal. Guardar publica los cambios; Descartar recupera lo guardado. Elige texto que contraste con la imagen de portada.
+
+La transparencia se aplica cuando Portada es la primera sección visible del inicio. Al bajar cambia a los colores sólidos elegidos y al volver arriba recupera la transparencia. Las páginas internas y los inicios sin portada primero conservan su apariencia normal. Los menús móviles y de la vista previa usan siempre los colores sólidos para facilitar la lectura, incluso con la cabecera transparente. Se combina con la reducción de altura y respeta movimiento reducido.
+
+Cada sitio conserva su configuración independiente. Los diseños anteriores mantienen la opción desactivada; los controles requieren design_version 9. No requiere SQL ni variables nuevas. Si se desactiva la cabecera fija, la transparencia queda inactiva conservando los colores.
+
+Verificado con cuentas ficticias: guardado y recarga, colores distintos por sitio, transparencia inicial, color tras scroll, vuelta arriba, páginas internas, menú móvil sin desbordamiento, vista previa, desactivación en borrador y descarte, y combinación con cabecera compacta. Capturas: [panel](qa/cabecera-transparente-panel.png), [portada de inmobiliaria](qa/cabecera-transparente-inmobiliaria-portada.png), [menú móvil tras scroll](qa/cabecera-transparente-inmobiliaria-scroll-movil.png).

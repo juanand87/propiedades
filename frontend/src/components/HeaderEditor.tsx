@@ -17,6 +17,7 @@ export function HeaderEditor({
   styleReady,
   stickyReady,
   shrinkReady,
+  overlayReady,
 }: {
   draft: SiteDesign;
   update: (key: keyof SiteDesign, value: unknown) => void;
@@ -25,8 +26,15 @@ export function HeaderEditor({
   styleReady: boolean;
   stickyReady: boolean;
   shrinkReady: boolean;
+  overlayReady: boolean;
 }) {
   const style = draft.header_style ?? defaultHeaderStyle();
+  const overlay = draft.header_overlay ?? {
+    enabled: false,
+    cover_text_color: style.text_color ?? draft.text_color,
+    scroll_background_color: style.background_color ?? "#ffffff",
+    scroll_text_color: style.text_color ?? draft.text_color,
+  };
   const colors = [
     ["background_color", "Fondo de la cabecera", "#ffffff"],
     ["text_color", "Texto del menú", draft.text_color],
@@ -145,6 +153,92 @@ export function HeaderEditor({
         <p className="notice">
           La reducción estará disponible al terminar la actualización. Recarga
           en unos minutos.
+        </p>
+      )}
+      <fieldset
+        disabled={!overlayReady || !draft.header_sticky}
+        className="header-sticky-editor"
+      >
+        <label className="design-checkbox">
+          <input
+            type="checkbox"
+            checked={overlay.enabled}
+            onChange={(e) =>
+              update("header_overlay", {
+                ...overlay,
+                enabled: e.target.checked,
+              })
+            }
+          />
+          Cabecera transparente sobre la portada
+        </label>
+        <p>
+          Al bajar por la página cambia a un fondo sólido; al volver arriba
+          recupera la transparencia. Se aplica cuando Portada es la primera
+          sección visible.
+        </p>
+        {overlay.enabled &&
+          (
+            [
+              ["cover_text_color", "Texto sobre la portada"],
+              ["scroll_background_color", "Fondo después de hacer scroll"],
+              ["scroll_text_color", "Texto después de hacer scroll"],
+            ] as const
+          ).map(([key, label]) => (
+            <div className="header-color-row" key={key}>
+              <label>
+                {label}
+                <span className="header-color-value">
+                  <input
+                    type="color"
+                    aria-label={label}
+                    value={
+                      /^#[0-9a-f]{6}$/i.test(overlay[key])
+                        ? overlay[key]
+                        : "#ffffff"
+                    }
+                    onChange={(e) =>
+                      update("header_overlay", {
+                        ...overlay,
+                        [key]: e.target.value,
+                      })
+                    }
+                  />
+                  <input
+                    type="text"
+                    aria-label={`${label} hexadecimal`}
+                    required
+                    pattern="#[0-9a-fA-F]{6}"
+                    maxLength={7}
+                    value={overlay[key]}
+                    onChange={(e) =>
+                      update("header_overlay", {
+                        ...overlay,
+                        [key]: e.target.value,
+                      })
+                    }
+                  />
+                </span>
+              </label>
+            </div>
+          ))}
+        {overlay.enabled && (
+          <p className="muted">
+            Elige texto que contraste con tu portada. El menú móvil usa siempre
+            el fondo sólido para que los enlaces sean legibles.
+          </p>
+        )}
+      </fieldset>
+      {!draft.header_sticky && (
+        <p className="muted">
+          Activa primero la cabecera fija para utilizar la transparencia y el
+          cambio de color al hacer scroll.
+        </p>
+      )}
+      {!overlayReady && (
+        <p className="notice">
+          La transparencia estará disponible al terminar la actualización.
+          Recarga en unos minutos.
         </p>
       )}
       <h2>Tamaño y colores de la cabecera</h2>

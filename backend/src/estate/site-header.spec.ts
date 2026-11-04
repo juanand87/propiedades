@@ -3,6 +3,46 @@ import { defaultBrokerDesign, validateBrokerDesign } from './broker-site';
 import { validateHeaderHref } from './site-header';
 
 describe('Cabeceras configurables e independientes', () => {
+  it('conserva la transparencia desactivada y valida colores y tipos', () => {
+    const old: any = defaultDesign();
+    delete old.header_overlay;
+    expect(readDesign(JSON.stringify(old)).header_overlay).toBeNull();
+    const overlay = {
+      enabled: true,
+      cover_text_color: '#FFFFFF',
+      scroll_background_color: '#102B50',
+      scroll_text_color: '#FFFFFF',
+    };
+    const saved = validateBrokerDesign({
+      ...defaultBrokerDesign(),
+      header_sticky: true,
+      header_overlay: { ...overlay, owner_id: 'otro' },
+    });
+    expect(saved.header_overlay).toEqual({
+      enabled: true,
+      cover_text_color: '#ffffff',
+      scroll_background_color: '#102b50',
+      scroll_text_color: '#ffffff',
+    });
+    expect(
+      readDesign(
+        JSON.stringify({ ...defaultDesign(), header_overlay: overlay }),
+      ).header_overlay?.enabled,
+    ).toBe(true);
+    for (const header_overlay of [
+      [],
+      'true',
+      { ...overlay, enabled: 'true' },
+      { ...overlay, cover_text_color: '#fff' },
+      { ...overlay, scroll_background_color: 'url(x)' },
+      { ...overlay, scroll_text_color: null },
+    ])
+      expect(() => validateDesign({ ...old, header_overlay })).toThrow();
+    expect(
+      validateDesign({ ...old, header_overlay: { ...overlay, enabled: false } })
+        .header_overlay?.enabled,
+    ).toBe(false);
+  });
   it('conserva la reducción desactivada y valida su tamaño', () => {
     const old: any = defaultDesign();
     delete old.header_shrink;

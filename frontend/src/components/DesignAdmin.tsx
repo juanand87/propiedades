@@ -503,6 +503,7 @@ export function DesignAdmin({ broker = false }: { broker?: boolean }) {
                   styleReady={ready && siteInfo?.design_version >= 6}
                   stickyReady={ready && siteInfo?.design_version >= 7}
                   shrinkReady={ready && siteInfo?.design_version >= 8}
+                  overlayReady={ready && siteInfo?.design_version >= 9}
                 />
               </div>
               {(activeSection === "search" ||

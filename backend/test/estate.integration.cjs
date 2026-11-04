@@ -479,6 +479,12 @@ async function main() {
           header_sticky: true,
           header_shrink: true,
           header_shrink_percent: 70,
+          header_overlay: {
+            enabled: true,
+            cover_text_color: '#102b50',
+            scroll_background_color: '#18436a',
+            scroll_text_color: '#ffffff',
+          },
           header_style: {
             logo_height: 56,
             height: 104,
@@ -537,9 +543,15 @@ async function main() {
       admin,
       400,
     );
-    assert.equal(designed.design_version, 8);
+    assert.equal(designed.design_version, 9);
     const publicMainFooter = await call('GET', '/settings');
     assert.equal(publicMainFooter.design.header_sticky, true);
+    assert.equal(
+      publicMainFooter.design.header_overlay.scroll_background_color,
+      '#18436a',
+    );
+    assert.equal(publicMainFooter.design.header_overlay.enabled, true);
+    assertions += 2;
     assert.equal(publicMainFooter.design.header_shrink, true);
     assert.equal(publicMainFooter.design.header_shrink_percent, 70);
     assertions += 2;
@@ -665,6 +677,12 @@ async function main() {
       header_sticky: true,
       header_shrink: true,
       header_shrink_percent: 80,
+      header_overlay: {
+        enabled: true,
+        cover_text_color: '#ffffff',
+        scroll_background_color: '#102b50',
+        scroll_text_color: '#f1cc88',
+      },
       header_style: {
         logo_height: 64,
         height: 120,
@@ -730,6 +748,9 @@ async function main() {
     );
     const publicSiteA = await call('GET', '/advertisers/' + a.slug);
     assert.deepEqual(publicSiteA.site.header_style, designA.header_style);
+    assert.deepEqual(publicSiteA.site.header_overlay, designA.header_overlay);
+    assert.equal((await call('GET', '/settings')).design.header_overlay, null);
+    assertions += 2;
     assert.equal(publicSiteA.site.header_sticky, true);
     assert.equal(publicSiteA.site.header_shrink_percent, 80);
     assert.equal(publicSiteA.site.header_shrink, true);
@@ -768,7 +789,7 @@ async function main() {
       designA.footer_contact.email,
     );
     assert.deepEqual(publicSiteA.site.footer_socials, designA.footer_socials);
-    assert.equal(baseBroker.design_version, 8);
+    assert.equal(baseBroker.design_version, 9);
     const profileAfterFooter = await call(
       'GET',
       '/me/advertiser',
@@ -831,6 +852,8 @@ async function main() {
     assert.equal(ownB.design.header_links, null);
     assert.equal(ownB.design.header_style, null);
     assert.equal(ownB.design.header_sticky, false);
+    assert.equal(ownB.design.header_overlay, null);
+    assertions++;
     assert.equal(ownB.design.header_shrink, false);
     assert.equal(ownB.design.header_shrink_percent, 75);
     assertions += 2;

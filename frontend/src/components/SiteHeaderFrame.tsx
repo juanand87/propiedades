@@ -5,16 +5,19 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 export function SiteHeaderFrame({
   sticky,
   shrink,
+  overlay,
   children,
 }: {
   sticky?: boolean;
   shrink?: boolean;
+  overlay?: boolean;
   children: ReactNode;
 }) {
   const frame = useRef<HTMLDivElement>(null);
   const [compact, setCompact] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
   useEffect(() => {
-    if (!sticky || !shrink || !frame.current) return;
+    if (!sticky || (!shrink && !overlay) || !frame.current) return;
     const el = frame.current;
     const stage = el.closest<HTMLElement>(".design-preview-stage");
     const canvas = el.closest<HTMLElement>(".design-preview-canvas");
@@ -26,6 +29,7 @@ export function SiteHeaderFrame({
       const scroll = stage ? stage.scrollTop / (scale || 1) : window.scrollY;
       // Different enter/leave thresholds avoid flicker when the layout changes.
       setCompact((previous) => (previous ? scroll > 32 : scroll > 96));
+      setScrolled((previous) => (previous ? scroll > 8 : scroll > 48));
     };
     const header = el.firstElementChild as HTMLElement;
     const measure = () => {
@@ -44,11 +48,11 @@ export function SiteHeaderFrame({
       observer.disconnect();
       target.removeEventListener("scroll", onScroll);
     };
-  }, [sticky, shrink]);
+  }, [sticky, shrink, overlay]);
   return sticky ? (
     <div
       ref={frame}
-      className={`sticky-header-wrap${shrink ? " shrink-enabled" : ""}${shrink && compact ? " is-compact" : ""}`}
+      className={`sticky-header-wrap${shrink ? " shrink-enabled" : ""}${shrink && compact ? " is-compact" : ""}${overlay ? " overlay-enabled" : ""}${overlay && scrolled ? " is-scrolled" : ""}`}
     >
       {children}
     </div>

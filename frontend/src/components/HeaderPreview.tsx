@@ -25,6 +25,7 @@ export function HeaderPreview({
         : "";
   return (
     <SiteHeaderFrame
+      overlay={design.header_overlay?.enabled}
       sticky={design.header_sticky}
       shrink={design.header_shrink}
     >

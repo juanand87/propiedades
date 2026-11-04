@@ -64,6 +64,12 @@ export function brokerContact(d: SiteDesign, profile: any): SiteContact {
   );
 }
 export type HeaderLink = { label: string; href: string; new_tab: boolean };
+export type HeaderOverlay = {
+  enabled: boolean;
+  cover_text_color: string;
+  scroll_background_color: string;
+  scroll_text_color: string;
+};
 export type HeaderStyle = {
   logo_height: number;
   height: number;
@@ -86,6 +92,7 @@ export function defaultHeaderStyle(): HeaderStyle {
 }
 export type SiteDesign = {
   header_sticky?: boolean;
+  header_overlay?: HeaderOverlay | null;
   header_shrink?: boolean;
   header_shrink_percent?: number;
   header_style?: HeaderStyle | null;
@@ -121,6 +128,7 @@ export type SiteDesign = {
 export function defaultDesign(): SiteDesign {
   return {
     header_sticky: false,
+    header_overlay: null,
     header_shrink: false,
     header_shrink_percent: 75,
     header_style: null,
@@ -285,6 +293,14 @@ export function designStyle(d: SiteDesign): CSSProperties {
     Math.round((h?.logo_height ?? (d.logo_media_id ? 40 : 34)) * factor),
   );
   return {
+    ...(d.header_overlay?.enabled
+      ? {
+          "--header-cover-text": d.header_overlay.cover_text_color,
+          "--header-scroll-background":
+            d.header_overlay.scroll_background_color,
+          "--header-scroll-text": d.header_overlay.scroll_text_color,
+        }
+      : {}),
     "--header-compact-logo": `${compactLogo}px`,
     "--header-compact-height": `${Math.max(56, Math.round((h?.height ?? 80) * factor), compactLogo + 16)}px`,
     "--header-cover-compact-height": `${Math.max(56, Math.round((h?.height ?? 72) * factor), compactLogo + 16)}px`,
