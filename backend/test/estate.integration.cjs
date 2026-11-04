@@ -476,6 +476,15 @@ async function main() {
         design: {
           ...initialDesign.design,
           primary_color: '#18436a',
+          header_style: {
+            logo_height: 56,
+            height: 104,
+            background_color: '#102b50',
+            text_color: '#ffffff',
+            hover_color: '#f1cc88',
+            button_color: '#18436a',
+            button_text_color: '#ffffff',
+          },
           header_links: [
             { label: 'Comprar', href: '/propiedades', new_tab: false },
             { label: 'Equipo', href: '/informacion', new_tab: false },
@@ -525,8 +534,24 @@ async function main() {
       admin,
       400,
     );
-    assert.equal(designed.design_version, 5);
+    assert.equal(designed.design_version, 6);
     const publicMainFooter = await call('GET', '/settings');
+    assert.equal(publicMainFooter.design.header_style.height, 104);
+    assert.equal(publicMainFooter.design.header_style.logo_height, 56);
+    assertions += 2;
+    await call(
+      'PATCH',
+      '/admin/design',
+      {
+        revision: 2,
+        design: {
+          ...designed.design,
+          header_style: { ...designed.design.header_style, height: 999 },
+        },
+      },
+      admin,
+      400,
+    );
     assert.equal(
       publicMainFooter.design.footer_text,
       'Portal principal independiente.',
@@ -629,6 +654,15 @@ async function main() {
       ...baseBroker.design,
       primary_color: '#18436a',
       hero_title: 'Corredor Azul · Tu próximo lugar',
+      header_style: {
+        logo_height: 64,
+        height: 120,
+        background_color: '#ffffff',
+        text_color: '#18436a',
+        hover_color: '#075ce5',
+        button_color: null,
+        button_text_color: null,
+      },
       header_links: [
         { label: 'Mis casas', href: '#propiedades', new_tab: false },
         { label: 'Equipo Azul', href: '#nosotros', new_tab: false },
@@ -684,6 +718,9 @@ async function main() {
       403,
     );
     const publicSiteA = await call('GET', '/advertisers/' + a.slug);
+    assert.deepEqual(publicSiteA.site.header_style, designA.header_style);
+    assert.equal((await call('GET', '/settings')).design.header_style, null);
+    assertions += 2;
     assert.deepEqual(publicSiteA.site.header_links, designA.header_links);
     assert.equal(
       publicSiteA.site.header_button.label,
@@ -714,7 +751,7 @@ async function main() {
       designA.footer_contact.email,
     );
     assert.deepEqual(publicSiteA.site.footer_socials, designA.footer_socials);
-    assert.equal(baseBroker.design_version, 5);
+    assert.equal(baseBroker.design_version, 6);
     const profileAfterFooter = await call(
       'GET',
       '/me/advertiser',
@@ -775,6 +812,8 @@ async function main() {
     assert.equal(ownB.advertiser.id, b.id);
     assert.equal(ownB.design.primary_color, '#075ce5');
     assert.equal(ownB.design.header_links, null);
+    assert.equal(ownB.design.header_style, null);
+    assertions++;
     assert.equal(ownB.design.header_button, null);
     assertions += 2;
     assert.equal(ownB.design.footer_contact, null);
@@ -1088,6 +1127,6 @@ async function main() {
   }
 }
 main().catch((e) => {
-  console.error(e.message);
+  console.error(e.stack || e.message);
   process.exitCode = 1;
 });

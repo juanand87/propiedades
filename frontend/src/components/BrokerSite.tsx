@@ -86,7 +86,8 @@ export function BrokerSite({
   const contact = brokerContact(d, a);
   const base = `/anunciantes/${a.slug}`;
   const menuLinks = headerLinks(d, true);
-  const customHeader = d.header_links != null || d.header_button != null;
+  const customHeader =
+    d.header_style != null || d.header_links != null || d.header_button != null;
   const primary = d.header_button;
   const isOwner = user?.advertiser_id === a.id;
   const visible = d.sections.filter((s: any) => s.visible);
@@ -219,11 +220,11 @@ export function BrokerSite({
   return (
     <div
       id="sitio-inmobiliaria"
-      className={`estate-site broker-site${!propertyIdentifier && visible[0]?.id === "hero" ? " has-cover-hero" : ""}`}
+      className={`estate-site broker-site${d.header_style ? " styled-header-site" : ""}${!propertyIdentifier && visible[0]?.id === "hero" ? " has-cover-hero" : ""}`}
       style={designStyle(d)}
     >
       <header
-        className={`site-header broker-header${customHeader ? " custom-header" : ""}`}
+        className={`site-header broker-header${d.header_style ? " styled-header" : ""}${customHeader ? " custom-header" : ""}`}
       >
         <Link
           className="brand"

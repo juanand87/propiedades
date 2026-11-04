@@ -177,7 +177,9 @@ export default function EstateApp({
   const design = siteDesign(settings);
   const mainHeaderLinks = headerLinks(design);
   const customHeader =
-    design.header_links != null || design.header_button != null;
+    design.header_style != null ||
+    design.header_links != null ||
+    design.header_button != null;
   const primary = design.header_button;
   const primaryHref = primary
     ? headerHref(primary.href)
@@ -218,11 +220,11 @@ export default function EstateApp({
         />
       ) : (
         <div
-          className={`estate-site${path.length === 0 ? " modern-home" : ""}${path.length === 0 && design.sections.find((s) => s.visible)?.id === "hero" ? " has-cover-hero" : ""}`}
+          className={`estate-site${design.header_style ? " styled-header-site" : ""}${path.length === 0 ? " modern-home" : ""}${path.length === 0 && design.sections.find((s) => s.visible)?.id === "hero" ? " has-cover-hero" : ""}`}
           style={designStyle(design)}
         >
           <header
-            className={`site-header${customHeader ? " custom-header" : ""}`}
+            className={`site-header${design.header_style ? " styled-header" : ""}${customHeader ? " custom-header" : ""}`}
           >
             <Link
               href="/"

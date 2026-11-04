@@ -64,7 +64,28 @@ export function brokerContact(d: SiteDesign, profile: any): SiteContact {
   );
 }
 export type HeaderLink = { label: string; href: string; new_tab: boolean };
+export type HeaderStyle = {
+  logo_height: number;
+  height: number;
+  background_color: string | null;
+  text_color: string | null;
+  hover_color: string | null;
+  button_color: string | null;
+  button_text_color: string | null;
+};
+export function defaultHeaderStyle(): HeaderStyle {
+  return {
+    logo_height: 40,
+    height: 80,
+    background_color: null,
+    text_color: null,
+    hover_color: null,
+    button_color: null,
+    button_text_color: null,
+  };
+}
 export type SiteDesign = {
+  header_style?: HeaderStyle | null;
   header_links?: HeaderLink[] | null;
   header_button?: (HeaderLink & { visible: boolean }) | null;
   footer_text?: string | null;
@@ -96,6 +117,7 @@ export type SiteDesign = {
 };
 export function defaultDesign(): SiteDesign {
   return {
+    header_style: null,
     header_links: null,
     header_button: null,
     footer_text: null,
@@ -250,7 +272,19 @@ export function siteDesign(settings: { design?: SiteDesign }): SiteDesign {
   return settings.design || defaultDesign();
 }
 export function designStyle(d: SiteDesign): CSSProperties {
+  const h = d.header_style;
   return {
+    ...(h
+      ? {
+          "--header-logo-height": `${h.logo_height}px`,
+          "--header-height": `${Math.max(h.height, h.logo_height + 24)}px`,
+          "--header-background": h.background_color ?? "#ffffff",
+          "--header-text": h.text_color ?? d.text_color,
+          "--header-hover": h.hover_color ?? d.primary_color,
+          "--header-button": h.button_color ?? d.primary_color,
+          "--header-button-text": h.button_text_color ?? "#ffffff",
+        }
+      : {}),
     "--green": d.primary_color,
     "--accent": d.accent_color,
     "--paper": d.background_color,

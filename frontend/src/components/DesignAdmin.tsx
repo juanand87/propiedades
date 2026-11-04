@@ -500,6 +500,7 @@ export function DesignAdmin({ broker = false }: { broker?: boolean }) {
                   update={update}
                   broker={broker}
                   ready={ready && siteInfo?.design_version >= 5}
+                  styleReady={ready && siteInfo?.design_version >= 6}
                 />
               </div>
               {(activeSection === "search" ||
@@ -1303,7 +1304,7 @@ export function DesignAdmin({ broker = false }: { broker?: boolean }) {
                 focusHeader={activeSection === "header"}
               >
                 <div
-                  className={`design-preview${draft.sections.find((s) => s.visible)?.id === "hero" ? " preview-cover-first" : ""}`}
+                  className={`design-preview${draft.header_style ? " styled-header-site" : ""}${draft.sections.find((s) => s.visible)?.id === "hero" ? " preview-cover-first" : ""}`}
                   style={designStyle(draft)}
                 >
                   <HeaderPreview design={draft} broker={broker}>

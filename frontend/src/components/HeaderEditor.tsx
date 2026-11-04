@@ -3,6 +3,8 @@ import { ArrowDown, ArrowUp, Plus, Trash2 } from "lucide-react";
 import {
   headerLinks,
   headerPresets,
+  defaultHeaderStyle,
+  type HeaderStyle,
   type HeaderLink,
   type SiteDesign,
 } from "@/lib/site-design";
@@ -12,12 +14,29 @@ export function HeaderEditor({
   update,
   broker,
   ready,
+  styleReady,
 }: {
   draft: SiteDesign;
   update: (key: keyof SiteDesign, value: unknown) => void;
   broker: boolean;
   ready: boolean;
+  styleReady: boolean;
 }) {
+  const style = draft.header_style ?? defaultHeaderStyle();
+  const colors = [
+    ["background_color", "Fondo de la cabecera", "#ffffff"],
+    ["text_color", "Texto del menú", draft.text_color],
+    [
+      "hover_color",
+      "Enlaces al pasar el cursor y sección activa",
+      draft.primary_color,
+    ],
+    ["button_color", "Fondo del botón principal", draft.primary_color],
+    ["button_text_color", "Texto del botón principal", "#ffffff"],
+  ] as const;
+  function changeStyle(key: keyof HeaderStyle, value: number | string | null) {
+    update("header_style", { ...style, [key]: value });
+  }
   const presets = headerPresets(broker, draft);
   const links = draft.header_links ?? headerLinks(draft, broker);
   const defaultButton = {
@@ -56,6 +75,95 @@ export function HeaderEditor({
   }
   return (
     <section className="panel-card header-editor">
+      <h2>Tamaño y colores de la cabecera</h2>
+      {!styleReady && (
+        <p className="notice">
+          Los tamaños y colores estarán disponibles al terminar la
+          actualización. Recarga la página en unos minutos.
+        </p>
+      )}
+      <fieldset disabled={!styleReady} className="header-style-editor">
+        <label>
+          Tamaño del logo <strong>{style.logo_height} px</strong>
+          <input
+            type="range"
+            min={24}
+            max={80}
+            step={1}
+            value={style.logo_height}
+            onChange={(e) => changeStyle("logo_height", Number(e.target.value))}
+          />
+        </label>
+        <p className="muted">
+          Controla la altura del logo; su proporción se conserva. Puedes subirlo
+          en Identidad. Sin imagen, cambia el tamaño del icono.
+        </p>
+        <label>
+          Altura de la cabecera <strong>{style.height} px</strong>
+          <input
+            type="range"
+            min={64}
+            max={144}
+            step={1}
+            value={style.height}
+            onChange={(e) => changeStyle("height", Number(e.target.value))}
+          />
+        </label>
+        <p className="muted">
+          La altura crece si el logo necesita más espacio. En móvil, el logo se
+          adapta al ancho disponible.
+        </p>
+        <h3>Colores del menú</h3>
+        <p>
+          Deja Automático para seguir los colores del tema o elige un color
+          propio. Comprueba que los textos sean fáciles de leer.
+        </p>
+        {colors.map(([key, label, fallback]) => (
+          <div className="header-color-row" key={key}>
+            <label>
+              {label}
+              <span className="header-color-value">
+                <input
+                  type="color"
+                  aria-label={label}
+                  value={
+                    /^#[0-9a-f]{6}$/i.test(style[key] ?? fallback)
+                      ? (style[key] ?? fallback)
+                      : fallback
+                  }
+                  onChange={(e) => changeStyle(key, e.target.value)}
+                />
+                <input
+                  type="text"
+                  aria-label={`${label} hexadecimal`}
+                  required
+                  pattern="#[0-9a-fA-F]{6}"
+                  maxLength={7}
+                  value={style[key] ?? fallback}
+                  onChange={(e) => changeStyle(key, e.target.value)}
+                />
+              </span>
+            </label>
+            <label className="design-checkbox">
+              <input
+                type="checkbox"
+                checked={style[key] == null}
+                onChange={(e) =>
+                  changeStyle(key, e.target.checked ? null : fallback)
+                }
+              />{" "}
+              Automático
+            </label>
+          </div>
+        ))}
+        <button
+          type="button"
+          className="button outline small"
+          onClick={() => update("header_style", null)}
+        >
+          Restaurar tamaños y colores automáticos
+        </button>
+      </fieldset>
       <h2>Menú y botón principal</h2>
       {!ready && (
         <p className="notice">

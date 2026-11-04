@@ -2292,3 +2292,135 @@ body {
     white-space: normal;
   }
 }
+.header-style-editor {
+  margin-bottom: 32px;
+}
+.header-style-editor > label {
+  display: block;
+}
+.header-style-editor > label strong {
+  float: right;
+  font-size: 13px;
+}
+.header-style-editor input[type="range"] {
+  display: block;
+  width: 100%;
+  padding: 0;
+  margin: 14px 0;
+  accent-color: var(--green);
+}
+.header-color-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--line);
+}
+.header-color-value {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 7px;
+}
+.header-color-value input[type="color"] {
+  width: 48px;
+  height: 36px;
+  padding: 3px;
+  cursor: pointer;
+}
+.header-color-value input[type="text"] {
+  width: 105px;
+  min-width: 0;
+  font-family: monospace;
+}
+.header-style-editor > button {
+  margin-top: 20px;
+}
+/* Scoped to headers: logos and colors in footers keep their own design. */
+.site-header.styled-header,
+.has-cover-hero > .site-header.styled-header,
+.styled-header-site .design-preview-header {
+  height: auto;
+  min-height: var(--header-height);
+  padding-top: 12px;
+  padding-bottom: 12px;
+  background: var(--header-background);
+  color: var(--header-text);
+}
+.site-header.styled-header .site-logo,
+.design-preview-canvas .styled-header-site .design-preview-header img {
+  height: var(--header-logo-height);
+  width: auto;
+  max-width: 170px;
+  object-fit: contain;
+}
+.styled-header .brand-icon {
+  width: var(--header-logo-height);
+  height: var(--header-logo-height);
+  flex-shrink: 0;
+}
+.styled-header .brand-icon svg {
+  width: 68%;
+  height: 68%;
+}
+.styled-header-site .preview-header-brand > svg {
+  width: var(--header-logo-height);
+  height: var(--header-logo-height);
+}
+.site-header.styled-header .main-nav > a:not(.button),
+.site-header.styled-header .account-link,
+.site-header.styled-header .icon-link,
+.site-header.styled-header .mobile-toggle,
+.styled-header-site .preview-header-links,
+.styled-header-site .preview-header-toggle {
+  color: var(--header-text);
+}
+.site-header.styled-header .main-nav > a:not(.button):hover,
+.site-header.styled-header .main-nav > a:not(.button):focus-visible,
+.site-header.styled-header .main-nav > a.active,
+.site-header.styled-header .account-link:hover,
+.site-header.styled-header .icon-link:hover {
+  color: var(--header-hover);
+  border-color: var(--header-hover);
+}
+.site-header.styled-header .button,
+.styled-header-site .preview-header-button {
+  background: var(--header-button);
+  border-color: var(--header-button);
+  color: var(--header-button-text);
+}
+.site-header.styled-header .button:hover {
+  background: color-mix(in srgb, var(--header-button) 88%, black);
+}
+.site-header.styled-header .main-nav.open,
+.styled-header-site .preview-header-menu.open {
+  background: var(--header-background);
+}
+.styled-header-site.has-cover-hero .portal-hero {
+  padding-top: max(150px, calc(var(--header-height) + 65px));
+}
+.design-preview-canvas .styled-header-site.preview-cover-first .preview-hero {
+  padding-top: max(125px, calc(var(--header-height) + 65px));
+}
+@media (max-width: 600px) {
+  .site-header.styled-header .site-logo {
+    max-width: 110px;
+    height: min(var(--header-logo-height), 56px);
+  }
+  .site-header.styled-header .brand-icon {
+    width: min(var(--header-logo-height), 56px);
+    height: min(var(--header-logo-height), 56px);
+  }
+}
+@container design-canvas (max-width: 600px) {
+  .design-preview-canvas .styled-header-site .design-preview-header img {
+    max-width: 110px;
+    height: min(var(--header-logo-height), 56px);
+  }
+  .styled-header-site .preview-header-brand > svg {
+    width: min(var(--header-logo-height), 56px);
+    height: min(var(--header-logo-height), 56px);
+  }
+}

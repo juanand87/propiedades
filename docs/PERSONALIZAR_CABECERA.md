@@ -10,12 +10,20 @@ Se admiten rutas del sitio que comiencen por /, anclas de sección con # y enlac
 
 La vista previa refleja textos, orden y botón. En modo móvil, su botón de menú abre el desplegable para revisar los enlaces. Los cambios permanecen en el borrador hasta guardar el diseño completo; Descartar vuelve a cargar lo publicado.
 
-No requiere SQL: se usan los JSON existentes de estate_settings y advertiser_sites, con las mismas revisiones y permisos. Los diseños anteriores conservan sus menús y botones automáticos. La edición nueva se habilita cuando el backend informa design_version 5.
+No requiere SQL: se usan los JSON existentes de estate_settings y advertiser_sites, con las mismas revisiones y permisos. Los diseños anteriores conservan sus menús y botones automáticos. La edición de enlaces se habilita con design_version 5; tamaños y colores requieren design_version 6.
 
 ## Verificación
 
-61 pruebas unitarias y 199 comprobaciones de integración en la base local aislada, con cero conexiones a producción. Se verificaron compatibilidad, límites, destinos inseguros, persistencia, revisiones, permisos e independencia entre sitios. Compilaciones de backend y frontend correctas y lint sin errores.
+63 pruebas unitarias y 206 comprobaciones de integración en la base local aislada, con cero conexiones a producción. Se verificaron compatibilidad, límites, destinos inseguros, persistencia, revisiones, permisos e independencia entre sitios. Compilaciones de backend y frontend correctas y lint sin errores.
 
 En navegador, con cuentas ficticias de administrador y corredor: edición de textos y destinos, agregado y orden de enlaces, rechazo de JavaScript, botón personalizado y oculto, persistencia tras recargar, menú interactivo de la vista previa móvil, enlaces externos seguros, acceso del propietario y navegación de los menús publicados a 390 × 844 sin desbordamiento horizontal.
 
 Capturas: [editor principal](qa/cabecera-editor-principal.png), [editor de inmobiliaria](qa/cabecera-editor-inmobiliaria.png), [menú principal móvil](qa/cabecera-principal-movil.png) y [menú de inmobiliaria móvil](qa/cabecera-inmobiliaria-movil.png).
+
+## Tamaños y colores
+
+En Cabecera se ajustan el tamaño del logo (24–80 px), la altura mínima de la cabecera (64–144 px), el fondo, el texto del menú, el resaltado de enlaces y los colores del botón principal. Los colores admiten selector visual o código hexadecimal de seis dígitos. Automático sigue el tema; Restaurar tamaños y colores automáticos recupera la apariencia anterior sin cambiar enlaces ni botón.
+
+La cabecera crece si el logo requiere más espacio y la portada conserva separación respecto a ella. El logo mantiene su proporción y se adapta al ancho móvil. Los colores se aplican también al menú desplegable; el logo del footer mantiene su tamaño independiente. Los controles actualizan el borrador y su vista previa de inmediato, pero se publican únicamente al guardar.
+
+Comprobado con cuentas ficticias: guardado y recarga en administrador e inmobiliaria, estilos distintos entre sitios, restauración y descarte, altura máxima, logo grande, menú móvil sin desbordamiento y footer sin cambios. Capturas: [tamaños y colores](qa/cabecera-tamanos-colores.png), [inmobiliaria en móvil](qa/cabecera-colores-inmobiliaria-movil.png). No requiere SQL ni nuevas variables de entorno.

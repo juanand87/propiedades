@@ -1,7 +1,17 @@
 import { BadRequestException } from '@nestjs/common';
 export type HeaderLink = { label: string; href: string; new_tab: boolean };
+export type HeaderStyle = {
+  logo_height: number;
+  height: number;
+  background_color: string | null;
+  text_color: string | null;
+  hover_color: string | null;
+  button_color: string | null;
+  button_text_color: string | null;
+};
 export function defaultHeader() {
   return {
+    header_style: null as HeaderStyle | null,
     header_links: null as HeaderLink[] | null,
     header_button: null as (HeaderLink & { visible: boolean }) | null,
   };
@@ -75,6 +85,46 @@ function link(value: any): HeaderLink {
 }
 export function validateHeader(b: any) {
   const d = defaultHeader();
+  if (b.header_style != null) {
+    const s = b.header_style;
+    if (typeof s !== 'object' || Array.isArray(s))
+      throw new BadRequestException('Revisa el estilo de la cabecera.');
+    if (
+      !Number.isInteger(s.logo_height) ||
+      s.logo_height < 24 ||
+      s.logo_height > 80 ||
+      !Number.isInteger(s.height) ||
+      s.height < 64 ||
+      s.height > 144
+    )
+      throw new BadRequestException(
+        'La cabecera admite logos de 24 a 80 px y alturas de 64 a 144 px.',
+      );
+    const style: HeaderStyle = {
+      logo_height: s.logo_height,
+      height: s.height,
+      background_color: null,
+      text_color: null,
+      hover_color: null,
+      button_color: null,
+      button_text_color: null,
+    };
+    for (const key of [
+      'background_color',
+      'text_color',
+      'hover_color',
+      'button_color',
+      'button_text_color',
+    ] as const) {
+      if (s[key] == null) continue;
+      if (typeof s[key] !== 'string' || !/^#[0-9a-f]{6}$/i.test(s[key]))
+        throw new BadRequestException(
+          'Usa colores de seis dígitos en la cabecera.',
+        );
+      style[key] = s[key].toLowerCase();
+    }
+    d.header_style = style;
+  }
   if (b.header_links !== undefined && b.header_links !== null) {
     if (!Array.isArray(b.header_links) || b.header_links.length > 6)
       throw new BadRequestException(
