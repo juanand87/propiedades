@@ -1,4 +1,6 @@
 "use client";
+import { SiteHeaderFrame } from "./SiteHeaderFrame";
+
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import {
@@ -223,87 +225,91 @@ export function BrokerSite({
       className={`estate-site broker-site${d.header_style ? " styled-header-site" : ""}${!propertyIdentifier && visible[0]?.id === "hero" ? " has-cover-hero" : ""}`}
       style={designStyle(d)}
     >
-      <header
-        className={`site-header broker-header${d.header_style ? " styled-header" : ""}${customHeader ? " custom-header" : ""}`}
-      >
-        <Link
-          className="brand"
-          href={base}
-          aria-label={`${a.display_name}, inicio`}
+      <SiteHeaderFrame sticky={d.header_sticky}>
+        <header
+          className={`site-header broker-header${d.header_style ? " styled-header" : ""}${customHeader ? " custom-header" : ""}`}
         >
-          {brand}
-        </Link>
-        <nav
-          className={`main-nav${menu ? " open" : ""}`}
-          id="broker-site-menu"
-          aria-label="Navegación del sitio del anunciante"
-        >
-          {menuLinks.map((item, index) => (
-            <Link
-              key={index}
-              href={headerHref(item.href, base)}
-              target={item.new_tab ? "_blank" : undefined}
-              rel={item.new_tab ? "noopener noreferrer" : undefined}
-              onClick={() => setMenu(false)}
-            >
-              {item.label}
-            </Link>
-          ))}
-          {customHeader &&
-            (primary
-              ? primary.visible
-              : shows("contact") || !!contact.phone) && (
+          <Link
+            className="brand"
+            href={base}
+            aria-label={`${a.display_name}, inicio`}
+          >
+            {brand}
+          </Link>
+          <nav
+            className={`main-nav${menu ? " open" : ""}`}
+            id="broker-site-menu"
+            aria-label="Navegación del sitio del anunciante"
+          >
+            {menuLinks.map((item, index) => (
               <Link
-                className="button small header-mobile-cta"
-                href={primary ? headerHref(primary.href, base) : contactHref}
-                target={primary?.new_tab ? "_blank" : undefined}
-                rel={primary?.new_tab ? "noopener noreferrer" : undefined}
+                key={index}
+                href={headerHref(item.href, base)}
+                target={item.new_tab ? "_blank" : undefined}
+                rel={item.new_tab ? "noopener noreferrer" : undefined}
                 onClick={() => setMenu(false)}
               >
-                {primary?.label || "Contactar"}
-                <ArrowUpRight size={16} />
+                {item.label}
               </Link>
-            )}
-        </nav>
-        <div className="header-actions">
-          {isOwner && (
-            <Link
-              className={customHeader ? "account-link" : "button small"}
-              href={user.role === "admin" ? "/panel/sitio" : "/dashboard/sitio"}
-            >
-              Editar mi sitio
-            </Link>
-          )}
-          {primary != null
-            ? primary.visible && (
+            ))}
+            {customHeader &&
+              (primary
+                ? primary.visible
+                : shows("contact") || !!contact.phone) && (
                 <Link
-                  className="button small"
-                  href={headerHref(primary.href, base)}
-                  target={primary.new_tab ? "_blank" : undefined}
-                  rel={primary.new_tab ? "noopener noreferrer" : undefined}
+                  className="button small header-mobile-cta"
+                  href={primary ? headerHref(primary.href, base) : contactHref}
+                  target={primary?.new_tab ? "_blank" : undefined}
+                  rel={primary?.new_tab ? "noopener noreferrer" : undefined}
+                  onClick={() => setMenu(false)}
                 >
-                  {primary.label}
-                  <ArrowUpRight size={16} />
-                </Link>
-              )
-            : !isOwner &&
-              (shows("contact") || contact.phone) && (
-                <Link className="button small" href={contactHref}>
-                  Contactar
+                  {primary?.label || "Contactar"}
                   <ArrowUpRight size={16} />
                 </Link>
               )}
-          <button
-            className="mobile-toggle"
-            aria-controls="broker-site-menu"
-            aria-label="Abrir menú del anunciante"
-            aria-expanded={menu}
-            onClick={() => setMenu(!menu)}
-          >
-            {menu ? <X /> : <Menu />}
-          </button>
-        </div>
-      </header>
+          </nav>
+          <div className="header-actions">
+            {isOwner && (
+              <Link
+                className={customHeader ? "account-link" : "button small"}
+                href={
+                  user.role === "admin" ? "/panel/sitio" : "/dashboard/sitio"
+                }
+              >
+                Editar mi sitio
+              </Link>
+            )}
+            {primary != null
+              ? primary.visible && (
+                  <Link
+                    className="button small"
+                    href={headerHref(primary.href, base)}
+                    target={primary.new_tab ? "_blank" : undefined}
+                    rel={primary.new_tab ? "noopener noreferrer" : undefined}
+                  >
+                    {primary.label}
+                    <ArrowUpRight size={16} />
+                  </Link>
+                )
+              : !isOwner &&
+                (shows("contact") || contact.phone) && (
+                  <Link className="button small" href={contactHref}>
+                    Contactar
+                    <ArrowUpRight size={16} />
+                  </Link>
+                )}
+            <button
+              className="mobile-toggle"
+              aria-controls="broker-site-menu"
+              aria-label="Abrir menú del anunciante"
+              aria-expanded={menu}
+              onClick={() => setMenu(!menu)}
+            >
+              {menu ? <X /> : <Menu />}
+            </button>
+          </div>
+        </header>
+      </SiteHeaderFrame>
       {propertyIdentifier ? (
         <Detail
           key={`${a.id}-${propertyIdentifier}`}

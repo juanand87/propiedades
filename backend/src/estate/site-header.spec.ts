@@ -3,6 +3,20 @@ import { defaultBrokerDesign, validateBrokerDesign } from './broker-site';
 import { validateHeaderHref } from './site-header';
 
 describe('Cabeceras configurables e independientes', () => {
+  it('conserva la cabecera normal anterior y valida el comportamiento fijo', () => {
+    const old: any = defaultDesign();
+    delete old.header_sticky;
+    expect(readDesign(JSON.stringify(old)).header_sticky).toBe(false);
+    expect(validateDesign({ ...old, header_sticky: true }).header_sticky).toBe(
+      true,
+    );
+    expect(
+      validateBrokerDesign({ ...defaultBrokerDesign(), header_sticky: true })
+        .header_sticky,
+    ).toBe(true);
+    for (const header_sticky of ['true', 1, null, {}])
+      expect(() => validateDesign({ ...old, header_sticky })).toThrow();
+  });
   it('conserva el estilo automático cuando el diseño es anterior', () => {
     expect(
       readDesign(

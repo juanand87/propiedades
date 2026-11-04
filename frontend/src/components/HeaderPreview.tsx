@@ -1,5 +1,6 @@
 "use client";
 import { useState, type ReactNode } from "react";
+import { SiteHeaderFrame } from "./SiteHeaderFrame";
 import { Menu, X } from "lucide-react";
 import { headerLinks, type SiteDesign } from "@/lib/site-design";
 export function HeaderPreview({
@@ -23,31 +24,33 @@ export function HeaderPreview({
         ? button.label
         : "";
   return (
-    <div className="design-preview-header">
-      <div className="preview-header-brand">{children}</div>
-      <div className={`preview-header-menu${open ? " open" : ""}`}>
-        <div className="preview-header-links">
-          {links.map((item, index) => (
-            <span key={index}>{item.label}</span>
-          ))}
+    <SiteHeaderFrame sticky={design.header_sticky}>
+      <div className="design-preview-header">
+        <div className="preview-header-brand">{children}</div>
+        <div className={`preview-header-menu${open ? " open" : ""}`}>
+          <div className="preview-header-links">
+            {links.map((item, index) => (
+              <span key={index}>{item.label}</span>
+            ))}
+          </div>
+          {buttonLabel && (
+            <span className="preview-header-button">{buttonLabel}</span>
+          )}
         </div>
-        {buttonLabel && (
-          <span className="preview-header-button">{buttonLabel}</span>
-        )}
+        <button
+          type="button"
+          className="preview-header-toggle"
+          aria-label={
+            open
+              ? "Cerrar menú de la vista previa"
+              : "Abrir menú de la vista previa"
+          }
+          aria-expanded={open}
+          onClick={() => setOpen(!open)}
+        >
+          {open ? <X size={24} /> : <Menu size={24} />}
+        </button>
       </div>
-      <button
-        type="button"
-        className="preview-header-toggle"
-        aria-label={
-          open
-            ? "Cerrar menú de la vista previa"
-            : "Abrir menú de la vista previa"
-        }
-        aria-expanded={open}
-        onClick={() => setOpen(!open)}
-      >
-        {open ? <X size={24} /> : <Menu size={24} />}
-      </button>
-    </div>
+    </SiteHeaderFrame>
   );
 }

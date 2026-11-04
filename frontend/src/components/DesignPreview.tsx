@@ -36,8 +36,28 @@ export function DesignPreview({
       stage.current.scrollTop = stage.current.scrollHeight;
   }, [focusFooter, focusHeader, size.height, size.width, mode]);
   const scale = size.width ? Math.min(1, size.width / width) : 0;
+  useEffect(() => {
+    if (scale && canvas.current && stage.current)
+      canvas.current.style.setProperty(
+        "--preview-scroll-top",
+        `${stage.current.scrollTop / scale}px`,
+      );
+  }, [scale]);
   return (
-    <div className="design-preview-stage" ref={stage}>
+    <div
+      className="design-preview-stage"
+      ref={stage}
+      role="region"
+      aria-label="Vista previa interactiva del sitio"
+      tabIndex={0}
+      onScroll={(e) => {
+        if (scale)
+          canvas.current?.style.setProperty(
+            "--preview-scroll-top",
+            `${e.currentTarget.scrollTop / scale}px`,
+          );
+      }}
+    >
       <div
         className="design-preview-scaled-space"
         style={{ height: size.height * scale }}

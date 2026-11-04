@@ -14,7 +14,7 @@ No requiere SQL: se usan los JSON existentes de estate_settings y advertiser_sit
 
 ## Verificación
 
-63 pruebas unitarias y 206 comprobaciones de integración en la base local aislada, con cero conexiones a producción. Se verificaron compatibilidad, límites, destinos inseguros, persistencia, revisiones, permisos e independencia entre sitios. Compilaciones de backend y frontend correctas y lint sin errores.
+64 pruebas unitarias y 211 comprobaciones de integración en la base local aislada, con cero conexiones a producción. Se verificaron compatibilidad, límites, destinos inseguros, persistencia, revisiones, permisos e independencia entre sitios. Compilaciones de backend y frontend correctas y lint sin errores.
 
 En navegador, con cuentas ficticias de administrador y corredor: edición de textos y destinos, agregado y orden de enlaces, rechazo de JavaScript, botón personalizado y oculto, persistencia tras recargar, menú interactivo de la vista previa móvil, enlaces externos seguros, acceso del propietario y navegación de los menús publicados a 390 × 844 sin desbordamiento horizontal.
 
@@ -27,3 +27,11 @@ En Cabecera se ajustan el tamaño del logo (24–80 px), la altura mínima de la
 La cabecera crece si el logo requiere más espacio y la portada conserva separación respecto a ella. El logo mantiene su proporción y se adapta al ancho móvil. Los colores se aplican también al menú desplegable; el logo del footer mantiene su tamaño independiente. Los controles actualizan el borrador y su vista previa de inmediato, pero se publican únicamente al guardar.
 
 Comprobado con cuentas ficticias: guardado y recarga en administrador e inmobiliaria, estilos distintos entre sitios, restauración y descarte, altura máxima, logo grande, menú móvil sin desbordamiento y footer sin cambios. Capturas: [tamaños y colores](qa/cabecera-tamanos-colores.png), [inmobiliaria en móvil](qa/cabecera-colores-inmobiliaria-movil.png). No requiere SQL ni nuevas variables de entorno.
+
+## Cabecera fija al desplazarse
+
+En Cabecera → Comportamiento de la cabecera, activa Mantener la cabecera visible al hacer scroll y guarda. Se configura de forma independiente en el portal principal y cada inmobiliaria, y está desactivado en diseños anteriores. Requiere backend design_version 7 y no necesita SQL.
+
+La cabecera permanece visible en escritorio y móvil, conserva su presentación sobre la portada y permite abrir el menú después de desplazarse. Los enlaces a secciones dejan espacio bajo la cabecera. El ajuste público del portal no fija la cabecera exterior de los paneles de edición.
+
+La vista previa reproduce el comportamiento dentro de su propio desplazamiento; también se puede enfocar y desplazar con el teclado. Verificado con datos ficticios: guardar, recargar, desactivar, descartar y volver a activar, scroll en escritorio/móvil, navegación a secciones e independencia entre sitios. Capturas: [panel](qa/cabecera-fija-panel.png), [inmobiliaria en móvil](qa/cabecera-fija-inmobiliaria-movil.png).

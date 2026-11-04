@@ -11,6 +11,7 @@ export type HeaderStyle = {
 };
 export function defaultHeader() {
   return {
+    header_sticky: false,
     header_style: null as HeaderStyle | null,
     header_links: null as HeaderLink[] | null,
     header_button: null as (HeaderLink & { visible: boolean }) | null,
@@ -85,6 +86,11 @@ function link(value: any): HeaderLink {
 }
 export function validateHeader(b: any) {
   const d = defaultHeader();
+  if (b.header_sticky !== undefined && typeof b.header_sticky !== 'boolean')
+    throw new BadRequestException(
+      'Indica si la cabecera queda fija al desplazarse.',
+    );
+  d.header_sticky = b.header_sticky ?? false;
   if (b.header_style != null) {
     const s = b.header_style;
     if (typeof s !== 'object' || Array.isArray(s))

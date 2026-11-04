@@ -79,7 +79,10 @@ body {
   font-size: 13px;
   font-weight: 550;
 }
-.has-cover-hero > .site-header {
+:is(
+  .has-cover-hero > .site-header,
+  .has-cover-hero > :where(.sticky-header-wrap) > .site-header
+) {
   position: absolute;
   left: 50%;
   transform: translateX(-50%);
@@ -797,7 +800,10 @@ body {
   }
 }
 @media (max-width: 800px) {
-  .has-cover-hero > .site-header {
+  :is(
+    .has-cover-hero > .site-header,
+    .has-cover-hero > :where(.sticky-header-wrap) > .site-header
+  ) {
     top: 12px;
     width: calc(100% - 28px);
     padding: 0 15px;
@@ -2081,7 +2087,10 @@ body {
   padding-bottom: 14px;
   position: relative;
 }
-.has-cover-hero > .site-header.custom-header {
+:is(
+  .has-cover-hero > .site-header,
+  .has-cover-hero > :where(.sticky-header-wrap) > .site-header
+).custom-header {
   position: absolute;
   min-height: 72px;
 }
@@ -2340,7 +2349,10 @@ body {
 }
 /* Scoped to headers: logos and colors in footers keep their own design. */
 .site-header.styled-header,
-.has-cover-hero > .site-header.styled-header,
+:is(
+  .has-cover-hero > .site-header,
+  .has-cover-hero > :where(.sticky-header-wrap) > .site-header
+).styled-header,
 .styled-header-site .design-preview-header {
   height: auto;
   min-height: var(--header-height);
@@ -2422,5 +2434,47 @@ body {
   .styled-header-site .preview-header-brand > svg {
     width: min(var(--header-logo-height), 56px);
     height: min(var(--header-logo-height), 56px);
+  }
+}
+.header-sticky-editor {
+  margin-bottom: 28px;
+}
+.sticky-header-wrap {
+  position: sticky;
+  top: 0;
+  z-index: 60;
+}
+.design-preview:has(> .sticky-header-wrap) {
+  overflow: clip;
+}
+.design-preview > .sticky-header-wrap {
+  position: relative;
+  top: var(--preview-scroll-top, 0px);
+}
+.has-cover-hero > .sticky-header-wrap,
+.preview-cover-first > .sticky-header-wrap {
+  height: 0;
+}
+.has-cover-hero > .sticky-header-wrap > .site-header {
+  position: relative;
+}
+.preview-cover-first > .sticky-header-wrap > .design-preview-header {
+  position: relative;
+  right: auto;
+  width: calc(100% - 48px);
+}
+.estate-site:has(> .sticky-header-wrap) section[id],
+.estate-site:has(> .sticky-header-wrap) main [id] {
+  scroll-margin-top: calc(var(--header-height, 80px) + 50px);
+}
+@media (max-width: 1100px) {
+  .sticky-header-wrap .main-nav.open {
+    max-height: calc(100dvh - var(--header-height, 80px) - 50px);
+    overflow-y: auto;
+  }
+}
+@container design-canvas (max-width: 600px) {
+  .preview-cover-first > .sticky-header-wrap > .design-preview-header {
+    width: calc(100% - 28px);
   }
 }

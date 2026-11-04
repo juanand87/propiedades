@@ -85,6 +85,7 @@ export function defaultHeaderStyle(): HeaderStyle {
   };
 }
 export type SiteDesign = {
+  header_sticky?: boolean;
   header_style?: HeaderStyle | null;
   header_links?: HeaderLink[] | null;
   header_button?: (HeaderLink & { visible: boolean }) | null;
@@ -117,6 +118,7 @@ export type SiteDesign = {
 };
 export function defaultDesign(): SiteDesign {
   return {
+    header_sticky: false,
     header_style: null,
     header_links: null,
     header_button: null,

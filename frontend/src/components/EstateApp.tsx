@@ -1,4 +1,6 @@
 "use client";
+import { SiteHeaderFrame } from "./SiteHeaderFrame";
+
 import Link from "next/link";
 import { createContext, useContext, useEffect, useState } from "react";
 import { House, Menu, X, ArrowUpRight, Heart } from "lucide-react";
@@ -223,98 +225,104 @@ export default function EstateApp({
           className={`estate-site${design.header_style ? " styled-header-site" : ""}${path.length === 0 ? " modern-home" : ""}${path.length === 0 && design.sections.find((s) => s.visible)?.id === "hero" ? " has-cover-hero" : ""}`}
           style={designStyle(design)}
         >
-          <header
-            className={`site-header${design.header_style ? " styled-header" : ""}${customHeader ? " custom-header" : ""}`}
+          <SiteHeaderFrame
+            sticky={
+              design.header_sticky && !["panel", "dashboard"].includes(path[0])
+            }
           >
-            <Link
-              href="/"
-              className="brand"
-              aria-label={`${settings.site_name}, inicio`}
+            <header
+              className={`site-header${design.header_style ? " styled-header" : ""}${customHeader ? " custom-header" : ""}`}
             >
-              {brand}
-              {(!design.logo_url || design.show_site_name) && (
-                <>
-                  {settings.site_name}
-                  <span className="brand-dot">.</span>
-                </>
-              )}
-            </Link>
-            <nav
-              className={menu ? "main-nav open" : "main-nav"}
-              id="main-site-menu"
-              aria-label="Navegación principal"
-            >
-              {mainHeaderLinks.map((item, index) => (
+              <Link
+                href="/"
+                className="brand"
+                aria-label={`${settings.site_name}, inicio`}
+              >
+                {brand}
+                {(!design.logo_url || design.show_site_name) && (
+                  <>
+                    {settings.site_name}
+                    <span className="brand-dot">.</span>
+                  </>
+                )}
+              </Link>
+              <nav
+                className={menu ? "main-nav open" : "main-nav"}
+                id="main-site-menu"
+                aria-label="Navegación principal"
+              >
+                {mainHeaderLinks.map((item, index) => (
+                  <Link
+                    key={index}
+                    className={
+                      item.href === "/propiedades" && path[0] === "propiedades"
+                        ? "active"
+                        : undefined
+                    }
+                    href={headerHref(item.href)}
+                    target={item.new_tab ? "_blank" : undefined}
+                    rel={item.new_tab ? "noopener noreferrer" : undefined}
+                    onClick={() => setMenu(false)}
+                  >
+                    {item.label}
+                  </Link>
+                ))}
+                {customHeader && (primary == null || primary.visible) && (
+                  <Link
+                    className="button small header-mobile-cta"
+                    href={primaryHref}
+                    target={primary?.new_tab ? "_blank" : undefined}
+                    rel={primary?.new_tab ? "noopener noreferrer" : undefined}
+                    onClick={() => setMenu(false)}
+                  >
+                    {primaryLabel}
+                    <ArrowUpRight size={16} />
+                  </Link>
+                )}
+              </nav>
+              <div className="header-actions">
                 <Link
-                  key={index}
-                  className={
-                    item.href === "/propiedades" && path[0] === "propiedades"
-                      ? "active"
-                      : undefined
+                  href="/favoritos"
+                  aria-label="Mis favoritos"
+                  className="icon-link"
+                >
+                  <Heart size={20} />
+                </Link>
+                <Link
+                  className="account-link"
+                  href={
+                    user
+                      ? user.role === "admin"
+                        ? "/panel"
+                        : "/dashboard"
+                      : "/login"
                   }
-                  href={headerHref(item.href)}
-                  target={item.new_tab ? "_blank" : undefined}
-                  rel={item.new_tab ? "noopener noreferrer" : undefined}
-                  onClick={() => setMenu(false)}
                 >
-                  {item.label}
+                  {user ? "Mi panel" : "Ingresar"}
                 </Link>
-              ))}
-              {customHeader && (primary == null || primary.visible) && (
-                <Link
-                  className="button small header-mobile-cta"
-                  href={primaryHref}
-                  target={primary?.new_tab ? "_blank" : undefined}
-                  rel={primary?.new_tab ? "noopener noreferrer" : undefined}
-                  onClick={() => setMenu(false)}
+                {(primary == null || primary.visible) && (
+                  <Link
+                    className="button small publish-link"
+                    href={primaryHref}
+                    target={primary?.new_tab ? "_blank" : undefined}
+                    rel={primary?.new_tab ? "noopener noreferrer" : undefined}
+                  >
+                    {primaryLabel}
+                    <ArrowUpRight size={16} />
+                  </Link>
+                )}
+                <button
+                  className="mobile-toggle"
+                  aria-controls="main-site-menu"
+                  aria-label="Abrir navegación"
+                  aria-expanded={menu}
+                  onClick={() => setMenu(!menu)}
                 >
-                  {primaryLabel}
-                  <ArrowUpRight size={16} />
-                </Link>
-              )}
-            </nav>
-            <div className="header-actions">
-              <Link
-                href="/favoritos"
-                aria-label="Mis favoritos"
-                className="icon-link"
-              >
-                <Heart size={20} />
-              </Link>
-              <Link
-                className="account-link"
-                href={
-                  user
-                    ? user.role === "admin"
-                      ? "/panel"
-                      : "/dashboard"
-                    : "/login"
-                }
-              >
-                {user ? "Mi panel" : "Ingresar"}
-              </Link>
-              {(primary == null || primary.visible) && (
-                <Link
-                  className="button small publish-link"
-                  href={primaryHref}
-                  target={primary?.new_tab ? "_blank" : undefined}
-                  rel={primary?.new_tab ? "noopener noreferrer" : undefined}
-                >
-                  {primaryLabel}
-                  <ArrowUpRight size={16} />
-                </Link>
-              )}
-              <button
-                className="mobile-toggle"
-                aria-controls="main-site-menu"
-                aria-label="Abrir navegación"
-                aria-expanded={menu}
-                onClick={() => setMenu(!menu)}
-              >
-                {menu ? <X /> : <Menu />}
-              </button>
-            </div>
-          </header>
+                  {menu ? <X /> : <Menu />}
+                </button>
+              </div>
+            </header>
+          </SiteHeaderFrame>
           {workspace ? (
             <Workspace path={path} />
           ) : auth ? (

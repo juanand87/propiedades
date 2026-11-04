@@ -15,12 +15,14 @@ export function HeaderEditor({
   broker,
   ready,
   styleReady,
+  stickyReady,
 }: {
   draft: SiteDesign;
   update: (key: keyof SiteDesign, value: unknown) => void;
   broker: boolean;
   ready: boolean;
   styleReady: boolean;
+  stickyReady: boolean;
 }) {
   const style = draft.header_style ?? defaultHeaderStyle();
   const colors = [
@@ -75,6 +77,28 @@ export function HeaderEditor({
   }
   return (
     <section className="panel-card header-editor">
+      <h2>Comportamiento de la cabecera</h2>
+      <fieldset disabled={!stickyReady} className="header-sticky-editor">
+        <label className="design-checkbox">
+          <input
+            type="checkbox"
+            checked={draft.header_sticky ?? false}
+            onChange={(e) => update("header_sticky", e.target.checked)}
+          />
+          Mantener la cabecera visible al hacer scroll
+        </label>
+        <p>
+          El logo, el menú y el botón principal permanecen disponibles al
+          desplazarse, en escritorio y móvil. Desplázate dentro de la vista
+          previa para probarlo.
+        </p>
+        {!stickyReady && (
+          <p className="notice">
+            Esta opción estará disponible al terminar la actualización. Recarga
+            en unos minutos.
+          </p>
+        )}
+      </fieldset>
       <h2>Tamaño y colores de la cabecera</h2>
       {!styleReady && (
         <p className="notice">
