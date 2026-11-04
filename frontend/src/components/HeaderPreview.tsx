@@ -24,7 +24,10 @@ export function HeaderPreview({
         ? button.label
         : "";
   return (
-    <SiteHeaderFrame sticky={design.header_sticky}>
+    <SiteHeaderFrame
+      sticky={design.header_sticky}
+      shrink={design.header_shrink}
+    >
       <div className="design-preview-header">
         <div className="preview-header-brand">{children}</div>
         <div className={`preview-header-menu${open ? " open" : ""}`}>

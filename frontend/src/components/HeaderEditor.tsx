@@ -16,6 +16,7 @@ export function HeaderEditor({
   ready,
   styleReady,
   stickyReady,
+  shrinkReady,
 }: {
   draft: SiteDesign;
   update: (key: keyof SiteDesign, value: unknown) => void;
@@ -23,6 +24,7 @@ export function HeaderEditor({
   ready: boolean;
   styleReady: boolean;
   stickyReady: boolean;
+  shrinkReady: boolean;
 }) {
   const style = draft.header_style ?? defaultHeaderStyle();
   const colors = [
@@ -99,6 +101,52 @@ export function HeaderEditor({
           </p>
         )}
       </fieldset>
+      <fieldset
+        disabled={!shrinkReady || !draft.header_sticky}
+        className="header-sticky-editor"
+      >
+        <label className="design-checkbox">
+          <input
+            type="checkbox"
+            checked={draft.header_shrink ?? false}
+            onChange={(e) => update("header_shrink", e.target.checked)}
+          />
+          Hacer la cabecera más pequeña al hacer scroll
+        </label>
+        <p>
+          Reduce la altura y el logo al bajar por la página. Recupera su tamaño
+          original al volver arriba. Se conserva un tamaño mínimo para facilitar
+          el uso del menú.
+        </p>
+        {(draft.header_shrink ?? false) && (
+          <label>
+            Tamaño reducido{" "}
+            <strong>{draft.header_shrink_percent ?? 75} % del original</strong>
+            <input
+              type="range"
+              min={65}
+              max={90}
+              step={5}
+              value={draft.header_shrink_percent ?? 75}
+              onChange={(e) =>
+                update("header_shrink_percent", Number(e.target.value))
+              }
+            />
+          </label>
+        )}
+      </fieldset>
+      {!draft.header_sticky && (
+        <p className="muted">
+          Activa primero la cabecera visible al hacer scroll para utilizar la
+          reducción.
+        </p>
+      )}
+      {!shrinkReady && (
+        <p className="notice">
+          La reducción estará disponible al terminar la actualización. Recarga
+          en unos minutos.
+        </p>
+      )}
       <h2>Tamaño y colores de la cabecera</h2>
       {!styleReady && (
         <p className="notice">

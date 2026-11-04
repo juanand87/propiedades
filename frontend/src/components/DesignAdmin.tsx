@@ -502,6 +502,7 @@ export function DesignAdmin({ broker = false }: { broker?: boolean }) {
                   ready={ready && siteInfo?.design_version >= 5}
                   styleReady={ready && siteInfo?.design_version >= 6}
                   stickyReady={ready && siteInfo?.design_version >= 7}
+                  shrinkReady={ready && siteInfo?.design_version >= 8}
                 />
               </div>
               {(activeSection === "search" ||

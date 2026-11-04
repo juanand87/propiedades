@@ -14,7 +14,7 @@ No requiere SQL: se usan los JSON existentes de estate_settings y advertiser_sit
 
 ## Verificación
 
-64 pruebas unitarias y 211 comprobaciones de integración en la base local aislada, con cero conexiones a producción. Se verificaron compatibilidad, límites, destinos inseguros, persistencia, revisiones, permisos e independencia entre sitios. Compilaciones de backend y frontend correctas y lint sin errores.
+65 pruebas unitarias y 217 comprobaciones de integración en la base local aislada, con cero conexiones a producción. Se verificaron compatibilidad, límites, destinos inseguros, persistencia, revisiones, permisos e independencia entre sitios. Compilaciones de backend y frontend correctas y lint sin errores.
 
 En navegador, con cuentas ficticias de administrador y corredor: edición de textos y destinos, agregado y orden de enlaces, rechazo de JavaScript, botón personalizado y oculto, persistencia tras recargar, menú interactivo de la vista previa móvil, enlaces externos seguros, acceso del propietario y navegación de los menús publicados a 390 × 844 sin desbordamiento horizontal.
 
@@ -35,3 +35,11 @@ En Cabecera → Comportamiento de la cabecera, activa Mantener la cabecera visib
 La cabecera permanece visible en escritorio y móvil, conserva su presentación sobre la portada y permite abrir el menú después de desplazarse. Los enlaces a secciones dejan espacio bajo la cabecera. El ajuste público del portal no fija la cabecera exterior de los paneles de edición.
 
 La vista previa reproduce el comportamiento dentro de su propio desplazamiento; también se puede enfocar y desplazar con el teclado. Verificado con datos ficticios: guardar, recargar, desactivar, descartar y volver a activar, scroll en escritorio/móvil, navegación a secciones e independencia entre sitios. Capturas: [panel](qa/cabecera-fija-panel.png), [inmobiliaria en móvil](qa/cabecera-fija-inmobiliaria-movil.png).
+
+## Cabecera compacta al hacer scroll
+
+Activa la cabecera fija y después Hacer la cabecera más pequeña al hacer scroll. El control Tamaño reducido permite conservar entre 65 y 90 % del tamaño original. Se aplica al logo y la altura, con mínimos para mantener el menú utilizable; al volver arriba recupera el tamaño normal. Cada inmobiliaria y el portal conservan sus propios ajustes. Guardar publica los cambios y Descartar recupera los valores guardados.
+
+El ajuste nuevo está desactivado en diseños anteriores y requiere design_version 8. Si se desactiva la cabecera fija, la reducción queda inactiva sin perder la preferencia. No requiere SQL ni variables nuevas.
+
+La vista previa usa su propio desplazamiento. La cabecera pública mantiene el espacio reservado en páginas sin portada para evitar saltos; utiliza distintos umbrales de entrada y salida para evitar parpadeos y respeta movimiento reducido. Verificado con datos ficticios: guardado y recarga, porcentajes diferentes por sitio, reducción y recuperación, navegación móvil, desactivación y altura del documento estable. Capturas: [panel](qa/cabecera-compacta-panel.png), [menú móvil](qa/cabecera-compacta-inmobiliaria-movil.png).

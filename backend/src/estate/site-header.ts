@@ -12,6 +12,8 @@ export type HeaderStyle = {
 export function defaultHeader() {
   return {
     header_sticky: false,
+    header_shrink: false,
+    header_shrink_percent: 75,
     header_style: null as HeaderStyle | null,
     header_links: null as HeaderLink[] | null,
     header_button: null as (HeaderLink & { visible: boolean }) | null,
@@ -91,6 +93,21 @@ export function validateHeader(b: any) {
       'Indica si la cabecera queda fija al desplazarse.',
     );
   d.header_sticky = b.header_sticky ?? false;
+  if (b.header_shrink !== undefined && typeof b.header_shrink !== 'boolean')
+    throw new BadRequestException(
+      'Indica si la cabecera se reduce al desplazarse.',
+    );
+  if (
+    b.header_shrink_percent !== undefined &&
+    (!Number.isInteger(b.header_shrink_percent) ||
+      b.header_shrink_percent < 65 ||
+      b.header_shrink_percent > 90)
+  )
+    throw new BadRequestException(
+      'El tamaño reducido de la cabecera debe estar entre 65 y 90 %.',
+    );
+  d.header_shrink = b.header_shrink ?? false;
+  d.header_shrink_percent = b.header_shrink_percent ?? 75;
   if (b.header_style != null) {
     const s = b.header_style;
     if (typeof s !== 'object' || Array.isArray(s))

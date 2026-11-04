@@ -3,6 +3,27 @@ import { defaultBrokerDesign, validateBrokerDesign } from './broker-site';
 import { validateHeaderHref } from './site-header';
 
 describe('Cabeceras configurables e independientes', () => {
+  it('conserva la reducción desactivada y valida su tamaño', () => {
+    const old: any = defaultDesign();
+    delete old.header_shrink;
+    delete old.header_shrink_percent;
+    expect(readDesign(JSON.stringify(old)).header_shrink).toBe(false);
+    expect(readDesign(JSON.stringify(old)).header_shrink_percent).toBe(75);
+    const broker = validateBrokerDesign({
+      ...defaultBrokerDesign(),
+      header_sticky: true,
+      header_shrink: true,
+      header_shrink_percent: 65,
+    });
+    expect(broker.header_shrink).toBe(true);
+    expect(broker.header_shrink_percent).toBe(65);
+    for (const value of [null, 'true', 1])
+      expect(() => validateDesign({ ...old, header_shrink: value })).toThrow();
+    for (const value of [null, 64, 91, 75.5, '75'])
+      expect(() =>
+        validateDesign({ ...old, header_shrink_percent: value }),
+      ).toThrow();
+  });
   it('conserva la cabecera normal anterior y valida el comportamiento fijo', () => {
     const old: any = defaultDesign();
     delete old.header_sticky;

@@ -86,6 +86,8 @@ export function defaultHeaderStyle(): HeaderStyle {
 }
 export type SiteDesign = {
   header_sticky?: boolean;
+  header_shrink?: boolean;
+  header_shrink_percent?: number;
   header_style?: HeaderStyle | null;
   header_links?: HeaderLink[] | null;
   header_button?: (HeaderLink & { visible: boolean }) | null;
@@ -119,6 +121,8 @@ export type SiteDesign = {
 export function defaultDesign(): SiteDesign {
   return {
     header_sticky: false,
+    header_shrink: false,
+    header_shrink_percent: 75,
     header_style: null,
     header_links: null,
     header_button: null,
@@ -275,7 +279,15 @@ export function siteDesign(settings: { design?: SiteDesign }): SiteDesign {
 }
 export function designStyle(d: SiteDesign): CSSProperties {
   const h = d.header_style;
+  const factor = (d.header_shrink_percent ?? 75) / 100;
+  const compactLogo = Math.max(
+    24,
+    Math.round((h?.logo_height ?? (d.logo_media_id ? 40 : 34)) * factor),
+  );
   return {
+    "--header-compact-logo": `${compactLogo}px`,
+    "--header-compact-height": `${Math.max(56, Math.round((h?.height ?? 80) * factor), compactLogo + 16)}px`,
+    "--header-cover-compact-height": `${Math.max(56, Math.round((h?.height ?? 72) * factor), compactLogo + 16)}px`,
     ...(h
       ? {
           "--header-logo-height": `${h.logo_height}px`,

@@ -477,6 +477,8 @@ async function main() {
           ...initialDesign.design,
           primary_color: '#18436a',
           header_sticky: true,
+          header_shrink: true,
+          header_shrink_percent: 70,
           header_style: {
             logo_height: 56,
             height: 104,
@@ -535,9 +537,12 @@ async function main() {
       admin,
       400,
     );
-    assert.equal(designed.design_version, 7);
+    assert.equal(designed.design_version, 8);
     const publicMainFooter = await call('GET', '/settings');
     assert.equal(publicMainFooter.design.header_sticky, true);
+    assert.equal(publicMainFooter.design.header_shrink, true);
+    assert.equal(publicMainFooter.design.header_shrink_percent, 70);
+    assertions += 2;
     assertions++;
     assert.equal(publicMainFooter.design.header_style.height, 104);
     assert.equal(publicMainFooter.design.header_style.logo_height, 56);
@@ -658,6 +663,8 @@ async function main() {
       primary_color: '#18436a',
       hero_title: 'Corredor Azul · Tu próximo lugar',
       header_sticky: true,
+      header_shrink: true,
+      header_shrink_percent: 80,
       header_style: {
         logo_height: 64,
         height: 120,
@@ -724,6 +731,9 @@ async function main() {
     const publicSiteA = await call('GET', '/advertisers/' + a.slug);
     assert.deepEqual(publicSiteA.site.header_style, designA.header_style);
     assert.equal(publicSiteA.site.header_sticky, true);
+    assert.equal(publicSiteA.site.header_shrink_percent, 80);
+    assert.equal(publicSiteA.site.header_shrink, true);
+    assertions += 2;
     assert.equal((await call('GET', '/settings')).design.header_sticky, false);
     assertions += 2;
     assert.equal((await call('GET', '/settings')).design.header_style, null);
@@ -758,7 +768,7 @@ async function main() {
       designA.footer_contact.email,
     );
     assert.deepEqual(publicSiteA.site.footer_socials, designA.footer_socials);
-    assert.equal(baseBroker.design_version, 7);
+    assert.equal(baseBroker.design_version, 8);
     const profileAfterFooter = await call(
       'GET',
       '/me/advertiser',
@@ -821,6 +831,9 @@ async function main() {
     assert.equal(ownB.design.header_links, null);
     assert.equal(ownB.design.header_style, null);
     assert.equal(ownB.design.header_sticky, false);
+    assert.equal(ownB.design.header_shrink, false);
+    assert.equal(ownB.design.header_shrink_percent, 75);
+    assertions += 2;
     assertions++;
     assertions++;
     assert.equal(ownB.design.header_button, null);

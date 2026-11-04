@@ -226,6 +226,7 @@ export default function EstateApp({
           style={designStyle(design)}
         >
           <SiteHeaderFrame
+            shrink={design.header_shrink}
             sticky={
               design.header_sticky && !["panel", "dashboard"].includes(path[0])
             }

@@ -229,7 +229,7 @@ export class EstateService {
     const { design_json, ...publicSettings } = row || {};
     return {
       ...publicSettings,
-      design_version: 7,
+      design_version: 8,
       design_ready:
         !!row &&
         Object.hasOwn(row, 'design_json') &&
@@ -471,7 +471,7 @@ export class EstateService {
     const design = this.brokerSiteDesign(a, row, u);
     return {
       site_name: a.display_name,
-      design_version: 7,
+      design_version: 8,
       homepage_title: design.hero_title,
       advertiser: { id: a.id, slug: a.slug, status: a.status },
       profile_contact: {
