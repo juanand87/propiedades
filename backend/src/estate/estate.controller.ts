@@ -20,6 +20,7 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { EstateService } from './estate.service';
 import { EstateGuard } from './estate.guard';
+import { DemoService } from './demo.service';
 
 @Catch()
 export class SafeExceptionFilter implements ExceptionFilter {
@@ -46,12 +47,34 @@ export class SafeExceptionFilter implements ExceptionFilter {
 
 @Controller()
 export class EstateController {
-  constructor(private estate: EstateService) {}
+  constructor(
+    private estate: EstateService,
+    private demo: DemoService,
+  ) {}
+  @Get('admin/examples') @UseGuards(EstateGuard) examples(@Req() req: any) {
+    return this.demo.status(req.user);
+  }
+  @Post('admin/examples') @UseGuards(EstateGuard) installExamples(
+    @Req() req: any,
+    @Body() b: any,
+  ) {
+    return this.demo.install(req.user, b);
+  }
+  @Patch('admin/examples/pause') @UseGuards(EstateGuard) pauseExamples(
+    @Req() req: any,
+  ) {
+    return this.demo.pause(req.user);
+  }
   @Get() health() {
     return this.estate.health();
   }
   @Get('ready') ready() {
     return this.estate.ready();
+  }
+  @Patch('admin/examples/publish') @UseGuards(EstateGuard) publishExamples(
+    @Req() req: any,
+  ) {
+    return this.demo.publish(req.user);
   }
   @Get('catalog') catalog() {
     return this.estate.catalog();

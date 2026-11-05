@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { EstateController } from './estate.controller';
 import { EstateService } from './estate.service';
 import { EstateGuard } from './estate.guard';
+import { DemoService } from './demo.service';
 
 @Module({
   imports: [
@@ -16,6 +17,6 @@ import { EstateGuard } from './estate.guard';
     }),
   ],
   controllers: [EstateController],
-  providers: [EstateService, EstateGuard],
+  providers: [EstateService, EstateGuard, DemoService],
 })
 export class EstateModule {}

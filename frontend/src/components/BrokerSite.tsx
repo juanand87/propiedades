@@ -118,23 +118,29 @@ export function BrokerSite({
   const sections: Record<string, React.ReactNode> = {
     hero: (
       <section className="portal-hero broker-hero" id="inicio">
-        <HeroMedia design={d} />
-        <div className="hero-copy">
-          <span className="eyebrow">
-            {labels[a.kind]} · {a.display_name}
-          </span>
-          <h1>{d.hero_title}</h1>
-          <p className="preserve-lines">{d.hero_subtitle}</p>
-          {(shows("listings") || shows("contact")) && (
-            <Link
-              className="button"
-              href={shows("listings") ? `${base}#propiedades` : contactHref}
-            >
-              {shows("listings") ? "Explorar propiedades" : "Contactar"}
-              <ArrowUpRight size={18} />
-            </Link>
+        <HeroMedia
+          design={d}
+          renderCopy={(copy) => (
+            <div className="hero-copy">
+              <span className="eyebrow">
+                {labels[a.kind]} · {a.display_name}
+              </span>
+              <h1 className="preserve-lines">{copy?.title ?? d.hero_title}</h1>
+              <p className="preserve-lines">
+                {copy?.subtitle ?? d.hero_subtitle}
+              </p>
+              {(shows("listings") || shows("contact")) && (
+                <Link
+                  className="button"
+                  href={shows("listings") ? `${base}#propiedades` : contactHref}
+                >
+                  {shows("listings") ? "Explorar propiedades" : "Contactar"}
+                  <ArrowUpRight size={18} />
+                </Link>
+              )}
+            </div>
           )}
-        </div>
+        />
       </section>
     ),
     about: (

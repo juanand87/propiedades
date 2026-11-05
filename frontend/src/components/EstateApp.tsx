@@ -12,6 +12,7 @@ import {
   headerLinks,
   headerHref,
 } from "@/lib/site-design";
+import { PropertyFeed } from "./PropertyFeed";
 import { PublicView } from "./PublicView";
 import { Workspace } from "./Workspace";
 import { AuthView } from "./AuthView";
@@ -213,7 +214,9 @@ export default function EstateApp({
         setFavorites,
       }}
     >
-      {path[0] === "anunciantes" && path[1] ? (
+      {path[0] === "descubrir" ? (
+        <PropertyFeed />
+      ) : path[0] === "anunciantes" && path[1] ? (
         <BrokerSite
           slug={path[1]}
           advertiser={initialAdvertiser}

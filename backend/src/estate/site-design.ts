@@ -1,5 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
 import { uuid } from './rules';
+import { validateHeroCopy, type HeroCopy } from './hero-copy';
 import { defaultHeader, validateHeader } from './site-header';
 import { defaultBrokerFooter, validateBrokerFooter } from './broker-footer';
 
@@ -17,7 +18,12 @@ export const defaultDesign = (sections = HOME_SECTIONS) => ({
   hero_media_id: null as string | null,
   hero_alt: 'Propiedad destacada en la portada',
   hero_mode: 'image' as 'image' | 'slider',
-  hero_slides: [] as { media_id: string; alt_text: string }[],
+  hero_copy: null as HeroCopy | null,
+  hero_slides: [] as {
+    media_id: string;
+    alt_text: string;
+    copy?: HeroCopy | null;
+  }[],
   hero_autoplay: true,
   hero_interval: 6,
   show_site_name: true,
@@ -73,6 +79,7 @@ export function validateDesign(b: any, sections = HOME_SECTIONS) {
       'Selecciona imagen o slider para la portada.',
     );
   d.hero_mode = b.hero_mode || 'image';
+  d.hero_copy = validateHeroCopy(b.hero_copy);
   if (b.hero_slides !== undefined) {
     if (!Array.isArray(b.hero_slides) || b.hero_slides.length > 8)
       throw new BadRequestException('El slider admite hasta 8 imágenes.');
@@ -88,6 +95,7 @@ export function validateDesign(b: any, sections = HOME_SECTIONS) {
       return {
         media_id: uuid(s.media_id),
         alt_text: s.alt_text.trim() || d.hero_alt,
+        ...(s.copy != null ? { copy: validateHeroCopy(s.copy) } : {}),
       };
     });
     if (

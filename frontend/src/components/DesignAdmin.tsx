@@ -33,6 +33,7 @@ import {
   socialNetworks,
 } from "@/lib/site-design";
 import { Notice, useEstate } from "./EstateApp";
+import { VisualHeroEditor } from "./VisualHeroEditor";
 import { HeroMedia } from "./HeroMedia";
 import { DesignPreview } from "./DesignPreview";
 import { ImageUpload } from "./ImageUpload";
@@ -74,6 +75,7 @@ export function DesignAdmin({ broker = false }: { broker?: boolean }) {
   const [uploadProgress, setUploadProgress] = useState("");
   const [uploadError, setUploadError] = useState("");
   const [uploadMessage, setUploadMessage] = useState("");
+  const replacingSlide = useRef<string | null>(null);
   const [selectedSlideId, setSelectedSlideId] = useState<string | undefined>();
   const [activeSection, setActiveSection] = useState("identity");
   const [previewMode, setPreviewMode] = useState<"desktop" | "mobile">(
@@ -105,6 +107,7 @@ export function DesignAdmin({ broker = false }: { broker?: boolean }) {
     }
   }, [picker]);
   function closePicker() {
+    replacingSlide.current = null;
     setPicker(null);
     pickerButton.current?.focus();
   }
@@ -174,19 +177,40 @@ export function DesignAdmin({ broker = false }: { broker?: boolean }) {
     setUploadMessage("");
     setPreviews((p) => ({ ...p, [media.id]: media.url }));
     if (key === "hero_slides") {
+      const replace = replacingSlide.current;
+      if (
+        draft?.hero_slides?.some(
+          (s) => s.media_id === media.id && s.media_id !== replace,
+        )
+      ) {
+        setError("Esta foto ya está en el slider. Elige otra.");
+        return;
+      }
+      replacingSlide.current = null;
       setSelectedSlideId(media.id);
       setDraft((p) =>
         p
           ? {
               ...p,
-              hero_slides: [
-                ...(p.hero_slides || []),
-                {
-                  media_id: media.id,
-                  alt_text: media.name.slice(0, 200),
-                  url: media.url,
-                },
-              ],
+              hero_slides: replace
+                ? (p.hero_slides || []).map((s) =>
+                    s.media_id === replace
+                      ? {
+                          ...s,
+                          media_id: media.id,
+                          alt_text: media.name.slice(0, 200),
+                          url: media.url,
+                        }
+                      : s,
+                  )
+                : [
+                    ...(p.hero_slides || []),
+                    {
+                      media_id: media.id,
+                      alt_text: media.name.slice(0, 200),
+                      url: media.url,
+                    },
+                  ],
             }
           : p,
       );
@@ -218,6 +242,7 @@ export function DesignAdmin({ broker = false }: { broker?: boolean }) {
         );
       if (
         key === "hero_slides" &&
+        !replacingSlide.current &&
         (draft?.hero_slides?.length || 0) + files.length > 8
       )
         throw new Error(
@@ -259,6 +284,7 @@ export function DesignAdmin({ broker = false }: { broker?: boolean }) {
       const message = `${completed ? `Se agregaron ${completed} de ${files.length} imágenes. Las demás no se cargaron. ` : ""}${(e as Error).message}`;
       setUploadError(message);
     } finally {
+      replacingSlide.current = null;
       uploading.current = false;
       setUploadProgress("");
       setBusy(false);
@@ -272,6 +298,7 @@ export function DesignAdmin({ broker = false }: { broker?: boolean }) {
       setLibrary(await request("/manage/media"));
       setPicker(key);
     } catch (e) {
+      replacingSlide.current = null;
       setError((e as Error).message);
     } finally {
       setBusy(false);
@@ -375,6 +402,7 @@ export function DesignAdmin({ broker = false }: { broker?: boolean }) {
             } catch (e) {
               const message = (e as Error).message;
               if (/cabecera/i.test(message)) setActiveSection("header");
+              if (/portada|slider/i.test(message)) setActiveSection("hero");
               setError(message);
               if (
                 broker &&
@@ -607,9 +635,7 @@ export function DesignAdmin({ broker = false }: { broker?: boolean }) {
                 <section
                   className="panel-card"
                   hidden={
-                    !["hero", "about", "properties", "footer"].includes(
-                      activeSection,
-                    )
+                    !["about", "properties", "footer"].includes(activeSection)
                   }
                 >
                   <h2>
@@ -625,8 +651,6 @@ export function DesignAdmin({ broker = false }: { broker?: boolean }) {
                   <p>El nombre se administra en tu perfil de anunciante.</p>
                   {(
                     [
-                      ["hero_title", "Título de la portada", 180],
-                      ["hero_subtitle", "Presentación breve", 400],
                       ["about_title", "Título de presentación", 100],
                       ["listings_title", "Título de propiedades", 100],
                       ["contact_title", "Título de contacto", 100],
@@ -657,7 +681,7 @@ export function DesignAdmin({ broker = false }: { broker?: boolean }) {
                     >
                       {label}
                       <input
-                        required={key !== "hero_subtitle"}
+                        required
                         maxLength={max}
                         value={draft[key] || ""}
                         onChange={(e) => update(key, e.target.value)}
@@ -813,6 +837,49 @@ export function DesignAdmin({ broker = false }: { broker?: boolean }) {
                     se publica hasta que guardes.
                   </p>
                 )}
+                {activeSection === "hero" && (
+                  <VisualHeroEditor
+                    design={previewDesign!}
+                    fallback={{
+                      title: broker
+                        ? draft.hero_title || "Tu próximo lugar"
+                        : settings.homepage_title,
+                      subtitle: broker
+                        ? draft.hero_subtitle || ""
+                        : "Encuentra casas, departamentos y terrenos en Chile.\nConecta con las personas que tienen las llaves.",
+                    }}
+                    selectedId={selectedSlide?.media_id}
+                    onSelect={setSelectedSlideId}
+                    update={update}
+                    ready={ready && siteInfo?.design_version >= 10}
+                    busy={busy}
+                    onReplace={(button) => {
+                      replacingSlide.current =
+                        draft.hero_mode === "slider"
+                          ? selectedSlide?.media_id || null
+                          : null;
+                      void choose(
+                        draft.hero_mode === "slider"
+                          ? "hero_slides"
+                          : "hero_media_id",
+                        button,
+                      );
+                    }}
+                    onReplaceUpload={(files) => {
+                      if (!files.length) return;
+                      replacingSlide.current =
+                        draft.hero_mode === "slider"
+                          ? selectedSlide?.media_id || null
+                          : null;
+                      void upload(
+                        draft.hero_mode === "slider"
+                          ? "hero_slides"
+                          : "hero_media_id",
+                        files,
+                      );
+                    }}
+                  />
+                )}
                 {(["logo_media_id", "hero_media_id"] as const)
                   .filter(
                     (key) =>
@@ -941,81 +1008,6 @@ export function DesignAdmin({ broker = false }: { broker?: boolean }) {
                     >
                       Agregar desde mi biblioteca
                     </button>
-                    <section
-                      className="slider-live-editor"
-                      aria-label="Vista previa inmediata del slider"
-                      style={designStyle(draft)}
-                    >
-                      <h3>Así va quedando tu portada</h3>
-                      <p role="status">
-                        {selectedSlide
-                          ? `Viendo foto ${(draft.hero_slides || []).findIndex((slide) => slide.media_id === selectedSlide.media_id) + 1} de ${draft.hero_slides?.length}. Cada foto nueva se muestra aquí al terminar de cargar.`
-                          : "Agrega tu primera foto para verla aquí, sin necesidad de guardar."}
-                      </p>
-                      {selectedSlide ? (
-                        <>
-                          <div className="slider-live-stage">
-                            <HeroMedia
-                              preview
-                              design={previewDesign!}
-                              selectedMediaId={selectedSlide.media_id}
-                              onSelectMedia={setSelectedSlideId}
-                            />
-                            <div className="slider-live-copy">
-                              <small>VISTA PREVIA · SIN PUBLICAR</small>
-                              <strong>
-                                {broker
-                                  ? draft.hero_title
-                                  : settings.homepage_title}
-                              </strong>
-                              <span>
-                                {broker
-                                  ? draft.hero_subtitle
-                                  : "Descubre propiedades y conecta con su anunciante."}
-                              </span>
-                            </div>
-                          </div>
-                          <div
-                            className="slider-live-thumbnails"
-                            role="group"
-                            aria-label="Seleccionar foto para la vista previa"
-                          >
-                            {(previewDesign?.hero_slides || []).map(
-                              (slide, index) => (
-                                <button
-                                  key={slide.media_id}
-                                  type="button"
-                                  aria-label={`Previsualizar foto ${index + 1}`}
-                                  aria-pressed={
-                                    selectedSlide.media_id === slide.media_id
-                                  }
-                                  onClick={() =>
-                                    setSelectedSlideId(slide.media_id)
-                                  }
-                                >
-                                  <img src={assetUrl(slide.url)} alt="" />
-                                  <span>{index + 1}</span>
-                                </button>
-                              ),
-                            )}
-                          </div>
-                        </>
-                      ) : (
-                        <div className="slider-live-empty">
-                          <ImageIcon size={36} />
-                          <strong>Tu portada aparecerá aquí</strong>
-                          <span>
-                            Elige fotos arriba o agrégalas desde tu biblioteca.
-                          </span>
-                        </div>
-                      )}
-                    </section>
-                    <h3>2. Elige el orden</h3>
-                    <p>
-                      {draft.hero_slides?.length
-                        ? "La primera foto abre tu portada. Usa los botones para cambiar el orden."
-                        : "Tus fotos aparecerán aquí después de agregarlas."}
-                    </p>
                     {(draft.hero_slides || []).map((slide, index) => (
                       <div
                         className="slider-editor-row slider-selected-settings"
@@ -1332,19 +1324,6 @@ export function DesignAdmin({ broker = false }: { broker?: boolean }) {
                       >
                         {s.id === "hero" ? (
                           <>
-                            <div className="preview-hero-copy">
-                              <small>ENCUENTRA TU PRÓXIMO LUGAR</small>
-                              <h2>
-                                {broker
-                                  ? draft.hero_title
-                                  : settings.homepage_title}
-                              </h2>
-                              <p>
-                                {broker
-                                  ? draft.hero_subtitle
-                                  : "Descubre propiedades y conecta con su anunciante."}
-                              </p>
-                            </div>
                             <HeroMedia
                               preview
                               design={previewDesign!}
@@ -1354,6 +1333,23 @@ export function DesignAdmin({ broker = false }: { broker?: boolean }) {
                                   : undefined
                               }
                               onSelectMedia={setSelectedSlideId}
+                              renderCopy={(copy) => (
+                                <div className="preview-hero-copy">
+                                  <small>ENCUENTRA TU PRÓXIMO LUGAR</small>
+                                  <h2 className="preserve-lines">
+                                    {copy?.title ??
+                                      (broker
+                                        ? draft.hero_title
+                                        : settings.homepage_title)}
+                                  </h2>
+                                  <p className="preserve-lines">
+                                    {copy?.subtitle ??
+                                      (broker
+                                        ? draft.hero_subtitle
+                                        : "Encuentra casas, departamentos y terrenos en Chile.\nConecta con las personas que tienen las llaves.")}
+                                  </p>
+                                </div>
+                              )}
                             />
                           </>
                         ) : s.id === "about" ? (
@@ -1524,7 +1520,8 @@ export function DesignAdmin({ broker = false }: { broker?: boolean }) {
                 type="button"
                 disabled={
                   picker === "hero_slides" &&
-                  ((draft?.hero_slides?.length || 0) >= 8 ||
+                  ((!replacingSlide.current &&
+                    (draft?.hero_slides?.length || 0) >= 8) ||
                     !!draft?.hero_slides?.some((s) => s.media_id === media.id))
                 }
                 onClick={() => {

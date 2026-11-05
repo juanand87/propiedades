@@ -21,10 +21,28 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     path[0] === "anunciantes" && path[1]
       ? await getServerAdvertiser(path[1])
       : undefined;
+  if (path[0] === "descubrir")
+    return {
+      title: "Descubrir propiedades",
+      description: "Recorre propiedades en pantalla completa, una a la vez.",
+      alternates: { canonical: getSiteUrl() + "/descubrir" },
+    };
   const identifier = propertyIdentifier(path);
   if (advertiser && !identifier) {
-    const title = advertiser.site?.hero_title || advertiser.display_name;
-    const image = advertiser.site?.hero_url || advertiser.site?.logo_url;
+    const coverCopy =
+      (advertiser.site?.hero_mode === "slider"
+        ? advertiser.site?.hero_slides?.[0]?.copy
+        : null) ?? advertiser.site?.hero_copy;
+    const title =
+      coverCopy?.title ||
+      advertiser.site?.hero_title ||
+      advertiser.display_name;
+    const image =
+      (advertiser.site?.hero_mode === "slider"
+        ? advertiser.site?.hero_slides?.[0]?.url
+        : null) ||
+      advertiser.site?.hero_url ||
+      advertiser.site?.logo_url;
     const url = `${getSiteUrl()}/anunciantes/${advertiser.slug}`;
     return {
       title: {
@@ -34,8 +52,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
             : `${title} | ${advertiser.display_name}`,
       },
       description: (
-        advertiser.site?.hero_subtitle ||
-        advertiser.description ||
+        coverCopy?.subtitle ??
+        advertiser.site?.hero_subtitle ??
+        advertiser.description ??
         ""
       ).slice(0, 180),
       alternates: { canonical: url },
@@ -90,6 +109,7 @@ export default async function Page({ params }: Props) {
     ![
       "",
       "propiedades",
+      "descubrir",
       "anunciantes",
       "login",
       "register",

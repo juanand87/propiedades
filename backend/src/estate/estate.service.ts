@@ -12,6 +12,7 @@ import { JwtService } from '@nestjs/jwt';
 import { randomUUID } from 'node:crypto';
 import * as bcrypt from 'bcrypt';
 import sharp from 'sharp';
+import { DEMO_ADVERTISER_ID } from './demo-properties';
 import { designMediaIds, readDesign, validateDesign } from './site-design';
 import { readBrokerDesign, validateBrokerDesign } from './broker-site';
 import {
@@ -229,7 +230,7 @@ export class EstateService {
     const { design_json, ...publicSettings } = row || {};
     return {
       ...publicSettings,
-      design_version: 9,
+      design_version: 10,
       design_ready:
         !!row &&
         Object.hasOwn(row, 'design_json') &&
@@ -471,7 +472,7 @@ export class EstateService {
     const design = this.brokerSiteDesign(a, row, u);
     return {
       site_name: a.display_name,
-      design_version: 9,
+      design_version: 10,
       homepage_title: design.hero_title,
       advertiser: { id: a.id, slug: a.slug, status: a.status },
       profile_contact: {
@@ -687,6 +688,7 @@ export class EstateService {
     const result: any = u
       ? { ...row }
       : Object.fromEntries(publicFields.map((k) => [k, row[k]]));
+    result.is_demo = row.advertiser_id === DEMO_ADVERTISER_ID;
     result.advertiser = {
       id: row.advertiser_id,
       name: row.display_name,
@@ -1232,6 +1234,10 @@ export class EstateService {
     this.throttle(`inquiry:${ip}`, 5, 600000);
     if (b.website) return { success: true };
     const p = await this.get(id);
+    if (p.is_demo)
+      throw new BadRequestException(
+        'Esta es una propiedad de ejemplo y no admite consultas ni visitas.',
+      );
     if (p.availability === 'sold')
       throw new BadRequestException('Esta propiedad ya fue vendida.');
     const name = text(b.name, 120),

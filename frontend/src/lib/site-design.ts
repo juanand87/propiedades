@@ -64,6 +64,7 @@ export function brokerContact(d: SiteDesign, profile: any): SiteContact {
   );
 }
 export type HeaderLink = { label: string; href: string; new_tab: boolean };
+export type HeroCopy = { title: string; subtitle: string };
 export type HeaderOverlay = {
   enabled: boolean;
   cover_text_color: string;
@@ -111,7 +112,13 @@ export type SiteDesign = {
   hero_media_id: string | null;
   hero_alt: string;
   hero_mode?: "image" | "slider";
-  hero_slides?: { media_id: string; alt_text: string; url?: string }[];
+  hero_copy?: HeroCopy | null;
+  hero_slides?: {
+    media_id: string;
+    alt_text: string;
+    url?: string;
+    copy?: HeroCopy | null;
+  }[];
   hero_autoplay?: boolean;
   hero_interval?: number;
   show_site_name: boolean;
@@ -148,6 +155,7 @@ export function defaultDesign(): SiteDesign {
     hero_media_id: null,
     hero_alt: "Propiedad destacada en la portada",
     hero_mode: "image",
+    hero_copy: null,
     hero_slides: [],
     hero_autoplay: true,
     hero_interval: 6,
@@ -347,6 +355,7 @@ export function headerPresets(broker: boolean, d: SiteDesign): HeaderLink[] {
       }));
   return [
     { label: "Inicio", href: "/", new_tab: false },
+    { label: "Descubrir propiedades", href: "/descubrir", new_tab: false },
     { label: "Buscar propiedades", href: "/propiedades", new_tab: false },
     { label: "Anunciantes", href: "/anunciantes", new_tab: false },
     { label: "Nosotros", href: "/informacion", new_tab: false },
@@ -357,7 +366,9 @@ export function headerPresets(broker: boolean, d: SiteDesign): HeaderLink[] {
 export function headerLinks(d: SiteDesign, broker = false): HeaderLink[] {
   const defaults = broker
     ? headerPresets(true, d)
-    : headerPresets(false, d).slice(1, 4);
+    : headerPresets(false, d).filter((item) =>
+        ["/propiedades", "/anunciantes", "/informacion"].includes(item.href),
+      );
   const links = d.header_links ?? defaults;
   return broker
     ? links.filter((item) => {

@@ -476,6 +476,10 @@ async function main() {
         design: {
           ...initialDesign.design,
           primary_color: '#18436a',
+          hero_copy: {
+            title: 'Portal visual QA',
+            subtitle: 'Texto común del portal.',
+          },
           header_sticky: true,
           header_shrink: true,
           header_shrink_percent: 70,
@@ -543,9 +547,11 @@ async function main() {
       admin,
       400,
     );
-    assert.equal(designed.design_version, 9);
+    assert.equal(designed.design_version, 10);
     const publicMainFooter = await call('GET', '/settings');
     assert.equal(publicMainFooter.design.header_sticky, true);
+    assert.equal(publicMainFooter.design.hero_copy.title, 'Portal visual QA');
+    assertions++;
     assert.equal(
       publicMainFooter.design.header_overlay.scroll_background_color,
       '#18436a',
@@ -674,6 +680,10 @@ async function main() {
       ...baseBroker.design,
       primary_color: '#18436a',
       hero_title: 'Corredor Azul · Tu próximo lugar',
+      hero_copy: {
+        title: 'Portada visual de inmobiliaria',
+        subtitle: 'Asesoría local.',
+      },
       header_sticky: true,
       header_shrink: true,
       header_shrink_percent: 80,
@@ -748,6 +758,9 @@ async function main() {
     );
     const publicSiteA = await call('GET', '/advertisers/' + a.slug);
     assert.deepEqual(publicSiteA.site.header_style, designA.header_style);
+    assert.deepEqual(publicSiteA.site.hero_copy, designA.hero_copy);
+    assert.equal((await call('GET', '/settings')).design.hero_copy, null);
+    assertions += 2;
     assert.deepEqual(publicSiteA.site.header_overlay, designA.header_overlay);
     assert.equal((await call('GET', '/settings')).design.header_overlay, null);
     assertions += 2;
@@ -789,7 +802,7 @@ async function main() {
       designA.footer_contact.email,
     );
     assert.deepEqual(publicSiteA.site.footer_socials, designA.footer_socials);
-    assert.equal(baseBroker.design_version, 9);
+    assert.equal(baseBroker.design_version, 10);
     const profileAfterFooter = await call(
       'GET',
       '/me/advertiser',
@@ -852,6 +865,8 @@ async function main() {
     assert.equal(ownB.design.header_links, null);
     assert.equal(ownB.design.header_style, null);
     assert.equal(ownB.design.header_sticky, false);
+    assert.equal(ownB.design.hero_copy, null);
+    assertions++;
     assert.equal(ownB.design.header_overlay, null);
     assertions++;
     assert.equal(ownB.design.header_shrink, false);
@@ -1012,7 +1027,14 @@ async function main() {
       ...currentBroker.design,
       hero_mode: 'slider',
       hero_slides: [
-        { media_id: sliderA1.id, alt_text: 'Primera portada' },
+        {
+          media_id: sliderA1.id,
+          alt_text: 'Primera portada',
+          copy: {
+            title: 'Terraza con texto propio',
+            subtitle: 'Primera foto independiente.',
+          },
+        },
         { media_id: sliderA2.id, alt_text: 'Segunda portada' },
       ],
       hero_interval: 4,
@@ -1046,6 +1068,12 @@ async function main() {
     assertions += 3;
     const publicSlider = await call('GET', '/advertisers/' + a.slug);
     assert.equal(publicSlider.site.hero_slides[1].media_id, sliderA2.id);
+    assert.equal(
+      publicSlider.site.hero_slides[0].copy.title,
+      'Terraza con texto propio',
+    );
+    assert.equal(publicSlider.site.hero_slides[1].copy, undefined);
+    assertions += 2;
     assert.ok(!publicSlider.site.hero_slides[0].url.includes('signature='));
     assertions += 2;
     await call('GET', '/media/' + sliderA2.id);
@@ -1099,7 +1127,11 @@ async function main() {
       hero_mode: 'slider',
       hero_slides: [
         { media_id: global1.id, alt_text: 'Global uno' },
-        { media_id: global2.id, alt_text: 'Global dos' },
+        {
+          media_id: global2.id,
+          alt_text: 'Global dos',
+          copy: { title: 'Segunda foto del portal', subtitle: '' },
+        },
       ],
     };
     await call(
@@ -1139,6 +1171,11 @@ async function main() {
       admin,
     );
     assert.equal(reorderedGlobal.design.hero_slides[0].media_id, global2.id);
+    assert.equal(
+      reorderedGlobal.design.hero_slides[0].copy.title,
+      'Segunda foto del portal',
+    );
+    assertions++;
     assertions++;
     await call(
       'PATCH',
@@ -1156,6 +1193,89 @@ async function main() {
     await call('GET', '/media/' + global2.id, null, null, 404);
     await call('DELETE', '/manage/media/' + global1.id, null, admin);
     await call('DELETE', '/manage/media/' + global2.id, null, admin);
+    // Only our disposable QA schema receives these examples.
+    await call('GET', '/admin/examples', null, null, 401);
+    await call('GET', '/admin/examples', null, one.access_token, 403);
+    await call(
+      'POST',
+      '/admin/examples',
+      { mode: 'published' },
+      one.access_token,
+      403,
+    );
+    await call('POST', '/admin/examples', { mode: 'invalid' }, admin, 400);
+    const demo = await call(
+      'POST',
+      '/admin/examples',
+      { mode: 'draft' },
+      admin,
+      201,
+    );
+    assert.equal(demo.created, 20);
+    assert.equal(demo.total, 20);
+    assert.equal(demo.published, 0);
+    assertions += 3;
+    const repeatedDemo = await call(
+      'POST',
+      '/admin/examples',
+      { mode: 'published' },
+      admin,
+      201,
+    );
+    assert.equal(repeatedDemo.created, 0);
+    assert.equal(repeatedDemo.existing, 20);
+    assert.equal(repeatedDemo.published, 0);
+    assertions += 3;
+    const visibleDemo = await call(
+      'PATCH',
+      '/admin/examples/publish',
+      {},
+      admin,
+    );
+    assert.equal(visibleDemo.published, 20);
+    assertions++;
+    const feedExamples = await call('GET', '/properties?limit=6');
+    assert.ok(feedExamples.total >= 22);
+    assert.equal(feedExamples.items.length, 6);
+    assertions += 2;
+    const demoEntry = feedExamples.items.find((p) => p.is_demo);
+    assert.ok(demoEntry);
+    assert.equal(demoEntry.media.length, 3);
+    assertions += 2;
+    const firstDemo = await call('GET', '/properties/' + demoEntry.id);
+    assert.equal(firstDemo.is_demo, true);
+    assertions++;
+    await call(
+      'POST',
+      '/properties/' + demoEntry.id + '/inquiries',
+      {
+        name: 'QA',
+        email: 'qa@qa.invalid',
+        message: 'Consulta de prueba no debe guardarse',
+        consent: true,
+      },
+      null,
+      400,
+    );
+    await call('PATCH', '/admin/examples/pause', {}, one.access_token, 403);
+    const pausedDemo = await call('PATCH', '/admin/examples/pause', {}, admin);
+    assert.equal(pausedDemo.published, 0);
+    assert.equal(pausedDemo.total, 20);
+    assertions += 2;
+    await call('GET', '/properties/' + demoEntry.id, null, null, 404);
+    await call('GET', '/media/' + demoEntry.media[0].id, null, null, 404);
+    assert.equal((await call('GET', '/properties/' + p.id)).is_demo, false);
+    assertions++;
+    const afterPause = await call(
+      'POST',
+      '/admin/examples',
+      { mode: 'published' },
+      admin,
+      201,
+    );
+    assert.equal(afterPause.published, 0);
+    assertions++;
+    await call('PATCH', '/admin/examples/publish', {}, admin);
     console.log(
       JSON.stringify({
         passed: true,
