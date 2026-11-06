@@ -5,6 +5,7 @@ import { EstateController } from './estate.controller';
 import { EstateService } from './estate.service';
 import { EstateGuard } from './estate.guard';
 import { DemoService } from './demo.service';
+import { ImageStorageService } from './image-storage.service';
 
 @Module({
   imports: [
@@ -17,6 +18,6 @@ import { DemoService } from './demo.service';
     }),
   ],
   controllers: [EstateController],
-  providers: [EstateService, EstateGuard, DemoService],
+  providers: [EstateService, EstateGuard, DemoService, ImageStorageService],
 })
 export class EstateModule {}

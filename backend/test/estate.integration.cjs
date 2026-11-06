@@ -122,6 +122,7 @@ async function main() {
       DB_SSL_CA: '',
       JWT_SECRET: crypto.randomBytes(48).toString('hex'),
       INTEGRATIONS_ENABLED: 'false',
+      SPACES_IMAGES_ENABLED: 'false',
       SCHEDULED_JOBS_ENABLED: 'false',
       ADMIN_RECOVERY_ENABLED: 'false',
       PORT: '3318',

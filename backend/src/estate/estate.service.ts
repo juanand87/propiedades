@@ -6,10 +6,12 @@ import {
   NotFoundException,
   UnauthorizedException,
   ServiceUnavailableException,
+  Optional,
 } from '@nestjs/common';
 import { DataSource, EntityManager } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
+import { ImageStorageService } from './image-storage.service';
 import * as bcrypt from 'bcrypt';
 import sharp from 'sharp';
 import { DEMO_ADVERTISER_ID } from './demo-properties';
@@ -93,6 +95,7 @@ export class EstateService {
   constructor(
     readonly db: DataSource,
     private jwt: JwtService,
+    @Optional() private images?: ImageStorageService,
   ) {}
   private attempts = new Map<string, { n: number; reset: number }>();
   private readonly unknownPasswordHash = bcrypt.hashSync(
@@ -119,7 +122,18 @@ export class EstateService {
       const rows = await this.db.query(
         "SELECT version FROM estate_migrations WHERE version IN ('001_real_estate','002_locations','003_identity')",
       );
-      return { service: 'propiedades', schemaReady: rows.length === 3 };
+      if (this.images?.enabled)
+        await this.db.query(
+          'SELECT media_id,object_key,bucket,size_bytes,sha256,status FROM estate_media_objects LIMIT 0',
+        );
+      return {
+        service: 'propiedades',
+        schemaReady: rows.length === 3,
+        imageStorage: {
+          version: 1,
+          provider: this.images?.enabled ? 'spaces' : 'database',
+        },
+      };
     } catch {
       return { service: 'propiedades', schemaReady: false };
     }
@@ -1135,6 +1149,60 @@ export class EstateService {
       throw new BadRequestException('La imagen procesada supera 2 MB.');
     const id = randomUUID(),
       name = uploadName(file.originalname);
+    if (this.images?.enabled) {
+      // Fail before creating a remote object when the explicit migration is missing.
+      await this.db.query('SELECT media_id FROM estate_media_objects LIMIT 0');
+      const key = this.images.objectKey(id),
+        digest = createHash('sha256').update(buffer).digest('hex');
+      // A durable cleanup record handles timeouts/DB failure without losing the key.
+      await this.db.query(
+        "INSERT INTO estate_media_objects(media_id,object_key,bucket,size_bytes,sha256,status) VALUES (?,?,?,?,?,'uploading')",
+        [id, key, this.images.config!.bucket, buffer.length, digest],
+      );
+      try {
+        await this.images.put(key, buffer);
+        await this.db.transaction(async (tx) => {
+          await tx.query(
+            'INSERT INTO estate_media(id,owner_id,name,content,size_bytes) VALUES (?,?,?,?,?)',
+            [id, u.id, name, Buffer.alloc(0), buffer.length],
+          );
+          await tx.query(
+            "UPDATE estate_media_objects SET status='ready' WHERE media_id=?",
+            [id],
+          );
+        });
+      } catch (e) {
+        const cleanup = await this.db
+          .query(
+            "UPDATE estate_media_objects SET status='pending_delete' WHERE media_id=? AND status='uploading'",
+            [id],
+          )
+          .catch(() => null);
+        // An ambiguous commit can have succeeded. Never remove a ready object or
+        // one whose DB state cannot be checked after a connection failure.
+        if (Number(cleanup?.affectedRows) !== 1) {
+          const saved = await this.db
+            .query(
+              "SELECT m.id FROM estate_media m JOIN estate_media_objects o ON o.media_id=m.id WHERE m.id=? AND o.status='ready'",
+              [id],
+            )
+            .catch(() => []);
+          if (saved.length) return { id, name, url: this.mediaUrl(id, u) };
+          throw e;
+        }
+        try {
+          await this.images.remove(key);
+          await this.db.query(
+            "DELETE FROM estate_media_objects WHERE media_id=? AND status='pending_delete'",
+            [id],
+          );
+        } catch {
+          /* Durable pending_delete record can be retried without exposing any image. */
+        }
+        throw e;
+      }
+      return { id, name, url: this.mediaUrl(id, u) };
+    }
     await this.db.query(
       'INSERT INTO estate_media(id,owner_id,name,content,size_bytes) VALUES (?,?,?,?,?)',
       [id, u.id, name, buffer, buffer.length],
@@ -1177,17 +1245,34 @@ export class EstateService {
       if (payload.mid !== id || (!isAdmin(actor) && m.owner_id !== actor.id))
         throw new NotFoundException();
     }
+    if (m.content.length === 0) {
+      const [object] = await this.db.query(
+        "SELECT object_key,bucket FROM estate_media_objects WHERE media_id=? AND status='ready'",
+        [id],
+      );
+      if (!object) throw new NotFoundException();
+      if (!this.images?.enabled || object.bucket !== this.images.config?.bucket)
+        throw new ServiceUnavailableException(
+          'Configura Spaces para abrir esta imagen.',
+        );
+      return {
+        ...m,
+        redirect: await this.images.signedRead(object.object_key),
+        public: !!pub || !!logo || siteImage || brokerImage,
+      };
+    }
     return { ...m, public: !!pub || !!logo || siteImage || brokerImage };
   }
   async removeMedia(u: Actor, id: string) {
     uuid(id);
+    let objectKey: string | undefined;
     await this.db.transaction(async (tx) => {
       // Same lock order as saveDesign: prevent deletion while an image is published.
       const [settings] = await tx.query(
         'SELECT * FROM estate_settings WHERE id=1 FOR UPDATE',
       );
       const [m] = await tx.query(
-        'SELECT owner_id FROM estate_media WHERE id=? FOR UPDATE',
+        'SELECT owner_id,OCTET_LENGTH(content) stored_bytes FROM estate_media WHERE id=? FOR UPDATE',
         [id],
       );
       if (!m || (!isAdmin(u) && m.owner_id !== u.id))
@@ -1203,8 +1288,38 @@ export class EstateService {
         (await this.brokerMediaUsage(id, false, tx))
       )
         throw new ConflictException('La imagen está en uso.');
+      if (Number(m.stored_bytes) === 0) {
+        const [object] = await tx.query(
+          "SELECT object_key,bucket FROM estate_media_objects WHERE media_id=? AND status='ready' FOR UPDATE",
+          [id],
+        );
+        if (
+          !object ||
+          !this.images?.enabled ||
+          object.bucket !== this.images.config?.bucket
+        )
+          throw new ServiceUnavailableException(
+            'Configura Spaces antes de eliminar esta imagen.',
+          );
+        objectKey = object.object_key;
+        await tx.query(
+          "UPDATE estate_media_objects SET status='pending_delete' WHERE media_id=?",
+          [id],
+        );
+      }
       await tx.query('DELETE FROM estate_media WHERE id=?', [id]);
     });
+    if (objectKey) {
+      try {
+        await this.images!.remove(objectKey);
+        await this.db.query(
+          "DELETE FROM estate_media_objects WHERE media_id=? AND status='pending_delete'",
+          [id],
+        );
+      } catch {
+        return { success: true, cleanup_pending: true };
+      }
+    }
     return { success: true };
   }
   async favorite(u: Actor, id: string, remove = false) {

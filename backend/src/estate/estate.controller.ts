@@ -111,6 +111,13 @@ export class EstateController {
     @Res() res: any,
   ) {
     const m = await this.estate.media(id, signature);
+    if (m.redirect) {
+      res.set({
+        'Cache-Control': 'private,no-store',
+        'Referrer-Policy': 'no-referrer',
+      });
+      return res.redirect(302, m.redirect);
+    }
     res.set({
       'Content-Type': m.mime,
       'Content-Length': m.size_bytes,
