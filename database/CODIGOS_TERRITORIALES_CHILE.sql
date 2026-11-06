@@ -3,17 +3,18 @@
 -- Ejecutar en propiedades tras ACTUALIZAR_PROPIEDADES.sql. Repetible MySQL/MariaDB.
 -- Conserva IDs, propiedades, nombres existentes y referencias. No conecta a otra BD.
 USE propiedades;
+-- Ejecutar TODO el archivo en la misma pestaña/conexión.
+SET @cut_previous_safe_updates = @@SESSION.SQL_SAFE_UPDATES;
+SET SESSION SQL_SAFE_UPDATES = 0;
 SET @cut_ddl = IF((SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='estate_regions' AND column_name='cut_code')=0, 'ALTER TABLE estate_regions ADD COLUMN cut_code char(2) NULL', 'SELECT 1');
 PREPARE cut_stmt FROM @cut_ddl; EXECUTE cut_stmt; DEALLOCATE PREPARE cut_stmt;
 SET @cut_ddl = IF((SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='estate_communes' AND column_name='cut_code')=0, 'ALTER TABLE estate_communes ADD COLUMN cut_code char(5) NULL', 'SELECT 1');
 PREPARE cut_stmt FROM @cut_ddl; EXECUTE cut_stmt; DEALLOCATE PREPARE cut_stmt;
 SET @cut_ddl = IF((SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='estate_communes' AND column_name='province_code')=0, 'ALTER TABLE estate_communes ADD COLUMN province_code char(3) NULL', 'SELECT 1');
 PREPARE cut_stmt FROM @cut_ddl; EXECUTE cut_stmt; DEALLOCATE PREPARE cut_stmt;
-CREATE TEMPORARY TABLE IF NOT EXISTS tmp_estate_cut (region_legacy_code varchar(10), region_cut char(2), province_code char(3), cut_code char(5) PRIMARY KEY, name varchar(120)) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
--- Workbench puede tener SQL_SAFE_UPDATES=1. Cambio solo de esta conexión.
-SET @cut_previous_safe_updates = @@SESSION.SQL_SAFE_UPDATES;
-SET SESSION SQL_SAFE_UPDATES = 0;
-DELETE FROM tmp_estate_cut;
+-- Solo se recrea la tabla TEMPORAL de esta conexión; no se borran datos del catálogo.
+DROP TEMPORARY TABLE IF EXISTS tmp_estate_cut;
+CREATE TEMPORARY TABLE tmp_estate_cut (region_legacy_code varchar(10), region_cut char(2), province_code char(3), cut_code char(5) PRIMARY KEY, name varchar(120)) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 INSERT INTO tmp_estate_cut VALUES
 ('I','01','011','01101','Iquique'),
 ('I','01','011','01107','Alto Hospicio'),
