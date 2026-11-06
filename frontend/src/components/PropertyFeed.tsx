@@ -39,17 +39,27 @@ function FeedCard({
       data-feed-index={index}
       aria-label={`Propiedad ${index + 1}: ${p.title}`}
     >
-      <img
-        className="feed-photo"
-        src={assetUrl(media[current].url)}
-        alt={media[current].alt_text || p.title}
-        loading={active ? "eager" : "lazy"}
-        fetchPriority={active ? "high" : "auto"}
-      />
+      {p._video ? (
+        <FeedVideo
+          url={p._video.url}
+          active={active}
+          title={p._video.title}
+          poster={assetUrl(media[0].url)}
+        />
+      ) : (
+        <img
+          className="feed-photo"
+          src={assetUrl(media[current].url)}
+          alt={media[current].alt_text || p.title}
+          loading={active ? "eager" : "lazy"}
+          fetchPriority={active ? "high" : "auto"}
+        />
+      )}
       <div className="feed-photo-progress" aria-hidden="true">
-        {media.map((m: any, i: number) => (
-          <i key={m.id || i} className={i === current ? "active" : ""} />
-        ))}
+        {!p._video &&
+          media.map((m: any, i: number) => (
+            <i key={m.id || i} className={i === current ? "active" : ""} />
+          ))}
       </div>
       <div className="feed-card-top">
         <span>
@@ -58,10 +68,12 @@ function FeedCard({
             : labels[p.type_id] || p.type_id}
         </span>
         <span>
-          {current + 1}/{media.length} fotos
+          {p._video
+            ? "Video · " + Math.round((p._video.duration_ms || 0) / 1000) + " s"
+            : `${current + 1}/${media.length} fotos`}
         </span>
       </div>
-      {media.length > 1 && (
+      {!p._video && media.length > 1 && (
         <div className="feed-photo-arrows">
           <button
             type="button"
@@ -82,7 +94,7 @@ function FeedCard({
         </div>
       )}
       <div className="feed-actions">
-        <FavoriteButton id={p.id} />
+        <FavoriteButton id={p.property_id || p.id} />
         <button
           type="button"
           aria-label={`Compartir ${p.title}`}
@@ -121,6 +133,7 @@ function FeedCard({
           </span>
         </div>
         <p>{p.advertiser?.name}</p>
+        {p._video && <p>{p._video.title}</p>}
         <Link className="feed-detail" href={`/propiedades/${p.slug}`}>
           {p.is_demo ? "Ver ficha de ejemplo" : "Ver detalles y consultar"}
           <ArrowUpRight size={18} />
@@ -130,6 +143,80 @@ function FeedCard({
         )}
       </div>
     </article>
+  );
+}
+
+function FeedVideo({
+  url,
+  active,
+  title,
+  poster,
+}: {
+  url: string;
+  active: boolean;
+  title: string;
+  poster: string;
+}) {
+  const ref = useRef<HTMLVideoElement>(null);
+  const [paused, setPaused] = useState(false),
+    [muted, setMuted] = useState(true),
+    [error, setError] = useState(false);
+  useEffect(() => {
+    const player = ref.current;
+    if (!player) return;
+    const sync = () => {
+      if (active && !paused && !document.hidden) {
+        void player.play().catch(() => {});
+      } else player.pause();
+    };
+    sync();
+    document.addEventListener("visibilitychange", sync);
+    return () => {
+      document.removeEventListener("visibilitychange", sync);
+      player.pause();
+    };
+  }, [active, paused]);
+  return (
+    <>
+      <video
+        ref={ref}
+        className="feed-photo"
+        src={active ? assetUrl(url) : undefined}
+        poster={poster}
+        muted={muted}
+        playsInline
+        loop
+        preload="none"
+        aria-label={title}
+        onError={() => setError(true)}
+        onCanPlay={() => setError(false)}
+      />
+      <div className="feed-video-controls">
+        <button
+          type="button"
+          onClick={() => setPaused((v) => !v)}
+          aria-label={paused ? "Reproducir video" : "Pausar video"}
+        >
+          {paused ? "Reproducir" : "Pausar"}
+        </button>
+        <button type="button" onClick={() => setMuted((v) => !v)}>
+          {muted ? "Activar sonido" : "Silenciar"}
+        </button>
+        {error && (
+          <button
+            type="button"
+            onClick={() => {
+              setError(false);
+              setPaused(false);
+              ref.current?.load();
+              void ref.current?.play().catch(() => {});
+            }}
+          >
+            Reintentar video
+          </button>
+        )}
+      </div>
+    </>
   );
 }
 
@@ -147,7 +234,20 @@ export function PropertyFeed() {
     [busy, setBusy] = useState(true),
     [error, setError] = useState(""),
     [message, setMessage] = useState(""),
-    [type, setType] = useState("");
+    [type, setType] = useState(""),
+    [mode, setMode] = useState<"photos" | "videos">("photos"),
+    [videosEnabled, setVideosEnabled] = useState(false);
+  useEffect(() => {
+    let current = true;
+    void request("/videos/capabilities")
+      .then((r) => {
+        if (current) setVideosEnabled(r.enabled === true);
+      })
+      .catch(() => {});
+    return () => {
+      current = false;
+    };
+  }, []);
   const load = useCallback(
     async (next: number, reset = false) => {
       if (pending.current && !reset) return;
@@ -157,8 +257,15 @@ export function PropertyFeed() {
       setError("");
       try {
         const r = await request(
-          `/properties?limit=6&page=${next}&sort=recent${type ? `&type_id=${encodeURIComponent(type)}` : ""}`,
+          `${mode === "videos" ? "/videos" : "/properties?limit=6&sort=recent"}${mode === "videos" ? "?" : "&"}page=${next}${type ? `&type_id=${encodeURIComponent(type)}` : ""}`,
         );
+        if (mode === "videos")
+          r.items = r.items.map((v: any) => ({
+            ...v.property,
+            id: v.id,
+            property_id: v.property_id,
+            _video: v,
+          }));
         if (run !== generation.current) return;
         setItems((old) =>
           reset
@@ -180,7 +287,7 @@ export function PropertyFeed() {
         }
       }
     },
-    [type],
+    [type, mode],
   );
   const invalidate = useCallback(() => {
     generation.current++;
@@ -289,6 +396,32 @@ export function PropertyFeed() {
               ))}
           </select>
         </label>
+        <div
+          className="feed-mode"
+          role="group"
+          aria-label="Contenido del recorrido"
+        >
+          <button
+            type="button"
+            aria-pressed={mode === "photos"}
+            onClick={() => setMode("photos")}
+          >
+            Fotos
+          </button>
+          <button
+            type="button"
+            disabled={!videosEnabled}
+            title={
+              videosEnabled
+                ? "Ver recorridos en video"
+                : "Videos pendientes de activación en el backend"
+            }
+            aria-pressed={mode === "videos"}
+            onClick={() => setMode("videos")}
+          >
+            Videos
+          </button>
+        </div>
         <Link className="feed-list-link" href="/propiedades">
           <ArrowLeft size={16} />
           Ver listado
@@ -338,7 +471,11 @@ export function PropertyFeed() {
             <section className="feed-empty">
               <House size={45} />
               <h1>Aquí comienza tu próximo lugar</h1>
-              <p>Todavía no hay propiedades publicadas para este filtro.</p>
+              <p>
+                {mode === "videos"
+                  ? "Todavía no hay videos publicados para este filtro."
+                  : "Todavía no hay propiedades publicadas para este filtro."}
+              </p>
               <Link href="/propiedades">Explorar el listado</Link>
               {user?.role === "admin" && (
                 <Link href="/panel/ejemplos">

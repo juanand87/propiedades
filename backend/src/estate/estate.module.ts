@@ -5,7 +5,10 @@ import { EstateController } from './estate.controller';
 import { EstateService } from './estate.service';
 import { EstateGuard } from './estate.guard';
 import { DemoService } from './demo.service';
+import { PropertyVideosService } from './property-videos.service';
+import { PropertyVideosController } from './property-videos.controller';
 import { ImageStorageService } from './image-storage.service';
+import { VideoStorageService } from './video-storage.service';
 
 @Module({
   imports: [
@@ -17,7 +20,14 @@ import { ImageStorageService } from './image-storage.service';
       }),
     }),
   ],
-  controllers: [EstateController],
-  providers: [EstateService, EstateGuard, DemoService, ImageStorageService],
+  controllers: [EstateController, PropertyVideosController],
+  providers: [
+    EstateService,
+    EstateGuard,
+    DemoService,
+    PropertyVideosService,
+    ImageStorageService,
+    VideoStorageService,
+  ],
 })
 export class EstateModule {}

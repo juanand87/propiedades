@@ -123,6 +123,8 @@ async function main() {
       JWT_SECRET: crypto.randomBytes(48).toString('hex'),
       INTEGRATIONS_ENABLED: 'false',
       SPACES_IMAGES_ENABLED: 'false',
+      SPACES_VIDEOS_ENABLED: 'false',
+      PROPERTY_VIDEOS_ENABLED: 'false',
       SCHEDULED_JOBS_ENABLED: 'false',
       ADMIN_RECOVERY_ENABLED: 'false',
       PORT: '3318',

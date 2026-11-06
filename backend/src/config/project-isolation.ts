@@ -1,6 +1,7 @@
 import * as net from 'node:net';
 import { getDatabaseSsl } from './database-ssl';
 import { imageSpacesConfig } from './image-spaces';
+import { videoSpacesConfig } from './video-spaces';
 
 const inheritedResource =
   /mundobeat|clownfish-app-x3a5k|tiendas-chi|marketplace_music/i;
@@ -22,6 +23,15 @@ function isApprovedSharedDatabase(env: Record<string, any>) {
 
 export function validateProjectEnvironment(env: Record<string, any>) {
   imageSpacesConfig(env);
+  videoSpacesConfig(env);
+  if (![undefined, 'true', 'false'].includes(env.PROPERTY_VIDEOS_ENABLED))
+    throw Error('PROPERTY_VIDEOS_ENABLED debe ser true o false.');
+  if (
+    env.NODE_ENV === 'production' &&
+    env.PROPERTY_VIDEOS_ENABLED === 'true' &&
+    !videoSpacesConfig(env)
+  )
+    throw Error('Los videos de producción exigen SPACES_VIDEOS_ENABLED=true.');
   if (env.PROJECT_ID !== 'propiedades' || env.DB_DATABASE !== 'propiedades') {
     throw new Error(
       'Este backend exige PROJECT_ID=propiedades y DB_DATABASE=propiedades.',
@@ -101,7 +111,7 @@ export function assertConnectionAllowed(args: any[], env: Record<string, any>) {
     !options?.path &&
     host === String(env.DB_HOST).toLowerCase() &&
     Number(options?.port) === Number(env.DB_PORT || 3306);
-  const spaces = imageSpacesConfig(env);
+  const spaces = imageSpacesConfig(env) || videoSpacesConfig(env);
   const isImageSpaces =
     spaces &&
     host === spaces.host &&

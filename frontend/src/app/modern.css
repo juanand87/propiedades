@@ -3225,3 +3225,77 @@ body {
   > button {
   border-radius: 50%;
 }
+
+.feed-mode {
+  display: flex;
+  gap: 4px;
+  border: 1px solid #ffffff30;
+  padding: 4px;
+  border-radius: 22px;
+}
+.property-feed .feed-mode button {
+  background: transparent;
+  color: #d9e9e5;
+  border: 0;
+  padding: 7px 12px;
+  border-radius: 18px;
+  font-size: 12px;
+}
+.property-feed .feed-mode button[aria-pressed="true"] {
+  background: #d0f5a8;
+  color: #15362d;
+}
+.property-feed .feed-mode button:disabled {
+  opacity: 0.4;
+}
+.feed-video-controls {
+  position: absolute;
+  z-index: 3;
+  top: 80px;
+  left: 22px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  max-width: 85%;
+}
+.property-feed .feed-video-controls button {
+  background: #143b38d9;
+  color: white;
+  border: 1px solid #ffffff50;
+  padding: 9px 13px;
+  border-radius: 20px;
+  font-size: 12px;
+}
+@media (max-width: 600px) {
+  .property-feed .feed-mode button {
+    padding: 6px 8px;
+    font-size: 11px;
+  }
+  .feed-header {
+    gap: 8px;
+  }
+  .feed-video-controls {
+    top: 65px;
+    left: 16px;
+  }
+}
+@media (max-width: 700px) {
+  .property-feed .feed-header > div:has(> strong) {
+    display: none;
+  }
+  .property-feed .feed-filter {
+    min-width: 0;
+    flex: 1;
+  }
+  .property-feed .feed-filter select {
+    max-width: 100%;
+    width: 100%;
+  }
+  .property-feed .feed-mode {
+    flex-direction: row;
+    flex-shrink: 0;
+  }
+}
+.property-feed .feed-header .feed-mode {
+  flex-direction: row;
+}

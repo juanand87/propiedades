@@ -12,6 +12,8 @@ import { DataSource, EntityManager } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
 import { createHash, randomUUID } from 'node:crypto';
 import { ImageStorageService } from './image-storage.service';
+import { VideoStorageService } from './video-storage.service';
+import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
 import sharp from 'sharp';
 import { DEMO_ADVERTISER_ID } from './demo-properties';
@@ -96,6 +98,8 @@ export class EstateService {
     readonly db: DataSource,
     private jwt: JwtService,
     @Optional() private images?: ImageStorageService,
+    @Optional() private videos?: VideoStorageService,
+    @Optional() private config?: ConfigService,
   ) {}
   private attempts = new Map<string, { n: number; reset: number }>();
   private readonly unknownPasswordHash = bcrypt.hashSync(
@@ -126,12 +130,31 @@ export class EstateService {
         await this.db.query(
           'SELECT media_id,object_key,bucket,size_bytes,sha256,status FROM estate_media_objects LIMIT 0',
         );
+      if (this.config?.get('PROPERTY_VIDEOS_ENABLED') === 'true') {
+        await this.db.query('SELECT id FROM property_videos LIMIT 0');
+        await this.db.query(
+          'SELECT video_id,duration_ms,content_digest FROM property_video_recordings LIMIT 0',
+        );
+        if (this.videos?.enabled)
+          await this.db.query(
+            'SELECT video_id,object_key,bucket,sha256,status FROM property_video_objects LIMIT 0',
+          );
+      }
       return {
         service: 'propiedades',
         schemaReady: rows.length === 3,
         imageStorage: {
           version: 1,
           provider: this.images?.enabled ? 'spaces' : 'database',
+        },
+        videoStorage: {
+          version: 1,
+          provider:
+            this.config?.get('PROPERTY_VIDEOS_ENABLED') !== 'true'
+              ? 'disabled'
+              : this.videos?.enabled
+                ? 'spaces'
+                : 'local',
         },
       };
     } catch {
