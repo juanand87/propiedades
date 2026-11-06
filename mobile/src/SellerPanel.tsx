@@ -146,7 +146,7 @@ export function SellerPanel({
       setBusy(false);
     }
   }
-  async function save() {
+  async function save(sendForReview = true) {
     setBusy(true);
     setError("");
     setSuccess("");
@@ -171,14 +171,16 @@ export function SellerPanel({
         "/manage/properties/" + id,
         { token },
       );
-      if (current.publication_status !== "pending_review")
+      if (sendForReview && current.publication_status !== "pending_review")
         await api("/manage/properties/" + id + "/status", {
           method: "PATCH",
           token,
           body: { status: "pending_review" },
         });
       setSuccess(
-        "Tu propiedad fue enviada a revisión. Al aprobarla aparecerá en el recorrido.",
+        sendForReview
+          ? "Tu propiedad fue enviada a revisión. Al aprobarla aparecerá en el recorrido."
+          : "Borrador guardado. Puedes continuar editándolo desde la app o el panel web.",
       );
       setEditing(false);
       setAllowance(
@@ -360,6 +362,7 @@ export function SellerPanel({
           ))}
           {photos.length < 8 &&
             button("Agregar fotografías", () => void images())}
+          {button(busy ? "Guardando…" : "Guardar borrador", () => void save(false))}
           {button(
             busy
               ? "Guardando…"

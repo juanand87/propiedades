@@ -24,6 +24,8 @@ La primera ejecución del backend crea una instancia MySQL independiente, aplica
 
 ## Cuenta de pruebas
 
+Para probar con las mismas cuentas y BD de la web en DigitalOcean, detén el Metro anterior y ejecuta desde la raíz `npm run mobile:android:production`. Este comando comprueba la API pública, configura el modo de producción y recarga el bundle. Inicia sesión con tu cuenta de la web: las cuentas y propiedades del entorno local permanecen separadas. Las propiedades creadas en este modo se guardan en DigitalOcean y siguen el proceso de revisión para aparecer públicamente. `npm run mobile:android` continúa abriendo la demo local.
+
 - Correo: **mobile-admin@qa.invalid**.
 - Contraseña: abrir `tmp/mobile-local/credentials.json` después del primer arranque. Es aleatoria y exclusiva de esta demo; el archivo está ignorado por Git.
 - Las credenciales y usuarios del sitio público no se copian a esta base.

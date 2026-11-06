@@ -39,6 +39,30 @@ export class PropertyVideosController {
   list(@Req() req: any, @Param('id') id: string) {
     return this.videos.list(req.user, id);
   }
+  @Get('manage/videos/:id/preview')
+  @UseGuards(EstateGuard)
+  preview(@Req() req: any, @Param('id') id: string, @Res() res: any) {
+    res.set({
+      'Cache-Control': 'private,no-store',
+      'Referrer-Policy': 'no-referrer',
+    });
+    return this.videos
+      .preview(req.user, id)
+      .then((preview) => res.json(preview));
+  }
+  @Get('videos/:id/preview')
+  previewContent(
+    @Param('id') id: string,
+    @Query('signature') signature: string,
+    @Req() req: any,
+    @Res() res: any,
+  ) {
+    res.set({
+      'Cache-Control': 'private,no-store',
+      'Referrer-Policy': 'no-referrer',
+    });
+    return this.videos.previewContent(id, signature, req.headers.range, res);
+  }
   @Post('manage/properties/:id/videos')
   @UseGuards(EstateGuard)
   @UseInterceptors(

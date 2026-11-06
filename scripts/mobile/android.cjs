@@ -2,6 +2,10 @@ const fs = require("node:fs"),
   path = require("node:path"),
   { spawn, spawnSync } = require("node:child_process");
 const root = path.resolve(__dirname, "../..");
+const production = process.argv.includes("--production");
+const apiUrl = production
+  ? "https://clownfish-app-2-bgbzm.ondigitalocean.app/api"
+  : "http://10.0.2.2:3328/api";
 const sdk =
   process.env.ANDROID_HOME ||
   path.join(process.env.LOCALAPPDATA || "", "Android/Sdk");
@@ -17,18 +21,32 @@ const env = {
       path.join(process.env.USERPROFILE, ".android"),
     "avd",
   ),
-  EXPO_PUBLIC_API_URL: "http://10.0.2.2:3328/api",
+  EXPO_PUBLIC_ENV: production ? "production" : "local",
+  EXPO_PUBLIC_API_URL: apiUrl,
 };
 async function main() {
   if (!fs.existsSync(adb) || !fs.existsSync(emulator))
     throw Error(
       "Install Android Studio and its SDK first. See mobile/README.md.",
     );
-  const health = await fetch("http://127.0.0.1:3328/api/mobile/environment")
+  const health = await fetch(
+    `${production ? apiUrl : "http://127.0.0.1:3328/api"}/mobile/environment`,
+    { signal: AbortSignal.timeout(20000) },
+  )
     .then((r) => (r.ok ? r.json() : null))
     .catch(() => null);
-  if (health?.environment !== "local-mobile")
-    throw Error("Start npm run mobile:backend first.");
+  if (
+    health?.project !== "propiedades" ||
+    health?.environment !== (production ? "production" : "local-mobile") ||
+    health?.apiVersion !== 2 ||
+    !health?.videos
+  )
+    throw Error(
+      production
+        ? "The Propiedades production mobile API is not ready."
+        : "Start npm run mobile:backend first.",
+    );
+  console.log(`Android API: ${apiUrl} (${production ? "production" : "local"})`);
   const devices =
     spawnSync(adb, ["devices"], { encoding: "utf8", windowsHide: true })
       .stdout || "";
@@ -80,7 +98,7 @@ async function main() {
   const expo = path.join(root, "mobile/node_modules/expo/bin/cli");
   const app = spawn(
     process.execPath,
-    [expo, "start", "--android", "--localhost"],
+    [expo, "start", "--android", "--localhost", "--clear"],
     {
       cwd: path.join(root, "mobile"),
       env,

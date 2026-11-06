@@ -27,6 +27,7 @@ import { assetUrl, date, labels, price, request, send } from "@/lib/estate-api";
 import { Empty, Notice, useEstate } from "./EstateApp";
 import { DemoAdmin } from "./DemoAdmin";
 import { DesignAdmin } from "./DesignAdmin";
+import { PropertyVideosEditor } from "./PropertyVideosEditor";
 
 function useLoad(path: string) {
   const [data, setData] = useState<any>(null),
@@ -1028,6 +1029,7 @@ function PropertyEditor({ root, id }: { root: string; id?: string }) {
           </button>
         </div>
       </form>
+      <PropertyVideosEditor key={id || "new-property"} propertyId={id} />
       {history.length > 0 && (
         <section className="panel-card">
           <h2>Historial de publicación</h2>

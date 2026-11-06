@@ -8,6 +8,7 @@
     "mobile:install": "npm --prefix mobile ci",
     "mobile:backend": "npm --prefix backend run build && node scripts/mobile/local.cjs",
     "mobile:android": "node scripts/mobile/android.cjs",
+    "mobile:android:production": "node scripts/mobile/android.cjs --production",
     "mobile:setup-android": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/mobile/setup-android.ps1",
     "mobile:check": "npm --prefix mobile run check",
     "mobile:test": "node scripts/mobile/verify.cjs",

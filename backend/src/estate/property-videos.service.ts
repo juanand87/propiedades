@@ -4,7 +4,9 @@ import {
   NotFoundException,
   ConflictException,
   ServiceUnavailableException,
+  UnauthorizedException,
 } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { DataSource } from 'typeorm';
 import { createHash, randomUUID } from 'node:crypto';
@@ -35,6 +37,7 @@ export class PropertyVideosService {
     private config: ConfigService,
     private estate: EstateService,
     private storage: VideoStorageService,
+    private jwt: JwtService,
   ) {}
   private guard() {
     assertPropertyVideos(
@@ -113,6 +116,48 @@ export class PropertyVideosService {
       "SELECT v.id,v.property_id,v.title,v.status,v.size_bytes,v.created_at,r.duration_ms,r.capture_seconds FROM property_videos v LEFT JOIN property_video_recordings r ON r.video_id=v.id WHERE v.property_id=? AND v.status<>'archived' ORDER BY v.created_at DESC,v.id",
       [id],
     );
+  }
+  private async managedVideo(actor: Actor, id: string) {
+    const [v] = await this.db.query(
+      `SELECT v.id,v.size_bytes,p.advertiser_id ${joined} WHERE v.id=? AND v.status<>'archived'`,
+      [uuid(id)],
+    );
+    if (!v) throw new NotFoundException('Video no encontrado.');
+    ownership(actor, v.advertiser_id);
+    return v;
+  }
+  async preview(actor: Actor, id: string) {
+    this.guard();
+    await this.managedVideo(actor, id);
+    const signature = this.jwt.sign(
+      { sub: actor.id, videoId: id, aud: 'estate-video-preview' },
+      { expiresIn: '2m' },
+    );
+    return {
+      url: `/api/videos/${id}/preview?signature=${encodeURIComponent(signature)}`,
+    };
+  }
+  async previewContent(
+    id: string,
+    signature: string,
+    range: string | undefined,
+    res: any,
+  ) {
+    this.guard();
+    let payload: any;
+    try {
+      payload = this.jwt.verify(signature, {
+        audience: 'estate-video-preview',
+      });
+      if (payload.videoId !== id) throw new Error('Video distinto');
+    } catch {
+      throw new UnauthorizedException(
+        'La vista previa venció. Vuelve a abrir el video.',
+      );
+    }
+    const actor = await this.estate.actor(payload.sub);
+    const v = await this.managedVideo(actor, id);
+    return this.serveContent(id, v.size_bytes, range, res);
   }
   async upload(actor: Actor, id: string, body: any, file: any) {
     this.guard();
@@ -353,6 +398,14 @@ export class PropertyVideosService {
       [uuid(id)],
     );
     if (!v) throw new NotFoundException('Video no disponible.');
+    return this.serveContent(id, v.size_bytes, rangeHeader, res);
+  }
+  private async serveContent(
+    id: string,
+    size: number,
+    rangeHeader: string | undefined,
+    res: any,
+  ) {
     if (this.storage.enabled) {
       const [o] = await this.db.query(
         "SELECT object_key,bucket FROM property_video_objects WHERE video_id=? AND status='ready'",
@@ -363,11 +416,8 @@ export class PropertyVideosService {
           throw new ServiceUnavailableException(
             'Configuración de videos no disponible.',
           );
-        if (videoRange(rangeHeader, Number(v.size_bytes)) === false)
-          return res
-            .status(416)
-            .set('Content-Range', `bytes */${v.size_bytes}`)
-            .end();
+        if (videoRange(rangeHeader, Number(size)) === false)
+          return res.status(416).set('Content-Range', `bytes */${size}`).end();
         res.set({
           'Cache-Control': 'private,no-store',
           'Referrer-Policy': 'no-referrer',
@@ -387,7 +437,7 @@ export class PropertyVideosService {
       throw new NotFoundException('Archivo de video no disponible.');
     const file = resolve(this.folder, id + '.mp4');
     const info = await stat(file).catch(() => null);
-    if (!info || info.size !== Number(v.size_bytes))
+    if (!info || info.size !== Number(size))
       throw new NotFoundException('Archivo de video no disponible.');
     const range = videoRange(rangeHeader, info.size);
     res.set({

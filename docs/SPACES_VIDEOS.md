@@ -62,6 +62,10 @@ El CDN puede permanecer activado, pero los enlaces firmados usados aquí son del
 
 ## Comprobaciones
 
+El editor web de propiedades (`/panel/propiedades/:id/editar` y `/dashboard/propiedades/:id/editar`) incluye la sección **Videos**. Lista las grabaciones asociadas a la misma propiedad, permite reproducirlas con una vista previa privada y cambiar entre publicado y borrador. Publicar exige una propiedad publicada y un anunciante aprobado y activo; guardar como borrador retira el video del recorrido público.
+
+La vista previa se solicita con la sesión del propietario o administrador en `GET /api/manage/videos/:id/preview`. Devuelve una URL firmada de dos minutos, con audiencia independiente de las sesiones y limitada a ese video y usuario. La reproducción vuelve a comprobar la cuenta y los permisos, admite Range/HEAD y utiliza el almacenamiento existente. Los borradores siguen inaccesibles desde el endpoint público de reproducción. Esta actualización requiere desplegar backend y frontend; no requiere SQL adicional.
+
 Prueba real con la BD local y el bucket de Propiedades: subida, hash del MP4, objeto privado, reproducción completa, streaming Range, HEAD, duración, misma propiedad en feed, otra cuenta bloqueada, reintentos idempotentes, propiedad pausada, borrador privado y eliminación al archivar. Se retiran los objetos creados por la prueba. La BD de producción no se utiliza para verificar esta integración.
 
 Referencias: [Spaces y SDK S3](https://docs.digitalocean.com/products/spaces/reference/aws-sdks/) y [reproducción nativa Expo](https://docs.expo.dev/versions/v58.0.0/sdk/video/).

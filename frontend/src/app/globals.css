@@ -2752,3 +2752,26 @@ td select {
     padding-top: 20px;
   }
 }
+.property-video-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+  gap: 20px;
+}
+.property-video-card {
+  min-width: 0;
+  padding: 20px;
+  border: 1px solid #dce4df;
+  border-radius: 16px;
+}
+.property-video-card video {
+  width: 100%;
+  max-height: 420px;
+  margin-bottom: 16px;
+  border-radius: 12px;
+  background: #071c20;
+}
+.property-video-card .button-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
