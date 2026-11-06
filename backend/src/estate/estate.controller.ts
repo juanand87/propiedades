@@ -137,6 +137,17 @@ export class EstateController {
   @Get('auth/profile') @UseGuards(EstateGuard) profile(@Req() req: any) {
     return req.user;
   }
+  @Post('me/account-type') @UseGuards(EstateGuard) accountType(
+    @Req() req: any,
+    @Body() b: any,
+  ) {
+    return this.estate.chooseAccount(req.user, b);
+  }
+  @Get('me/publication-allowance') @UseGuards(EstateGuard) allowance(
+    @Req() req: any,
+  ) {
+    return this.estate.publicationAllowance(req.user);
+  }
   @Post('auth/change-password') @UseGuards(EstateGuard) password(
     @Req() req: any,
     @Body() b: any,

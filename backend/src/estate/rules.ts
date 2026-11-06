@@ -7,6 +7,7 @@ export type Actor = {
   firstName: string;
   advertiser_id?: string;
   advertiser_status?: string;
+  account_type?: 'buyer' | 'seller' | null;
 };
 export const text = (v: unknown, max = 255) =>
   typeof v === 'string' ? v.trim().slice(0, max) : '';

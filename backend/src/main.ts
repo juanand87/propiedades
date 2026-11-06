@@ -24,7 +24,10 @@ async function bootstrap() {
     next();
   });
   app.enableShutdownHooks();
-  await app.listen(Number(config.get('PORT', 3001)), '0.0.0.0');
+  await app.listen(
+    Number(config.get('PORT', 3001)),
+    config.get('LOCAL_MOBILE_SANDBOX') === 'true' ? '127.0.0.1' : '0.0.0.0',
+  );
 }
 bootstrap().catch(() => {
   console.error(

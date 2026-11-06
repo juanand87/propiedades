@@ -4,7 +4,19 @@
   "scripts": {
     "build": "npm --prefix backend ci --include=dev && npm --prefix backend run build",
     "start": "npm --prefix backend run start:prod",
-    "start:prod": "npm --prefix backend run start:prod"
+    "start:prod": "npm --prefix backend run start:prod",
+    "mobile:install": "npm --prefix mobile ci",
+    "mobile:backend": "npm --prefix backend run build && node scripts/mobile/local.cjs",
+    "mobile:android": "node scripts/mobile/android.cjs",
+    "mobile:setup-android": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/mobile/setup-android.ps1",
+    "mobile:check": "npm --prefix mobile run check",
+    "mobile:test": "node scripts/mobile/verify.cjs",
+    "mobile:test:recording": "node scripts/mobile/verify-recording.cjs",
+    "mobile:backend:spaces": "npm --prefix backend run build && node scripts/mobile/local.cjs --spaces-images",
+    "mobile:test:spaces": "node scripts/mobile/verify-spaces-images.cjs",
+    "mobile:spaces:cleanup": "node scripts/mobile/cleanup-spaces-images.cjs",
+    "mobile:backend:video-spaces": "npm --prefix backend run build && node scripts/mobile/local.cjs --spaces-videos",
+    "mobile:test:video-spaces": "node scripts/mobile/verify-video-spaces.cjs"
   },
   "engines": {
     "node": ">=22"

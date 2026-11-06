@@ -9,6 +9,10 @@ import { PropertyVideosService } from './property-videos.service';
 import { PropertyVideosController } from './property-videos.controller';
 import { ImageStorageService } from './image-storage.service';
 import { VideoStorageService } from './video-storage.service';
+import {
+  GoogleAuthController,
+  GoogleAuthService,
+} from './google-auth.controller';
 
 @Module({
   imports: [
@@ -20,9 +24,14 @@ import { VideoStorageService } from './video-storage.service';
       }),
     }),
   ],
-  controllers: [EstateController, PropertyVideosController],
+  controllers: [
+    EstateController,
+    PropertyVideosController,
+    GoogleAuthController,
+  ],
   providers: [
     EstateService,
+    GoogleAuthService,
     EstateGuard,
     DemoService,
     PropertyVideosService,

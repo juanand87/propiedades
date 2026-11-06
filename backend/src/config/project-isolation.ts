@@ -22,6 +22,20 @@ function isApprovedSharedDatabase(env: Record<string, any>) {
 }
 
 export function validateProjectEnvironment(env: Record<string, any>) {
+  for (const key of ['USER_ONBOARDING_ENABLED', 'GOOGLE_AUTH_ENABLED'])
+    if (![undefined, 'true', 'false'].includes(env[key]))
+      throw Error(`${key} debe ser true o false.`);
+  if (
+    env.GOOGLE_AUTH_ENABLED === 'true' &&
+    (env.USER_ONBOARDING_ENABLED !== 'true' ||
+      !/^[a-zA-Z0-9_-]+\.apps\.googleusercontent\.com$/.test(
+        env.GOOGLE_CLIENT_ID || '',
+      ) ||
+      !env.GOOGLE_CLIENT_SECRET)
+  )
+    throw Error(
+      'Google exige USER_ONBOARDING_ENABLED=true y credenciales OAuth propias.',
+    );
   imageSpacesConfig(env);
   videoSpacesConfig(env);
   if (![undefined, 'true', 'false'].includes(env.PROPERTY_VIDEOS_ENABLED))
@@ -123,7 +137,18 @@ export function assertConnectionAllowed(args: any[], env: Record<string, any>) {
   ) {
     throw new Error('Conexión a infraestructura heredada bloqueada.');
   }
-  if (env.INTEGRATIONS_ENABLED !== 'true' && !isDatabase && !isImageSpaces) {
+  const isGoogleAuth =
+    env.GOOGLE_AUTH_ENABLED === 'true' &&
+    env.USER_ONBOARDING_ENABLED === 'true' &&
+    ['oauth2.googleapis.com', 'www.googleapis.com'].includes(host) &&
+    Number(options?.port) === 443 &&
+    !options?.path;
+  if (
+    env.INTEGRATIONS_ENABLED !== 'true' &&
+    !isDatabase &&
+    !isImageSpaces &&
+    !isGoogleAuth
+  ) {
     throw new Error('Integraciones externas deshabilitadas en Propiedades.');
   }
 }

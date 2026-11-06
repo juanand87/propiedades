@@ -102,6 +102,51 @@ export class EstateService {
     @Optional() private config?: ConfigService,
   ) {}
   private attempts = new Map<string, { n: number; reset: number }>();
+  get onboardingEnabled() {
+    return this.config?.get('USER_ONBOARDING_ENABLED') === 'true';
+  }
+  async chooseAccount(u: Actor, body: any) {
+    if (!this.onboardingEnabled)
+      throw new ServiceUnavailableException(
+        'El registro de perfiles estará disponible pronto.',
+      );
+    const kind = choice(body.account_type, ['buyer', 'seller']);
+    await this.db.transaction(async (tx) => {
+      await tx.query('SELECT id FROM users WHERE id=? FOR UPDATE', [u.id]);
+      const [a] = await tx.query(
+        'SELECT id,status FROM advertisers WHERE user_id=?',
+        [u.id],
+      );
+      if (kind === 'seller' && a?.status === 'suspended')
+        throw new ForbiddenException('Tu perfil está suspendido.');
+      if (kind === 'seller' && !a) {
+        const id = randomUUID();
+        await tx.query(
+          "INSERT INTO advertisers(id,user_id,slug,display_name,kind,status) VALUES (?,?,?,?,'owner','pending')",
+          [id, u.id, `${slugify(u.firstName)}-${id.slice(0, 8)}`, u.firstName],
+        );
+      }
+      await tx.query(
+        'INSERT INTO estate_account_profiles(user_id,account_type) VALUES (?,?) ON DUPLICATE KEY UPDATE account_type=VALUES(account_type)',
+        [u.id, kind],
+      );
+    });
+    return this.actor(u.id);
+  }
+  async publicationAllowance(u: Actor) {
+    const [row] = await this.db.query(
+      'SELECT COUNT(*) n FROM properties WHERE advertiser_id=?',
+      [u.advertiser_id || ''],
+    );
+    const limited = this.onboardingEnabled && !isAdmin(u);
+    return {
+      used: Number(row.n),
+      free_limit: limited ? 1 : null,
+      can_create: !limited || Number(row.n) === 0,
+      message:
+        'Tu primera propiedad es gratis. Para publicar una segunda propiedad necesitarás una membresía. Próximamente podrás activarla; por ahora no se realizan cobros.',
+    };
+  }
   private readonly unknownPasswordHash = bcrypt.hashSync(
     'estate-auth-timing-sentinel',
     12,
@@ -123,6 +168,18 @@ export class EstateService {
   }
   async health() {
     try {
+      if (this.onboardingEnabled)
+        await this.db.query(
+          'SELECT user_id,account_type FROM estate_account_profiles LIMIT 0',
+        );
+      if (this.config?.get('GOOGLE_AUTH_ENABLED') === 'true') {
+        await this.db.query(
+          'SELECT google_sub,user_id FROM estate_google_identities LIMIT 0',
+        );
+        await this.db.query(
+          'SELECT id,poll_hash,launch_hash,nonce,verifier,status,user_id,expires_at FROM estate_google_requests LIMIT 0',
+        );
+      }
       const rows = await this.db.query(
         "SELECT version FROM estate_migrations WHERE version IN ('001_real_estate','002_locations','003_identity')",
       );
@@ -175,6 +232,17 @@ export class EstateService {
       [id],
     );
     if (!u) throw new UnauthorizedException('La cuenta no está activa.');
+    if (this.onboardingEnabled) {
+      const [profile] = await this.db.query(
+        'SELECT account_type FROM estate_account_profiles WHERE user_id=?',
+        [id],
+      );
+      u.account_type = profile
+        ? profile.account_type
+        : u.advertiser_id
+          ? 'seller'
+          : null;
+    }
     return u;
   }
   async login(body: any, ip: string, panel = false) {
@@ -768,6 +836,23 @@ export class EstateService {
         ? uuid(b.advertiser_id)
         : this.publisher(u);
     return this.db.transaction(async (manager) => {
+      if (!id && this.onboardingEnabled && !isAdmin(u)) {
+        // Serialize all creations for this advertiser, including concurrent devices.
+        await manager.query(
+          'SELECT id FROM advertisers WHERE id=? FOR UPDATE',
+          [advertiserId],
+        );
+        const [used] = await manager.query(
+          'SELECT COUNT(*) n FROM properties WHERE advertiser_id=?',
+          [advertiserId],
+        );
+        if (Number(used.n) >= 1)
+          throw new ForbiddenException({
+            code: 'MEMBERSHIP_REQUIRED',
+            message:
+              'Tu primera propiedad es gratis. Para publicar una segunda propiedad necesitarás una membresía. Próximamente podrás activarla; por ahora no se realizan cobros.',
+          });
+      }
       let row: any;
       if (id) {
         [row] = await manager.query(
@@ -1479,7 +1564,12 @@ export class EstateService {
         (isAdmin(u) ? '' : ' WHERE p.advertiser_id=?'),
       params,
     );
-    return { ...row, inquiries: leads.total };
+    const [likes] = await this.db.query(
+      'SELECT COUNT(*) total FROM property_favorites f JOIN properties p ON p.id=f.property_id' +
+        (isAdmin(u) ? '' : ' WHERE p.advertiser_id=?'),
+      params,
+    );
+    return { ...row, inquiries: leads.total, likes: Number(likes.total) };
   }
   async users(u: Actor) {
     admin(u);

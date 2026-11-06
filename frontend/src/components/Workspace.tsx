@@ -252,6 +252,7 @@ function Overview({ root }: { root: string }) {
           ["Publicadas", data?.published, Check],
           ["En revisión", data?.pending, ListFilter],
           ["Interesados", data?.inquiries, MessageSquare],
+          ["Me gusta", data?.likes, Check],
           ["Visitas a fichas", data?.views, Eye],
           ["Vendidas", data?.sold, Building2],
         ].map(([label, value, Icon]: any) => (
@@ -560,6 +561,7 @@ const numberLabels: Record<string, string> = {
   contributions: "Contribuciones",
 };
 function PropertyEditor({ root, id }: { root: string; id?: string }) {
+  const allowance = useLoad("/me/publication-allowance");
   const { catalog, user } = useEstate(),
     router = useRouter();
   const [form, setForm] = useState<any>({
@@ -683,8 +685,26 @@ function PropertyEditor({ root, id }: { root: string; id?: string }) {
       setBusy(false);
     }
   };
+  if (!id && allowance.data?.can_create === false)
+    return (
+      <section className="panel-card">
+        <h2>Membresía para publicar otra propiedad</h2>
+        <p>{allowance.data.message}</p>
+        <Link href={`${root}/propiedades`}>Volver a mis propiedades</Link>
+      </section>
+    );
   return (
     <>
+      {!id && allowance.data?.free_limit === 1 && (
+        <div className="notice">{allowance.data.message}</div>
+      )}
+      {!id && allowance.data?.can_create === false ? (
+        <div className="panel-card">
+          <h2>Membresía para publicar otra propiedad</h2>
+          <p>{allowance.data.message}</p>
+          <Link href={`${root}/propiedades`}>Volver a mis propiedades</Link>
+        </div>
+      ) : null}
       <Link className="text-link" href={`${root}/propiedades`}>
         <ArrowLeft size={16} />
         Volver a propiedades

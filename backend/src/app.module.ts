@@ -13,6 +13,7 @@ import { getDatabaseSsl } from './config/database-ssl';
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
+      ignoreEnvFile: process.env.LOCAL_MOBILE_SANDBOX === 'true',
       validate(env) {
         validateProjectEnvironment(env);
         installNetworkIsolation(env);

@@ -1,0 +1,48 @@
+{
+  "expo": {
+    "name": "Propiedades · Local",
+    "slug": "propiedades-local",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#E6F4FE",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "package": "cl.propiedades.local"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-video",
+      "expo-secure-store",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Seleccionar videos para vincularlos a tus propiedades.",
+          "cameraPermission": "Permite la cámara para grabar recorridos de tus propiedades.",
+          "microphonePermission": "Permite el micrófono para añadir sonido al recorrido."
+        }
+      ],
+      "expo-router",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Permite la cámara para grabar recorridos de tus propiedades.",
+          "microphonePermission": "Permite el micrófono para añadir sonido al recorrido.",
+          "recordAudioAndroid": true
+        }
+      ]
+    ],
+    "scheme": "propiedades-local"
+  }
+}

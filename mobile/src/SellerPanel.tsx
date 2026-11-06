@@ -1,0 +1,443 @@
+import { useEffect, useState } from "react";
+import {
+  View,
+  Text,
+  TextInput,
+  Pressable,
+  Image,
+  StyleSheet,
+  Alert,
+} from "react-native";
+import * as ImagePicker from "expo-image-picker";
+import { File } from "expo-file-system";
+import { api, Session, mediaUrl } from "./api";
+type Catalog = {
+  types: { id: string; name: string }[];
+  regions: { id: number; name: string; cut_code?: string }[];
+  communes: {
+    id: number;
+    region_id: number;
+    name: string;
+    cut_code?: string;
+  }[];
+};
+type Allowance = { can_create: boolean; used: number; message: string };
+type Lead = {
+  id: string;
+  title: string;
+  name: string;
+  message: string;
+  email: string;
+  phone: string;
+  status: string;
+};
+export function SellerPanel({
+  session,
+  onChanged,
+}: {
+  session: Session;
+  onChanged: () => void;
+}) {
+  const [allowance, setAllowance] = useState<Allowance | null>(null),
+    [catalog, setCatalog] = useState<Catalog | null>(null),
+    [stats, setStats] = useState<{
+      likes: number;
+      inquiries: number;
+      views: number;
+    } | null>(null),
+    [leads, setLeads] = useState<Lead[]>([]),
+    [editing, setEditing] = useState(false),
+    [busy, setBusy] = useState(false),
+    [error, setError] = useState(""),
+    [success, setSuccess] = useState(""),
+    [savedId, setSavedId] = useState<string | null>(null);
+  const [form, setForm] = useState<Record<string, string>>({
+      type_id: "house",
+      price_unit: "CLP",
+    }),
+    [photos, setPhotos] = useState<{ id: string; url: string }[]>([]),
+    [picker, setPicker] = useState<string | null>(null),
+    [search, setSearch] = useState(""),
+    [showMessages, setShowMessages] = useState(false);
+  const token = session.access_token;
+  useEffect(() => {
+    let live = true;
+    Promise.all([
+      api<Allowance>("/me/publication-allowance", { token }),
+      api<Catalog>("/catalog"),
+      api<typeof stats>("/manage/stats", { token }),
+      api<Lead[]>("/manage/inquiries", { token }),
+    ])
+      .then(([a, c, s, l]) => {
+        if (live) {
+          setAllowance(a);
+          setCatalog(c);
+          setStats(s);
+          setLeads(l);
+        }
+      })
+      .catch((e) => {
+        if (live) setError(e.message);
+      });
+    return () => {
+      live = false;
+    };
+  }, [token]);
+  const button = (label: string, fn: () => void) => (
+    <Pressable
+      accessibilityRole="button"
+      disabled={busy}
+      onPress={fn}
+      style={[s.button, busy && { opacity: 0.5 }]}
+    >
+      <Text style={s.buttonText}>{label}</Text>
+    </Pressable>
+  );
+  const set = (key: string, value: string) =>
+    setForm((v) => ({
+      ...v,
+      [key]: value,
+      ...(key === "region_id" ? { commune_id: "" } : {}),
+    }));
+  const field = (key: string, label: string, numeric = false) => (
+    <View key={key}>
+      <Text style={s.text}>{label}</Text>
+      <TextInput
+        accessibilityLabel={label}
+        style={s.input}
+        value={form[key] || ""}
+        onChangeText={(v) => set(key, v)}
+        keyboardType={numeric ? "decimal-pad" : "default"}
+        multiline={key === "description"}
+        maxLength={key === "description" ? 30000 : 180}
+      />
+    </View>
+  );
+  async function images() {
+    setBusy(true);
+    setError("");
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ["images"],
+        allowsMultipleSelection: true,
+        selectionLimit: 8 - photos.length,
+        quality: 0.85,
+      });
+      if (result.canceled) return;
+      for (const asset of result.assets) {
+        if ((asset.fileSize || 0) > 8 * 1024 * 1024)
+          throw Error("Cada imagen debe pesar menos de 8 MB.");
+        const fd = new FormData();
+        fd.append(
+          "file",
+          new File(asset.uri),
+          asset.fileName || "propiedad.jpg",
+        );
+        const m = await api<{ id: string; url: string }>("/manage/media", {
+          method: "POST",
+          token,
+          body: fd,
+        });
+        setPhotos((p) => [...p, m].slice(0, 8));
+      }
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function save() {
+    setBusy(true);
+    setError("");
+    setSuccess("");
+    try {
+      let id = savedId;
+      if (!id) {
+        const p = await api<{ id: string }>("/manage/properties", {
+          method: "POST",
+          token,
+          body: { ...form, media_ids: photos.map((p) => p.id) },
+        });
+        id = p.id;
+        setSavedId(id);
+      } else {
+        await api("/manage/properties/" + id, {
+          method: "PATCH",
+          token,
+          body: { ...form, media_ids: photos.map((p) => p.id) },
+        });
+      }
+      const current = await api<{ publication_status: string }>(
+        "/manage/properties/" + id,
+        { token },
+      );
+      if (current.publication_status !== "pending_review")
+        await api("/manage/properties/" + id + "/status", {
+          method: "PATCH",
+          token,
+          body: { status: "pending_review" },
+        });
+      setSuccess(
+        "Tu propiedad fue enviada a revisión. Al aprobarla aparecerá en el recorrido.",
+      );
+      setEditing(false);
+      setAllowance(
+        await api<Allowance>("/me/publication-allowance", { token }),
+      );
+      onChanged();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  if (!session.user.advertiser_id)
+    return (
+      <View style={s.card}>
+        <Text style={s.text}>
+          Elige «Soy vendedor» en Cuenta para publicar tu primera propiedad
+          gratis.
+        </Text>
+      </View>
+    );
+  const options =
+    picker === "type_id"
+      ? catalog?.types
+      : picker === "region_id"
+        ? catalog?.regions
+        : picker === "commune_id"
+          ? catalog?.communes.filter(
+              (c) => String(c.region_id) === form.region_id,
+            )
+          : [
+              { id: "CLP", name: "Pesos chilenos" },
+              { id: "UF", name: "UF" },
+            ];
+  return (
+    <View style={s.card}>
+      <Text style={s.title}>Mi espacio de vendedor</Text>
+      <Text style={s.text}>
+        {stats?.likes ?? 0} me gusta · {stats?.inquiries ?? 0} mensajes ·{" "}
+        {stats?.views ?? 0} visitas
+      </Text>
+      {!!error && (
+        <Text accessibilityRole="alert" style={s.error}>
+          {error}
+        </Text>
+      )}
+      {!!success && <Text style={s.text}>{success}</Text>}
+      {!editing &&
+        button(
+          allowance?.can_create
+            ? "Publicar mi primera propiedad gratis"
+            : "Publicar otra propiedad",
+          () => {
+            if (!allowance) return;
+            if (!allowance.can_create) {
+              Alert.alert("Membresía", allowance.message);
+              return;
+            }
+            setEditing(true);
+          },
+        )}
+      {allowance &&
+        allowance.used > 0 &&
+        !editing &&
+        button("Editar mi propiedad", () => {
+          setBusy(true);
+          api<{ items: { id: string }[] }>("/manage/properties?limit=1", {
+            token,
+          })
+            .then(async (list) => {
+              if (!list.items[0]) throw Error("No se encontró la propiedad.");
+              const p = await api<Record<string, any>>(
+                "/manage/properties/" + list.items[0].id,
+                { token },
+              );
+              setSavedId(p.id);
+              setForm(
+                Object.fromEntries(
+                  Object.entries(p)
+                    .filter(
+                      ([, v]) => typeof v === "string" || typeof v === "number",
+                    )
+                    .map(([k, v]) => [k, String(v)]),
+                ),
+              );
+              setPhotos(p.media || []);
+              setEditing(true);
+            })
+            .catch((e) => setError(e.message))
+            .finally(() => setBusy(false));
+        })}
+      {editing && (
+        <>
+          <Text style={s.text}>
+            Primera propiedad gratis. Completa sus datos y fotografías.
+            Revisaremos la publicación antes de mostrarla.
+          </Text>
+          {field("title", "Título · mínimo 8 caracteres")}
+          {field("description", "Descripción · mínimo 40 caracteres")}
+          {(["type_id", "region_id", "commune_id", "price_unit"] as const).map(
+            (k) => (
+              <View key={k}>
+                {button(
+                  {
+                    type_id: "Tipo de propiedad",
+                    region_id: "Región",
+                    commune_id: "Comuna",
+                    price_unit: "Moneda",
+                  }[k] +
+                    ": " +
+                    ((k === "type_id"
+                      ? catalog?.types.find((t) => t.id === form[k])?.name
+                      : k === "region_id"
+                        ? catalog?.regions.find((t) => String(t.id) === form[k])
+                            ?.name
+                        : k === "commune_id"
+                          ? catalog?.communes.find(
+                              (t) => String(t.id) === form[k],
+                            )?.name
+                          : form[k]) ||
+                      (k === "commune_id" && !form.region_id
+                        ? "Primero selecciona una región"
+                        : "Seleccionar")),
+                  () => {
+                    if (k === "commune_id" && !form.region_id) {
+                      Alert.alert(
+                        "Selecciona una región",
+                        "Las comunas se mostrarán según la región elegida.",
+                      );
+                      return;
+                    }
+                    setPicker(k);
+                    setSearch("");
+                  },
+                )}
+              </View>
+            ),
+          )}
+          {picker && (
+            <View>
+              <TextInput
+                placeholder="Buscar opción"
+                placeholderTextColor="#aabeb7"
+                style={s.input}
+                value={search}
+                onChangeText={setSearch}
+              />
+              {options
+                ?.filter((o) =>
+                  o.name.toLowerCase().includes(search.toLowerCase()),
+                )
+                .slice(0, 30)
+                .map((o) => (
+                  <View key={o.id}>
+                    {button(o.name, () => {
+                      set(picker, String(o.id));
+                      setPicker(null);
+                    })}
+                  </View>
+                ))}
+              {button("Cerrar opciones", () => setPicker(null))}
+            </View>
+          )}
+          {field("price_amount", "Precio", true)}
+          {field("built_area", "Superficie construida (m²)", true)}
+          {field("land_area", "Terreno (m²)", true)}
+          {field("bedrooms", "Dormitorios", true)}
+          {field("bathrooms", "Baños", true)}
+          {photos.map((p) => (
+            <View key={p.id}>
+              <Image
+                source={{ uri: mediaUrl(p.url) }}
+                style={{ height: 120, borderRadius: 12 }}
+              />
+              {button("Quitar esta fotografía", () =>
+                setPhotos((v) => v.filter((x) => x.id !== p.id)),
+              )}
+            </View>
+          ))}
+          {photos.length < 8 &&
+            button("Agregar fotografías", () => void images())}
+          {button(
+            busy
+              ? "Guardando…"
+              : savedId
+                ? "Guardar y reenviar a revisión"
+                : "Enviar mi propiedad a revisión",
+            () => void save(),
+          )}
+          {button("Cerrar formulario", () => setEditing(false))}
+        </>
+      )}
+      {button(
+        showMessages ? "Ocultar mensajes" : "Ver mensajes recibidos",
+        () => setShowMessages(!showMessages),
+      )}
+      {showMessages &&
+        (leads.length ? (
+          leads.map((l) => (
+            <View key={l.id} style={s.card}>
+              <Text style={s.title}>{l.title}</Text>
+              <Text style={s.text}>
+                {l.name}: {l.message}
+              </Text>
+              <Text style={s.text}>
+                {l.email} · {l.phone}
+              </Text>
+              <Text style={s.text}>Estado: {l.status}</Text>
+              {button("Marcar como contactado", () => {
+                setBusy(true);
+                api("/manage/inquiries/" + l.id, {
+                  method: "PATCH",
+                  token,
+                  body: { status: "contacted" },
+                })
+                  .then(() =>
+                    setLeads((v) =>
+                      v.map((x) =>
+                        x.id === l.id ? { ...x, status: "contacted" } : x,
+                      ),
+                    ),
+                  )
+                  .catch((e) => setError(e.message))
+                  .finally(() => setBusy(false));
+              })}
+            </View>
+          ))
+        ) : (
+          <Text style={s.text}>
+            Aquí aparecerán las consultas de tus propiedades.
+          </Text>
+        ))}
+    </View>
+  );
+}
+const s = StyleSheet.create({
+  card: {
+    padding: 14,
+    gap: 12,
+    backgroundColor: "#102f33",
+    borderRadius: 18,
+    marginVertical: 14,
+  },
+  title: { fontSize: 20, fontWeight: "700", color: "#f3f7f0" },
+  text: { color: "#cadbd3", fontSize: 15, lineHeight: 22 },
+  input: {
+    borderWidth: 1,
+    borderColor: "#638578",
+    borderRadius: 12,
+    color: "#fff",
+    padding: 12,
+    marginTop: 6,
+  },
+  button: {
+    padding: 14,
+    backgroundColor: "#d0f5a8",
+    borderRadius: 12,
+    marginVertical: 4,
+  },
+  buttonText: { color: "#16342e", fontWeight: "700" },
+  error: { color: "#ffb9a8" },
+});
