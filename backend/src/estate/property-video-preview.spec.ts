@@ -112,4 +112,9 @@ describe('private property video previews', () => {
       'Video no disponible',
     );
   });
+  it('does not treat two missing advertiser IDs as ownership of a standalone video', async () => {
+    db.query.mockResolvedValue([{ id: videoId, size_bytes: 1024, created_by: actor.id, advertiser_id: null }]);
+    await expect(service.preview({ ...actor, id: 'another-user', advertiser_id: null as any }, videoId)).rejects.toThrow('no te pertenece');
+    await expect(service.preview({ ...actor, advertiser_id: undefined }, videoId)).resolves.toHaveProperty('url');
+  });
 });

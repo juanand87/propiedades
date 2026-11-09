@@ -22,7 +22,11 @@ function isApprovedSharedDatabase(env: Record<string, any>) {
 }
 
 export function validateProjectEnvironment(env: Record<string, any>) {
-  for (const key of ['USER_ONBOARDING_ENABLED', 'GOOGLE_AUTH_ENABLED'])
+  for (const key of [
+    'USER_ONBOARDING_ENABLED',
+    'GOOGLE_AUTH_ENABLED',
+    'SOCIAL_VIDEOS_ENABLED',
+  ])
     if (![undefined, 'true', 'false'].includes(env[key]))
       throw Error(`${key} debe ser true o false.`);
   if (

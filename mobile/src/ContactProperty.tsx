@@ -1,3 +1,4 @@
+import { videoColors } from "./video-colors";
 import { useState } from "react";
 import { View, Text, TextInput, Pressable } from "react-native";
 import { api, Property, Session } from "./api";
@@ -15,7 +16,7 @@ export function ContactProperty({
   if (property.is_demo) return null;
   if (!session)
     return (
-      <Text style={{ color: "#cadbd3" }}>
+      <Text style={{ color: videoColors.muted }}>
         Inicia sesión en Cuenta para enviar una consulta.
       </Text>
     );
@@ -27,14 +28,14 @@ export function ContactProperty({
       <TextInput
         accessibilityLabel="Mensaje al vendedor"
         placeholder="Me interesa esta propiedad…"
-        placeholderTextColor="#aabeb7"
+        placeholderTextColor={videoColors.muted}
         value={message}
         onChangeText={setMessage}
         multiline
         maxLength={5000}
         style={{
           color: "#fff",
-          borderColor: "#638578",
+          borderColor: videoColors.muted,
           borderWidth: 1,
           padding: 14,
           borderRadius: 12,
@@ -46,7 +47,7 @@ export function ContactProperty({
         accessibilityState={{ checked: consent }}
         onPress={() => setConsent(!consent)}
       >
-        <Text style={{ color: "#cadbd3" }}>
+        <Text style={{ color: videoColors.muted }}>
           {consent ? "☑" : "☐"} Autorizo compartir mi nombre y correo con este
           vendedor para responder mi consulta.
         </Text>
@@ -57,7 +58,9 @@ export function ContactProperty({
         style={{
           padding: 14,
           backgroundColor:
-            consent && message.trim().length >= 10 ? "#d0f5a8" : "#718269",
+            consent && message.trim().length >= 10
+              ? videoColors.cyan
+              : videoColors.muted,
           borderRadius: 12,
         }}
         onPress={() => {
@@ -82,12 +85,12 @@ export function ContactProperty({
             .finally(() => setBusy(false));
         }}
       >
-        <Text style={{ color: "#16342e", fontWeight: "700" }}>
+        <Text style={{ color: "#111111", fontWeight: "700" }}>
           {busy ? "Enviando…" : "Enviar consulta"}
         </Text>
       </Pressable>
       {!!notice && (
-        <Text accessibilityRole="alert" style={{ color: "#cadbd3" }}>
+        <Text accessibilityRole="alert" style={{ color: videoColors.muted }}>
           {notice}
         </Text>
       )}

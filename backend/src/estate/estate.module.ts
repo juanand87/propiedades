@@ -9,6 +9,11 @@ import { PropertyVideosService } from './property-videos.service';
 import { PropertyVideosController } from './property-videos.controller';
 import { ImageStorageService } from './image-storage.service';
 import { VideoStorageService } from './video-storage.service';
+import { VideoSocialService } from './video-social.service';
+import {
+  VideoSocialController,
+  OptionalEstateGuard,
+} from './video-social.controller';
 import {
   GoogleAuthController,
   GoogleAuthService,
@@ -28,6 +33,7 @@ import {
     EstateController,
     PropertyVideosController,
     GoogleAuthController,
+    VideoSocialController,
   ],
   providers: [
     EstateService,
@@ -37,6 +43,8 @@ import {
     PropertyVideosService,
     ImageStorageService,
     VideoStorageService,
+    VideoSocialService,
+    OptionalEstateGuard,
   ],
 })
 export class EstateModule {}

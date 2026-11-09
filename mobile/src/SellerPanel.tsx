@@ -1,3 +1,4 @@
+import { videoColors } from "./video-colors";
 import { useEffect, useState } from "react";
 import {
   View,
@@ -10,7 +11,7 @@ import {
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import { File } from "expo-file-system";
-import { api, Session, mediaUrl } from "./api";
+import { api, Page, Property, Session, mediaUrl } from "./api";
 type Catalog = {
   types: { id: string; name: string }[];
   regions: { id: number; name: string; cut_code?: string }[];
@@ -34,9 +35,15 @@ type Lead = {
 export function SellerPanel({
   session,
   onChanged,
+  pendingVideoId,
+  propertyMode,
+  onRecordFirst,
 }: {
   session: Session;
   onChanged: () => void;
+  pendingVideoId?: string;
+  propertyMode?: "new" | "link";
+  onRecordFirst?: () => void;
 }) {
   const [allowance, setAllowance] = useState<Allowance | null>(null),
     [catalog, setCatalog] = useState<Catalog | null>(null),
@@ -46,7 +53,9 @@ export function SellerPanel({
       views: number;
     } | null>(null),
     [leads, setLeads] = useState<Lead[]>([]),
-    [editing, setEditing] = useState(false),
+    [editing, setEditing] = useState(
+      !!pendingVideoId && propertyMode === "new",
+    ),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
     [success, setSuccess] = useState(""),
@@ -59,7 +68,11 @@ export function SellerPanel({
     [picker, setPicker] = useState<string | null>(null),
     [search, setSearch] = useState(""),
     [showMessages, setShowMessages] = useState(false);
+  const [list, setList] = useState<Page<Property> | null>(null);
   const token = session.access_token;
+  const [linked, setLinked] = useState(false);
+  const linkingExisting =
+    !!pendingVideoId && propertyMode === "link" && !linked;
   useEffect(() => {
     let live = true;
     Promise.all([
@@ -177,12 +190,18 @@ export function SellerPanel({
           token,
           body: { status: "pending_review" },
         });
+      if (pendingVideoId && !linked) await linkVideo(id);
       setSuccess(
-        sendForReview
-          ? "Tu propiedad fue enviada a revisión. Al aprobarla aparecerá en el recorrido."
-          : "Borrador guardado. Puedes continuar editándolo desde la app o el panel web.",
+        pendingVideoId
+          ? sendForReview
+            ? "Video vinculado. La propiedad fue enviada a revisión."
+            : "Video vinculado. Los datos de la propiedad quedaron como borrador."
+          : sendForReview
+            ? "Tu propiedad fue enviada a revisión. Al aprobarla aparecerá en el recorrido."
+            : "Borrador guardado. Puedes continuar editándolo desde la app o el panel web.",
       );
       setEditing(false);
+      setList(null);
       setAllowance(
         await api<Allowance>("/me/publication-allowance", { token }),
       );
@@ -193,12 +212,81 @@ export function SellerPanel({
       setBusy(false);
     }
   }
+  async function linkVideo(id: string) {
+    if (!pendingVideoId) return;
+    await api(`/manage/videos/${pendingVideoId}/property`, {
+      method: "POST",
+      token,
+      body: { property_id: id },
+    });
+    setLinked(true);
+    onChanged();
+  }
+  async function linkExistingProperty(id: string) {
+    setBusy(true);
+    setError("");
+    try {
+      await linkVideo(id);
+      setList(null);
+      setSuccess("Video vinculado a la propiedad.");
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function loadProperties(page: number) {
+    setBusy(true);
+    setError("");
+    try {
+      const result = await api<Page<Property>>(
+        `/manage/properties?limit=24&page=${page}`,
+        { token },
+      );
+      setList((previous) =>
+        page === 1
+          ? result
+          : { ...result, items: [...(previous?.items ?? []), ...result.items] },
+      );
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function editProperty(id: string) {
+    setBusy(true);
+    setError("");
+    setSuccess("");
+    try {
+      const property = await api<Property>(`/manage/properties/${id}`, {
+        token,
+      });
+      setSavedId(property.id);
+      setForm(
+        Object.fromEntries(
+          Object.entries(property)
+            .filter(
+              ([, value]) =>
+                typeof value === "string" || typeof value === "number",
+            )
+            .map(([key, value]) => [key, String(value)]),
+        ),
+      );
+      setPhotos(property.media);
+      setPicker(null);
+      setEditing(true);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
   if (!session.user.advertiser_id)
     return (
       <View style={s.card}>
         <Text style={s.text}>
-          Elige «Soy vendedor» en Cuenta para publicar tu primera propiedad
-          gratis.
+          Elige «Soy vendedor» en Cuenta para publicar propiedades gratis.
         </Text>
       </View>
     );
@@ -217,7 +305,19 @@ export function SellerPanel({
             ];
   return (
     <View style={s.card}>
-      <Text style={s.title}>Mi espacio de vendedor</Text>
+      <Text style={s.title}>
+        {pendingVideoId
+          ? propertyMode === "link"
+            ? "Vincular video a una propiedad"
+            : "Agregar datos de esta propiedad"
+          : "Mi espacio de vendedor"}
+      </Text>
+      {pendingVideoId && !linked && (
+        <Text style={s.text}>
+          Al vincularlo, el video queda en borrador. Podrás publicarlo cuando la
+          propiedad esté publicada.
+        </Text>
+      )}
       <Text style={s.text}>
         {stats?.likes ?? 0} me gusta · {stats?.inquiries ?? 0} mensajes ·{" "}
         {stats?.views ?? 0} visitas
@@ -227,56 +327,69 @@ export function SellerPanel({
           {error}
         </Text>
       )}
+      {allowance && <Text style={s.text}>{allowance.message}</Text>}
       {!!success && <Text style={s.text}>{success}</Text>}
       {!editing &&
+        !pendingVideoId &&
         button(
           allowance?.can_create
-            ? "Publicar mi primera propiedad gratis"
-            : "Publicar otra propiedad",
+            ? onRecordFirst
+              ? "Grabar video para una propiedad"
+              : "Crear propiedad gratis"
+            : "Límite de propiedades alcanzado",
           () => {
             if (!allowance) return;
             if (!allowance.can_create) {
               Alert.alert("Membresía", allowance.message);
               return;
             }
+            if (onRecordFirst) {
+              onRecordFirst();
+              return;
+            }
+            setSavedId(null);
+            setForm({ type_id: "house", price_unit: "CLP" });
+            setPhotos([]);
+            setPicker(null);
+            setSuccess("");
             setEditing(true);
           },
         )}
-      {allowance &&
+      {linkingExisting &&
+        button("Elegir propiedad existente", () => void loadProperties(1))}
+      {!pendingVideoId &&
+        allowance &&
         allowance.used > 0 &&
         !editing &&
-        button("Editar mi propiedad", () => {
-          setBusy(true);
-          api<{ items: { id: string }[] }>("/manage/properties?limit=1", {
-            token,
-          })
-            .then(async (list) => {
-              if (!list.items[0]) throw Error("No se encontró la propiedad.");
-              const p = await api<Record<string, any>>(
-                "/manage/properties/" + list.items[0].id,
-                { token },
-              );
-              setSavedId(p.id);
-              setForm(
-                Object.fromEntries(
-                  Object.entries(p)
-                    .filter(
-                      ([, v]) => typeof v === "string" || typeof v === "number",
-                    )
-                    .map(([k, v]) => [k, String(v)]),
-                ),
-              );
-              setPhotos(p.media || []);
-              setEditing(true);
-            })
-            .catch((e) => setError(e.message))
-            .finally(() => setBusy(false));
-        })}
+        button("Mis propiedades", () => void loadProperties(1))}
+      {!editing && list && (
+        <>
+          {linkingExisting && list.items.length === 0 && (
+            <Text style={s.text}>
+              Todavía no tienes propiedades para vincular.
+            </Text>
+          )}
+          {list.items.map((p) => (
+            <View key={p.id}>
+              {button(p.title, () =>
+                linkingExisting
+                  ? void linkExistingProperty(p.id)
+                  : void editProperty(p.id),
+              )}
+            </View>
+          ))}
+          {list.page < list.pages &&
+            button(
+              "Cargar más propiedades",
+              () => void loadProperties(list.page + 1),
+            )}
+        </>
+      )}
       {editing && (
         <>
           <Text style={s.text}>
-            Primera propiedad gratis. Completa sus datos y fotografías.
-            Revisaremos la publicación antes de mostrarla.
+            Completa los datos y fotografías de tu propiedad. Revisaremos la
+            publicación antes de mostrarla.
           </Text>
           {field("title", "Título · mínimo 8 caracteres")}
           {field("description", "Descripción · mínimo 40 caracteres")}
@@ -323,7 +436,7 @@ export function SellerPanel({
             <View>
               <TextInput
                 placeholder="Buscar opción"
-                placeholderTextColor="#aabeb7"
+                placeholderTextColor={videoColors.muted}
                 style={s.input}
                 value={search}
                 onChangeText={setSearch}
@@ -362,7 +475,10 @@ export function SellerPanel({
           ))}
           {photos.length < 8 &&
             button("Agregar fotografías", () => void images())}
-          {button(busy ? "Guardando…" : "Guardar borrador", () => void save(false))}
+          {button(
+            busy ? "Guardando…" : "Guardar borrador",
+            () => void save(false),
+          )}
           {button(
             busy
               ? "Guardando…"
@@ -421,15 +537,15 @@ const s = StyleSheet.create({
   card: {
     padding: 14,
     gap: 12,
-    backgroundColor: "#102f33",
+    backgroundColor: videoColors.surface,
     borderRadius: 18,
     marginVertical: 14,
   },
-  title: { fontSize: 20, fontWeight: "700", color: "#f3f7f0" },
-  text: { color: "#cadbd3", fontSize: 15, lineHeight: 22 },
+  title: { fontSize: 20, fontWeight: "700", color: videoColors.text },
+  text: { color: videoColors.muted, fontSize: 15, lineHeight: 22 },
   input: {
     borderWidth: 1,
-    borderColor: "#638578",
+    borderColor: videoColors.muted,
     borderRadius: 12,
     color: "#fff",
     padding: 12,
@@ -437,10 +553,10 @@ const s = StyleSheet.create({
   },
   button: {
     padding: 14,
-    backgroundColor: "#d0f5a8",
+    backgroundColor: videoColors.cyan,
     borderRadius: 12,
     marginVertical: 4,
   },
-  buttonText: { color: "#16342e", fontWeight: "700" },
+  buttonText: { color: "#111111", fontWeight: "700" },
   error: { color: "#ffb9a8" },
 });

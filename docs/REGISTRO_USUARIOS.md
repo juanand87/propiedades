@@ -8,7 +8,7 @@
 
 El registro usa correo (incluido Gmail) y contraseña de al menos 10 caracteres. Después se elige comprador o vendedor. El comprador abre Descubrir; el vendedor obtiene un perfil propietario pendiente de aprobación y puede crear su primera propiedad sin pago. Las propiedades siguen el proceso de revisión existente.
 
-Cada vendedor tiene una propiedad gratis en total, incluidos borradores y archivadas. Crear una segunda devuelve `MEMBERSHIP_REQUIRED` y explica que la membresía estará disponible próximamente. Editar la primera está permitido. El límite usa bloqueo de BD para solicitudes simultáneas. Cambiar de perfil o archivar no reinicia el cupo. Los administradores están exentos. Las cuentas existentes con anunciante se reconocen como vendedores; se conservan todas sus propiedades y también quedan sujetas al límite para nuevas creaciones al activar esta opción. No hay pasarela, precios ni cobros.
+El administrador asigna la membresía en Panel → Usuarios. Gratis permite 1 propiedad y 10 videos activos, Básico permite 10 propiedades y videos ilimitados, y Pro permite 50 propiedades y videos ilimitados. Se cuentan los videos publicados y en borrador. Eliminar un video libera un espacio. Las propiedades archivadas siguen contando y cambiar de plan conserva los datos existentes. Ejecutar `database/PLANES_MEMBRESIA.sql` antes de desplegar esta actualización.
 
 Los compradores pueden guardar favoritos y enviar consultas desde las fichas. Los vendedores ven las consultas y el total de favoritos en su espacio. Las consultas comparten nombre y correo únicamente tras consentimiento; el vendedor puede responder al correo proporcionado. No se implementa chat instantáneo ni notificaciones push en esta entrega.
 

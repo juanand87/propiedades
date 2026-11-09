@@ -1,3 +1,4 @@
+import { videoColors } from "./video-colors";
 import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -47,7 +48,7 @@ function Preview({ uri, active }: { uri: string; active: boolean }) {
       style={styles.preview}
       nativeControls
       contentFit="contain"
-      surfaceType="textureView"
+      surfaceType="surfaceView"
     />
   );
 }
@@ -73,7 +74,9 @@ function Action({
         disabled && { opacity: 0.4 },
       ]}
     >
-      <Text style={[styles.actionText, secondary && { color: "#e5f0eb" }]}>
+      <Text
+        style={[styles.actionText, secondary && { color: videoColors.text }]}
+      >
         {label}
       </Text>
     </Pressable>
@@ -282,7 +285,13 @@ export function VideoRecorder({
     );
   }
   async function save(publish: boolean) {
-    if (!clip || !property || !session || uploading.current || !title.trim())
+    if (
+      !clip ||
+      (propertyId && !property) ||
+      !session ||
+      uploading.current ||
+      !title.trim()
+    )
       return;
     const mode = publish ? "published" : "draft";
     if (attempt && attempt !== mode) return;
@@ -298,7 +307,9 @@ export function VideoRecorder({
       form.append("publish", String(publish));
       form.append("file", new File(clip.uri));
       const value = await api<{ id: string; status: string }>(
-        `/manage/properties/${property.id}/videos`,
+        property
+          ? `/manage/properties/${property.id}/videos`
+          : "/manage/videos",
         { method: "POST", token: session.access_token, body: form },
       );
       if (!alive.current) return;
@@ -306,7 +317,35 @@ export function VideoRecorder({
         throw new Error(
           "El video ya existe con otro estado. Revísalo en Mis videos.",
         );
-      if (publish) {
+      if (!property) {
+        if (publish) onPublished();
+        else onSaved();
+        const openProperty = (propertyMode: "new" | "link") =>
+          router.replace({
+            pathname: "/mis-videos",
+            params: { videoId: value.id, propertyMode },
+          });
+        Alert.alert(
+          publish ? "Video publicado" : "Borrador guardado",
+          "Puedes dejar el video independiente o asociarlo a una propiedad.",
+          [
+            {
+              text: "Más tarde",
+              style: "cancel",
+              onPress: () => router.replace("/mis-videos"),
+            },
+            {
+              text: "Vincular propiedad existente",
+              onPress: () => openProperty("link"),
+            },
+            {
+              text: "Agregar datos de esta propiedad",
+              onPress: () => openProperty("new"),
+            },
+          ],
+          { cancelable: false },
+        );
+      } else if (publish) {
         onPublished();
         router.replace("/");
       } else {
@@ -349,7 +388,7 @@ export function VideoRecorder({
         />
       </View>
     );
-  if (!property)
+  if (propertyId && !property)
     return (
       <View style={styles.panel}>
         <Text style={styles.heading}>Preparando tu propiedad</Text>
@@ -362,7 +401,7 @@ export function VideoRecorder({
             />
           </>
         ) : (
-          <ActivityIndicator color="#d0f5a8" />
+          <ActivityIndicator color={videoColors.cyan} />
         )}
         <Action label="Volver a Mis videos" secondary onPress={leave} />
       </View>
@@ -373,10 +412,14 @@ export function VideoRecorder({
         <Text style={styles.eyebrow}>REVISA Y PUBLICA</Text>
         <Text style={styles.heading}>Tu propiedad, en movimiento</Text>
         <Preview uri={clip.uri} active={foreground && phase === "preview"} />
-        <Text style={styles.property}>{property.title}</Text>
+        <Text style={styles.property}>
+          {property?.title || "Video de tu perfil"}
+        </Text>
         <Text style={styles.body}>
           Modo {clip.limit} s · {(clip.size / 1024 / 1024).toFixed(1)} MB ·
-          Vinculado a esta propiedad
+          {property
+            ? "Vinculado a esta propiedad"
+            : "Sin propiedad vinculada · puedes enlazarlo después"}
         </Text>
         <Text style={styles.label}>Título del video</Text>
         <TextInput
@@ -392,7 +435,7 @@ export function VideoRecorder({
             {error}
           </Text>
         )}
-        {property.publication_status !== "published" && (
+        {property && property.publication_status !== "published" && (
           <Text style={styles.error}>
             La propiedad aún no está publicada. Puedes guardar el video como
             borrador.
@@ -409,7 +452,7 @@ export function VideoRecorder({
           disabled={
             phase === "uploading" ||
             !title.trim() ||
-            property.publication_status !== "published" ||
+            (!!property && property.publication_status !== "published") ||
             attempt === "draft"
           }
           onPress={() => void save(true)}
@@ -529,7 +572,8 @@ export function VideoRecorder({
       </View>
       <View style={styles.cameraBottom}>
         <Text style={styles.property} numberOfLines={2}>
-          {property.title}
+          {property?.title ||
+            "Graba para tu perfil · vincular una propiedad es opcional"}
         </Text>
         <View style={styles.progress}>
           <View
@@ -616,35 +660,40 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 26,
     justifyContent: "center",
-    backgroundColor: "#0b1e21",
+    backgroundColor: videoColors.background,
   },
-  review: { flex: 1, padding: 20, backgroundColor: "#0b1e21" },
+  review: { flex: 1, padding: 20, backgroundColor: videoColors.background },
   eyebrow: {
-    color: "#b9dda0",
+    color: videoColors.cyan,
     fontSize: 10,
     letterSpacing: 2,
     marginBottom: 14,
   },
   heading: {
-    color: "#f1f6ee",
+    color: videoColors.text,
     fontSize: 29,
     fontWeight: "800",
     marginBottom: 18,
   },
-  body: { color: "#b3cbbf", fontSize: 14, lineHeight: 23, marginBottom: 15 },
+  body: {
+    color: videoColors.muted,
+    fontSize: 14,
+    lineHeight: 23,
+    marginBottom: 15,
+  },
   action: {
     padding: 16,
     borderRadius: 14,
     alignItems: "center",
-    backgroundColor: "#d0f5a8",
+    backgroundColor: videoColors.cyan,
     marginVertical: 6,
   },
   secondary: {
-    backgroundColor: "#1e3c3c",
+    backgroundColor: videoColors.surface,
     borderWidth: 1,
-    borderColor: "#3c5a51",
+    borderColor: videoColors.border,
   },
-  actionText: { color: "#19362b", fontWeight: "800" },
+  actionText: { color: "#111111", fontWeight: "800" },
   preview: {
     height: 360,
     width: "100%",
@@ -658,19 +707,19 @@ const styles = StyleSheet.create({
     fontSize: 16,
     marginBottom: 10,
   },
-  label: { color: "#d4e7d9", fontSize: 13, marginVertical: 10 },
+  label: { color: videoColors.text, fontSize: 13, marginVertical: 10 },
   input: {
     padding: 15,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: "#426554",
+    borderColor: videoColors.border,
     color: "#fff",
     fontSize: 15,
     marginBottom: 12,
   },
   error: { color: "#ffd0c3", lineHeight: 22, marginVertical: 10 },
   hint: {
-    color: "#b5c9c2",
+    color: videoColors.muted,
     fontSize: 11,
     lineHeight: 18,
     textAlign: "center",
@@ -690,16 +739,16 @@ const styles = StyleSheet.create({
     width: 42,
     height: 42,
     borderRadius: 22,
-    backgroundColor: "#092624aa",
+    backgroundColor: "#000a",
     alignItems: "center",
     justifyContent: "center",
   },
   white: { color: "#fff", fontWeight: "700" },
   badge: {
-    color: "#e4f7dc",
+    color: videoColors.text,
     fontSize: 10,
     letterSpacing: 1,
-    backgroundColor: "#173e35bb",
+    backgroundColor: "#202020bb",
     padding: 10,
     borderRadius: 20,
   },
@@ -709,15 +758,15 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     padding: 22,
-    backgroundColor: "#081c22ba",
+    backgroundColor: "#000b",
   },
   progress: {
     height: 4,
     borderRadius: 3,
-    backgroundColor: "#8fa59b55",
+    backgroundColor: "#ffffff55",
     overflow: "hidden",
   },
-  progressFill: { height: 4, backgroundColor: "#e5f7b5" },
+  progressFill: { height: 4, backgroundColor: videoColors.cyan },
   counter: {
     color: "#fff",
     fontVariant: ["tabular-nums"],
@@ -730,10 +779,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     paddingVertical: 9,
     borderRadius: 22,
-    backgroundColor: "#284a45",
+    backgroundColor: videoColors.surface,
   },
-  durationActive: { backgroundColor: "#d0f5a8" },
-  dark: { color: "#14372c", fontWeight: "800" },
+  durationActive: { backgroundColor: videoColors.cyan },
+  dark: { color: "#111111", fontWeight: "800" },
   controls: {
     flexDirection: "row",
     alignItems: "center",

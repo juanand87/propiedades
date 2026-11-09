@@ -1,3 +1,4 @@
+import { membershipPlans, MembershipPlan } from './membership';
 import {
   Injectable,
   BadRequestException,
@@ -133,18 +134,39 @@ export class EstateService {
     });
     return this.actor(u.id);
   }
+  async membership(userId: string, db: Pick<DataSource, 'query'> = this.db) {
+    const [row] = await db.query(
+      'SELECT plan FROM estate_user_memberships WHERE user_id=?',
+      [userId],
+    );
+    const plan = (row?.plan ?? 'free') as MembershipPlan;
+    return { plan, ...membershipPlans[plan] };
+  }
   async publicationAllowance(u: Actor) {
+    const plan = await this.membership(u.id);
+    const limit = isAdmin(u) ? null : plan.properties;
     const [row] = await this.db.query(
       'SELECT COUNT(*) n FROM properties WHERE advertiser_id=?',
       [u.advertiser_id || ''],
     );
-    const limited = this.onboardingEnabled && !isAdmin(u);
+    const [videoUsage] =
+      this.config?.get('PROPERTY_VIDEOS_ENABLED') === 'true'
+        ? await this.db.query(
+            "SELECT COUNT(*) n FROM property_videos WHERE created_by=? AND status<>'archived'",
+            [u.id],
+          )
+        : [{ n: 0 }];
     return {
       used: Number(row.n),
-      free_limit: limited ? 1 : null,
-      can_create: !limited || Number(row.n) === 0,
+      video_used: Number(videoUsage.n),
+      plan: plan.plan,
+      free_limit: limit,
+      video_limit: isAdmin(u) ? null : plan.videos,
+      can_create: limit === null || Number(row.n) < limit,
       message:
-        'Tu primera propiedad es gratis. Para publicar una segunda propiedad necesitarás una membresía. Próximamente podrás activarla; por ahora no se realizan cobros.',
+        limit === null
+          ? 'Cuenta administrativa sin límite de propiedades.'
+          : `Plan ${plan.name}: hasta ${limit} ${limit === 1 ? 'propiedad' : 'propiedades'}.`,
     };
   }
   private readonly unknownPasswordHash = bcrypt.hashSync(
@@ -168,6 +190,21 @@ export class EstateService {
   }
   async health() {
     try {
+      if (this.config?.get('SOCIAL_VIDEOS_ENABLED') === 'true') {
+        for (const table of [
+          'estate_video_profiles',
+          'estate_video_follows',
+          'estate_video_likes',
+          'estate_video_saves',
+          'estate_video_comments',
+        ])
+          await this.db.query(`SELECT * FROM ${table} LIMIT 0`);
+        const [column] = await this.db.query(
+          "SELECT IS_NULLABLE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='property_videos' AND COLUMN_NAME='property_id'",
+        );
+        if (column?.IS_NULLABLE !== 'YES')
+          throw new Error('Social video migration pending');
+      }
       if (this.onboardingEnabled)
         await this.db.query(
           'SELECT user_id,account_type FROM estate_account_profiles LIMIT 0',
@@ -836,22 +873,19 @@ export class EstateService {
         ? uuid(b.advertiser_id)
         : this.publisher(u);
     return this.db.transaction(async (manager) => {
-      if (!id && this.onboardingEnabled && !isAdmin(u)) {
-        // Serialize all creations for this advertiser, including concurrent devices.
-        await manager.query(
-          'SELECT id FROM advertisers WHERE id=? FOR UPDATE',
-          [advertiserId],
-        );
+      if (!id && !isAdmin(u)) {
+        await manager.query('SELECT id FROM users WHERE id=? FOR UPDATE', [
+          u.id,
+        ]);
+        const plan = await this.membership(u.id, manager);
         const [used] = await manager.query(
           'SELECT COUNT(*) n FROM properties WHERE advertiser_id=?',
           [advertiserId],
         );
-        if (Number(used.n) >= 1)
-          throw new ForbiddenException({
-            code: 'MEMBERSHIP_REQUIRED',
-            message:
-              'Tu primera propiedad es gratis. Para publicar una segunda propiedad necesitarás una membresía. Próximamente podrás activarla; por ahora no se realizan cobros.',
-          });
+        if (Number(used.n) >= plan.properties)
+          throw new ForbiddenException(
+            `Alcanzaste el límite de propiedades del plan ${plan.name} (${plan.properties}).`,
+          );
       }
       let row: any;
       if (id) {
@@ -1574,11 +1608,26 @@ export class EstateService {
   async users(u: Actor) {
     admin(u);
     return this.db.query(
-      'SELECT id,email,firstName,lastName,role,isActive,createdAt FROM users ORDER BY createdAt DESC LIMIT 500',
+      "SELECT u.id,u.email,u.firstName,u.lastName,u.role,u.isActive,u.createdAt,COALESCE(m.plan,'free') membership_plan FROM users u LEFT JOIN estate_user_memberships m ON m.user_id=CONVERT(u.id USING utf8mb4) COLLATE utf8mb4_unicode_ci ORDER BY u.createdAt DESC LIMIT 500",
     );
   }
   async updateUser(u: Actor, id: string, b: any) {
     admin(u);
+    if (b.membership_plan !== undefined) {
+      const plan = choice(b.membership_plan, ['free', 'basic', 'pro']);
+      await this.db.transaction(async (tx) => {
+        const [target] = await tx.query(
+          'SELECT id FROM users WHERE id=? FOR UPDATE',
+          [uuid(id)],
+        );
+        if (!target) throw new NotFoundException('Usuario no encontrado.');
+        await tx.query(
+          'INSERT INTO estate_user_memberships(user_id,plan) VALUES (?,?) ON DUPLICATE KEY UPDATE plan=VALUES(plan)',
+          [id, plan],
+        );
+      });
+      return { success: true };
+    }
     if (id === u.id)
       throw new BadRequestException(
         'No puedes suspender ni cambiar tu propio rol desde aquí.',

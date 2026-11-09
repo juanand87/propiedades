@@ -35,6 +35,8 @@ Se puede explorar sin iniciar sesión. Para favoritos, carga y publicación de v
 
 ## Qué probar
 
+El nuevo perfil de videos permite crear primero y vincular opcionalmente después. Incluye galería, siguiendo/seguidores/me gusta, comentarios, guardados, foto y menú Editar/Compartir/Descargar. Ver [PERFIL_DE_VIDEOS.md](../docs/PERFIL_DE_VIDEOS.md) para activación y pruebas. La demo local lo activa automáticamente; producción requiere su migración y `SOCIAL_VIDEOS_ENABLED=true`.
+
 1. **Descubrir:** desliza verticalmente; toca el video para pausar/reanudar; activa o silencia el sonido. Solo se reproduce la tarjeta activa y se pausa al abrir la ficha, cambiar de sección o pasar la app a segundo plano. Mantiene pocos reproductores cercanos al elemento visible y carga el feed de cinco en cinco.
 2. **Ver propiedad:** abre la ficha obtenida desde la API actual, con fotos, precio y anunciante. Las publicaciones ficticias no reciben consultas.
 3. **Propiedades:** recorre el catálogo paginado de la misma instancia local.

@@ -1,8 +1,8 @@
 {
   "expo": {
-    "name": "Propiedades · Local",
-    "slug": "propiedades-local",
-    "version": "1.0.0",
+    "name": "Proppix",
+    "slug": "proppix",
+    "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
@@ -11,13 +11,16 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundImage": "./assets/android-icon-background.png",
-        "monochromeImage": "./assets/android-icon-monochrome.png"
+        "backgroundColor": "#06272d",
+        "foregroundImage": "./assets/android-icon-foreground.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "cl.propiedades.local"
+      "package": "cl.proppix.app",
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.CAMERA"
+      ],
+      "versionCode": 2
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -43,6 +46,16 @@
         }
       ]
     ],
-    "scheme": "propiedades-local"
+    "scheme": "proppix",
+    "extra": {
+      "router": {
+        "asyncRoutes": {
+          "web": true
+        }
+      },
+      "eas": {
+        "projectId": "99edd5e4-9757-4012-b924-16cb6f56f84b"
+      }
+    }
   }
 }

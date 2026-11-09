@@ -5,6 +5,7 @@ import {
   ConflictException,
   ServiceUnavailableException,
   UnauthorizedException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
@@ -27,8 +28,10 @@ import {
 import { EstateService } from './estate.service';
 import { VideoStorageService } from './video-storage.service';
 
-const visible = `v.status='published' AND p.publication_status='published' AND a.status='approved' AND u.isActive=1`;
-const joined = `FROM property_videos v JOIN properties p ON p.id=v.property_id JOIN advertisers a ON a.id=p.advertiser_id JOIN users u ON CONVERT(u.id USING utf8mb4) COLLATE utf8mb4_unicode_ci=a.user_id`;
+export const videoVisible = `v.status='published' AND creator.isActive=1 AND (v.property_id IS NULL OR (p.publication_status='published' AND a.status='approved' AND u.isActive=1))`;
+export const videoJoined = `FROM property_videos v JOIN users creator ON CONVERT(creator.id USING utf8mb4) COLLATE utf8mb4_unicode_ci=v.created_by LEFT JOIN properties p ON p.id=v.property_id LEFT JOIN advertisers a ON a.id=p.advertiser_id LEFT JOIN users u ON CONVERT(u.id USING utf8mb4) COLLATE utf8mb4_unicode_ci=a.user_id`;
+const visible = videoVisible,
+  joined = videoJoined;
 @Injectable()
 export class PropertyVideosService {
   private folder = resolve(__dirname, '../../..', 'tmp/mobile-videos');
@@ -75,6 +78,7 @@ export class PropertyVideosService {
         enabled: true,
         storage: this.storage.enabled ? 'spaces' : 'local',
         version: 1,
+        social: this.config.get('SOCIAL_VIDEOS_ENABLED') === 'true',
       };
     } catch {
       return { enabled: false, storage: 'disabled', version: 1 };
@@ -86,14 +90,18 @@ export class PropertyVideosService {
     const limit = 5;
     const type =
       typeof q.type_id === 'string' && q.type_id.length <= 30 ? q.type_id : '';
-    const filter = type ? ' AND p.type_id=?' : '',
-      params = type ? [type] : [];
+    const videoId = q.video_id ? uuid(q.video_id) : null;
+    const filter =
+        (type ? ' AND p.type_id=?' : '') +
+        (q.linked_only === 'true' ? ' AND v.property_id IS NOT NULL' : '') +
+        (videoId ? ' AND v.id=?' : ''),
+      params = [...(type ? [type] : []), ...(videoId ? [videoId] : [])];
     const [count] = await this.db.query(
       `SELECT COUNT(*) total ${joined} WHERE ${visible}${filter}`,
       params,
     );
     const rows = await this.db.query(
-      `SELECT v.id,v.property_id,v.title,v.size_bytes,r.duration_ms,r.capture_seconds ${joined} LEFT JOIN property_video_recordings r ON r.video_id=v.id WHERE ${visible}${filter} ORDER BY v.created_at DESC,v.id LIMIT ? OFFSET ?`,
+      `SELECT v.id,v.property_id,v.title,v.size_bytes,creator.id creator_id,creator.firstName creator_name,r.duration_ms,r.capture_seconds ${joined} LEFT JOIN property_video_recordings r ON r.video_id=v.id WHERE ${visible}${filter} ORDER BY v.created_at DESC,v.id LIMIT ? OFFSET ?`,
       [...params, limit, (page - 1) * limit],
     );
     return {
@@ -101,7 +109,8 @@ export class PropertyVideosService {
         rows.map(async (v: any) => ({
           ...v,
           url: `/api/videos/${v.id}/content`,
-          property: await this.estate.get(v.property_id),
+          creator: { id: v.creator_id, display_name: v.creator_name },
+          property: v.property_id ? await this.estate.get(v.property_id) : null,
         })),
       ),
       total: Number(count.total),
@@ -119,12 +128,18 @@ export class PropertyVideosService {
   }
   private async managedVideo(actor: Actor, id: string) {
     const [v] = await this.db.query(
-      `SELECT v.id,v.size_bytes,p.advertiser_id ${joined} WHERE v.id=? AND v.status<>'archived'`,
+      `SELECT v.id,v.size_bytes,v.created_by,p.advertiser_id ${joined} WHERE v.id=? AND v.status<>'archived'`,
       [uuid(id)],
     );
     if (!v) throw new NotFoundException('Video no encontrado.');
-    ownership(actor, v.advertiser_id);
+    this.videoOwnership(actor, v);
     return v;
+  }
+  private videoOwnership(actor: Actor, video: any) {
+    if (video.created_by === actor.id || actor.role === 'admin') return;
+    if (!video.advertiser_id)
+      throw new ForbiddenException('Este video no te pertenece.');
+    ownership(actor, video.advertiser_id);
   }
   async preview(actor: Actor, id: string) {
     this.guard();
@@ -159,9 +174,13 @@ export class PropertyVideosService {
     const v = await this.managedVideo(actor, id);
     return this.serveContent(id, v.size_bytes, range, res);
   }
-  async upload(actor: Actor, id: string, body: any, file: any) {
+  async upload(actor: Actor, id: string | null, body: any, file: any) {
     this.guard();
-    await this.estate.get(uuid(id), actor);
+    if (id) await this.estate.get(uuid(id), actor);
+    else if (this.config.get('SOCIAL_VIDEOS_ENABLED') !== 'true')
+      throw new ServiceUnavailableException(
+        'Los videos independientes todavía no están habilitados.',
+      );
     validateMp4(file);
     if (this.storage.enabled)
       await this.db.query(
@@ -228,12 +247,17 @@ export class PropertyVideosService {
         await this.storage.put(key, file.buffer);
       }
       await this.db.transaction(async (tx) => {
-        const [p] = await tx.query(
-          'SELECT p.advertiser_id,p.publication_status,a.status,u.isActive FROM properties p JOIN advertisers a ON a.id=p.advertiser_id JOIN users u ON CONVERT(u.id USING utf8mb4) COLLATE utf8mb4_unicode_ci=a.user_id WHERE p.id=? FOR UPDATE',
-          [id],
-        );
-        if (!p) throw new NotFoundException('Propiedad no encontrada.');
-        ownership(actor, p.advertiser_id);
+        const [p] = id
+          ? await tx.query(
+              'SELECT p.advertiser_id,p.publication_status,a.status,u.isActive FROM properties p JOIN advertisers a ON a.id=p.advertiser_id JOIN users u ON CONVERT(u.id USING utf8mb4) COLLATE utf8mb4_unicode_ci=a.user_id WHERE p.id=? FOR UPDATE',
+              [id],
+            )
+          : [null];
+        if (id && !p) throw new NotFoundException('Propiedad no encontrada.');
+        if (p) ownership(actor, p.advertiser_id);
+        await tx.query('SELECT id FROM users WHERE id=? FOR UPDATE', [
+          actor.id,
+        ]);
         if (requestId) {
           const [receipt] = await tx.query(
             'SELECT v.id,v.property_id,v.title,v.status,v.created_by,r.content_digest,r.duration_ms FROM property_video_recordings r JOIN property_videos v ON v.id=r.video_id WHERE r.request_id=? FOR UPDATE',
@@ -260,6 +284,7 @@ export class PropertyVideosService {
         }
         if (
           publish &&
+          p &&
           (p.publication_status !== 'published' ||
             p.status !== 'approved' ||
             !Number(p.isActive))
@@ -267,14 +292,19 @@ export class PropertyVideosService {
           throw new BadRequestException(
             'Publica primero la propiedad con un anunciante aprobado y activo.',
           );
-        const [count] = await tx.query(
-          "SELECT COUNT(*) n FROM property_videos WHERE property_id=? AND status<>'archived'",
-          [id],
-        );
-        if (Number(count.n) >= 4)
-          throw new ConflictException(
-            'Cada propiedad admite hasta cuatro videos activos.',
-          );
+        if (actor.role !== 'admin') {
+          const plan = await this.estate.membership(actor.id, tx);
+          if (plan.videos !== null) {
+            const [used] = await tx.query(
+              "SELECT COUNT(*) n FROM property_videos WHERE created_by=? AND status<>'archived'",
+              [actor.id],
+            );
+            if (Number(used.n) >= plan.videos)
+              throw new ConflictException(
+                `Alcanzaste el límite de ${plan.videos} videos del plan ${plan.name}. Elimina uno para subir otro.`,
+              );
+          }
+        }
         await tx.query(
           'INSERT INTO property_videos(id,property_id,created_by,title,size_bytes,status) VALUES (?,?,?,?,?,?)',
           [
@@ -353,13 +383,13 @@ export class PropertyVideosService {
       );
       if (!v || v.status === 'archived')
         throw new NotFoundException('Video no encontrado.');
-      ownership(actor, v.advertiser_id);
+      this.videoOwnership(actor, v);
       const title = body.title === undefined ? v.title : videoTitle(body.title);
       const status =
         body.status === undefined
           ? v.status
           : choice(body.status, ['draft', 'published', 'archived']);
-      if (status === 'published') {
+      if (status === 'published' && v.property_id) {
         const [p] = await tx.query(
           'SELECT p.publication_status,a.status,u.isActive FROM properties p JOIN advertisers a ON a.id=p.advertiser_id JOIN users u ON CONVERT(u.id USING utf8mb4) COLLATE utf8mb4_unicode_ci=a.user_id WHERE p.id=? FOR UPDATE',
           [v.property_id],

@@ -94,7 +94,7 @@ function FeedCard({
         </div>
       )}
       <div className="feed-actions">
-        <FavoriteButton id={p.property_id || p.id} />
+        {!p.is_standalone && <FavoriteButton id={p.property_id || p.id} />}
         <button
           type="button"
           aria-label={`Compartir ${p.title}`}
@@ -107,37 +107,43 @@ function FeedCard({
         <span className="feed-location">
           {[p.commune_name, p.region_name].filter(Boolean).join(" · ")}
         </span>
-        <strong className="feed-price">
-          {price(p.price_amount, p.price_unit)}
-        </strong>
+        {!p.is_standalone && (
+          <strong className="feed-price">
+            {price(p.price_amount, p.price_unit)}
+          </strong>
+        )}
         <h2>{p.title}</h2>
-        <div className="feed-metrics">
-          {p.bedrooms != null && (
+        {!p.is_standalone && (
+          <div className="feed-metrics">
+            {p.bedrooms != null && (
+              <span>
+                <BedDouble size={17} />
+                {p.bedrooms} dorm.
+              </span>
+            )}
+            {p.bathrooms != null && (
+              <span>
+                <Bath size={17} />
+                {p.bathrooms} baños
+              </span>
+            )}
             <span>
-              <BedDouble size={17} />
-              {p.bedrooms} dorm.
+              <Maximize2 size={17} />
+              {Number(p.built_area || p.land_area || 0).toLocaleString(
+                "es-CL",
+              )}{" "}
+              m²
             </span>
-          )}
-          {p.bathrooms != null && (
-            <span>
-              <Bath size={17} />
-              {p.bathrooms} baños
-            </span>
-          )}
-          <span>
-            <Maximize2 size={17} />
-            {Number(p.built_area || p.land_area || 0).toLocaleString(
-              "es-CL",
-            )}{" "}
-            m²
-          </span>
-        </div>
+          </div>
+        )}
         <p>{p.advertiser?.name}</p>
         {p._video && <p>{p._video.title}</p>}
-        <Link className="feed-detail" href={`/propiedades/${p.slug}`}>
-          {p.is_demo ? "Ver ficha de ejemplo" : "Ver detalles y consultar"}
-          <ArrowUpRight size={18} />
-        </Link>
+        {!p.is_standalone && (
+          <Link className="feed-detail" href={`/propiedades/${p.slug}`}>
+            {p.is_demo ? "Ver ficha de ejemplo" : "Ver detalles y consultar"}
+            <ArrowUpRight size={18} />
+          </Link>
+        )}
         {p.is_demo && (
           <small>Publicación ilustrativa, no es una oferta real.</small>
         )}
@@ -241,7 +247,14 @@ export function PropertyFeed() {
     let current = true;
     void request("/videos/capabilities")
       .then((r) => {
-        if (current) setVideosEnabled(r.enabled === true);
+        if (current) {
+          setVideosEnabled(r.enabled === true);
+          if (
+            r.enabled &&
+            new URLSearchParams(window.location.search).has("video")
+          )
+            setMode("videos");
+        }
       })
       .catch(() => {});
     return () => {
@@ -257,11 +270,16 @@ export function PropertyFeed() {
       setError("");
       try {
         const r = await request(
-          `${mode === "videos" ? "/videos" : "/properties?limit=6&sort=recent"}${mode === "videos" ? "?" : "&"}page=${next}${type ? `&type_id=${encodeURIComponent(type)}` : ""}`,
+          `${mode === "videos" ? "/videos" : "/properties?limit=6&sort=recent"}${mode === "videos" ? "?" : "&"}page=${next}${type ? `&type_id=${encodeURIComponent(type)}` : ""}${mode === "videos" && new URLSearchParams(window.location.search).get("video") ? "&video_id=" + encodeURIComponent(new URLSearchParams(window.location.search).get("video")!) : ""}`,
         );
         if (mode === "videos")
           r.items = r.items.map((v: any) => ({
-            ...v.property,
+            ...(v.property || {
+              title: v.title,
+              media: [],
+              is_standalone: true,
+              advertiser: { name: v.creator?.display_name || "Propiedades" },
+            }),
             id: v.id,
             property_id: v.property_id,
             _video: v,
@@ -354,7 +372,10 @@ export function PropertyFeed() {
       void load(page + 1).then(() => requestAnimationFrame(scroll));
   }
   async function share(p: any) {
-    const url = new URL(`/propiedades/${p.slug}`, location.origin).href;
+    const url = new URL(
+      p._video ? `/descubrir?video=${p._video.id}` : `/propiedades/${p.slug}`,
+      location.origin,
+    ).href;
     try {
       if (navigator.share) await navigator.share({ title: p.title, url });
       else {

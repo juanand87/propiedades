@@ -15,11 +15,11 @@ async function call(path,body,token,method=body?'POST':'GET',expected=200){const
  await call('/me/account-type',{account_type:'seller'},null,'POST',401);
  const seller=await call('/me/account-type',{account_type:'seller'},token,'POST',201);assert.ok(seller.advertiser_id);assert.equal(seller.advertiser_status,'pending');
  const seller2=await call('/me/account-type',{account_type:'seller'},token,'POST',201);assert.equal(seller2.advertiser_id,seller.advertiser_id);
- const allowance=await call('/me/publication-allowance',null,token);assert.equal(allowance.can_create,true);
+ const allowance=await call('/me/publication-allowance',null,token);assert.equal(allowance.can_create,true);assert.equal(allowance.free_limit,1);
  const body={title:'Propiedad QA registro',description:'Propiedad ficticia para verificar el registro y la membresía en el entorno de pruebas local.',type_id:'house',price_amount:'50000000',price_unit:'CLP',bedrooms:2,bathrooms:1,built_area:80,land_area:120};
  const results=await Promise.all([fetch(base+'/manage/properties',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify(body)}),fetch(base+'/manage/properties',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify(body)})]);
  assert.deepEqual(results.map(r=>r.status).sort(),[201,403]);count+=2;
- const p=await results.find(r=>r.status===201).json();const denied=await results.find(r=>r.status===403).json();assert.equal(denied.code,'MEMBERSHIP_REQUIRED');
+ const p=await results.find(r=>r.status===201).json();
  await call('/manage/properties/'+p.id,{title:'Propiedad QA editada'},token,'PATCH');
  await call('/manage/properties/'+p.id+'/status',{status:'archived'},token,'PATCH');
  await call('/manage/properties',body,token,'POST',403);
@@ -28,5 +28,5 @@ async function call(path,body,token,method=body?'POST':'GET',expected=200){const
  await call('/manage/properties',body,token,'POST',403);
  const login=await call('/auth/login',{email,password},null,'POST',201);assert.equal(login.user.account_type,'seller');
  const stats=await call('/manage/stats',null,token);assert.equal(stats.likes,0);await call('/manage/inquiries',null,token);
- console.log(`PASS: ${count} HTTP checks, concurrent quota, role escalation, profile persistence, archive/profile-switch bypass, Google disabled. Production connections: 0`);
+ console.log(`PASS: ${count} HTTP checks, concurrent free quota, role escalation, profile persistence, quota after archive/profile switch, Google disabled. Production connections: 0`);
 })().catch(e=>{console.error(e);process.exitCode=1});

@@ -1472,6 +1472,7 @@ function UserAdmin() {
               <th>Nombre</th>
               <th>Correo</th>
               <th>Rol</th>
+              <th>Membresía</th>
               <th>Cuenta</th>
             </tr>
           </thead>
@@ -1505,6 +1506,35 @@ function UserAdmin() {
                         {labels[s]}
                       </option>
                     ))}
+                  </select>
+                </td>
+                <td>
+                  <select
+                    aria-label={`Membresía de ${u.email}`}
+                    value={u.membership_plan}
+                    onChange={async (e) => {
+                      setFailure("");
+                      try {
+                        await send(
+                          "/admin/users/" + u.id,
+                          { membership_plan: e.target.value },
+                          "PATCH",
+                        );
+                        reload();
+                      } catch (e) {
+                        setFailure((e as Error).message);
+                      }
+                    }}
+                  >
+                    <option value="free">
+                      Gratis · 1 propiedad · 10 videos
+                    </option>
+                    <option value="basic">
+                      Básico · 10 propiedades · videos ilimitados
+                    </option>
+                    <option value="pro">
+                      Pro · 50 propiedades · videos ilimitados
+                    </option>
                   </select>
                 </td>
                 <td>

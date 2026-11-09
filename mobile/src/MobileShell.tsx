@@ -47,10 +47,12 @@ import {
   Video,
 } from "./api";
 import { ScreenContext } from "./screen-context";
+import { videoColors } from "./video-colors";
 import { VideoCard } from "./VideoCard";
 import { VideoRecorder } from "./VideoRecorder";
 import { SellerPanel } from "./SellerPanel";
 import { ContactProperty } from "./ContactProperty";
+import { VideoProfile } from "./VideoProfile";
 
 type Tab = "feed" | "catalog" | "manage" | "account";
 const sessionKey = IS_PRODUCTION
@@ -80,7 +82,7 @@ function Button({
         disabled && { opacity: 0.45 },
       ]}
     >
-      <Text style={[s.buttonLabel, secondary && { color: "#d5efdf" }]}>
+      <Text style={[s.buttonLabel, secondary && { color: videoColors.text }]}>
         {label}
       </Text>
     </Pressable>
@@ -98,15 +100,20 @@ function AppContent() {
     };
   const propertyRoute = pathname.startsWith("/property/");
   const recordingRoute = pathname === "/grabar";
-  const { propertyId, from } = useGlobalSearchParams<{
-    propertyId?: string;
-    from?: Tab;
-  }>();
+  const profileRoute = pathname.startsWith("/perfil/");
+  const { propertyId, from, userId, videoId, propertyMode } =
+    useGlobalSearchParams<{
+      propertyId?: string;
+      from?: Tab;
+      userId?: string;
+      videoId?: string;
+      propertyMode?: "new" | "link";
+    }>();
   const tab: Tab = propertyRoute
     ? from && from in routes
       ? from
       : "feed"
-    : recordingRoute
+    : recordingRoute || profileRoute
       ? "manage"
       : pathname === "/propiedades"
         ? "catalog"
@@ -118,6 +125,13 @@ function AppContent() {
   const [ready, setReady] = useState(false),
     [error, setError] = useState(""),
     [booting, setBooting] = useState(false);
+  const [socialEnabled, setSocialEnabled] = useState(false);
+  useEffect(() => {
+    if (ready)
+      void api<{ social?: boolean }>("/videos/capabilities")
+        .then((c) => setSocialEnabled(c.social === true))
+        .catch(() => setSocialEnabled(false));
+  }, [ready]);
   const [session, setSession] = useState<Session | null>(null),
     [favorites, setFavorites] = useState<string[]>([]),
     [detail, setDetail] = useState<Property | null>(null),
@@ -302,7 +316,7 @@ function AppContent() {
       Alert.alert(
         "Guarda tus favoritos",
         IS_PRODUCTION
-          ? "Inicia sesión con tu cuenta de Propiedades."
+          ? "Inicia sesión con tu cuenta de Proppix."
           : "Inicia sesión con una cuenta local de pruebas.",
       );
       return;
@@ -588,7 +602,11 @@ function AppContent() {
   const tabs: { key: Tab; label: string; icon: string }[] = [
     { key: "feed", label: "Descubrir", icon: "▶" },
     { key: "catalog", label: "Propiedades", icon: "⌂" },
-    { key: "manage", label: "Mis videos", icon: "＋" },
+    {
+      key: "manage",
+      label: socialEnabled ? "Perfil" : "Mis videos",
+      icon: socialEnabled ? "○" : "＋",
+    },
     { key: "account", label: "Cuenta", icon: "○" },
   ];
   if (!ready)
@@ -599,12 +617,12 @@ function AppContent() {
           <Text style={s.hero}>Tu próximo lugar,{`\n`}en movimiento.</Text>
           <Text style={s.muted}>
             {IS_PRODUCTION
-              ? "Conectando con Propiedades…"
+              ? "Conectando con Proppix…"
               : "Conectando con el backend NestJS local. Sin conexión a producción."}
           </Text>
           <Text style={s.code}>{API_URL}</Text>
           {booting ? (
-            <ActivityIndicator color="#d0f5a8" />
+            <ActivityIndicator color={videoColors.cyan} />
           ) : (
             <>
               <Text style={s.error}>{error}</Text>
@@ -619,132 +637,99 @@ function AppContent() {
       style={s.feed}
       onLayout={(e) => setHeight(e.nativeEvent.layout.height)}
     >
-      {height > 1 && videos.length === 0 && catalog.length > 0 ? (
+      {height > 1 && (
         <FlatList
-          data={catalog}
-          keyExtractor={(p) => p.id}
+          ref={feedRef}
+          data={videos}
+          keyExtractor={(v) => v.id}
           pagingEnabled
           snapToInterval={height}
           decelerationRate="fast"
-          onEndReached={() => {
-            if (catalogPage < catalogPages) void loadCatalog(false);
+          showsVerticalScrollIndicator={false}
+          getItemLayout={(_, i) => ({
+            length: height,
+            offset: height * i,
+            index: i,
+          })}
+          initialNumToRender={2}
+          maxToRenderPerBatch={2}
+          windowSize={3}
+          extraData={`${active}-${muted}-${foreground}-${!!detail}-${favorites.join(",")}`}
+          onMomentumScrollEnd={(e) =>
+            setActive(Math.round(e.nativeEvent.contentOffset.y / height))
+          }
+          onScroll={(e) => {
+            const i = Math.round(e.nativeEvent.contentOffset.y / height);
+            setActive(i);
           }}
-          renderItem={({ item: p }) => (
-            <View style={{ height, justifyContent: "flex-end", padding: 20 }}>
-              {p.media[0] && (
-                <Image
-                  source={{ uri: mediaUrl(p.media[0].url) }}
-                  style={StyleSheet.absoluteFill}
-                  resizeMode="cover"
-                />
-              )}
-              <View
-                style={{
-                  backgroundColor: "rgba(0,25,30,.88)",
-                  padding: 18,
-                  borderRadius: 18,
-                  gap: 10,
-                }}
-              >
-                <Text style={s.h1}>{p.title}</Text>
-                <Text style={s.accent}>{price(p)}</Text>
-                <Text style={s.muted}>{p.commune_name}</Text>
-                <Button
-                  label="Ver propiedad"
-                  onPress={() => void openDetail(p)}
-                />
-              </View>
-            </View>
+          scrollEventThrottle={100}
+          onEndReached={() => void loadFeed()}
+          onEndReachedThreshold={1.5}
+          refreshControl={
+            <RefreshControl
+              refreshing={loading && page > 0}
+              onRefresh={() => void loadFeed(true)}
+              tintColor={videoColors.cyan}
+            />
+          }
+          renderItem={({ item, index }) => (
+            <VideoCard
+              item={item}
+              height={height}
+              active={index === active && foreground && !detail}
+              nearby={Math.abs(index - active) <= 1}
+              muted={muted}
+              social={socialEnabled}
+              session={session}
+              favorite={favorites.includes(item.property_id || "")}
+              onMute={() => setMuted((v) => !v)}
+              onFavorite={() => {
+                if (item.property_id) void favorite(item.property_id);
+              }}
+              onDetails={() => {
+                if (item.property) void openDetail(item.property);
+              }}
+              onShare={() => {
+                if (item.property) void share(item.property);
+              }}
+            />
           )}
-        />
-      ) : (
-        height > 1 && (
-          <FlatList
-            ref={feedRef}
-            data={videos}
-            keyExtractor={(v) => v.id}
-            pagingEnabled
-            snapToInterval={height}
-            decelerationRate="fast"
-            showsVerticalScrollIndicator={false}
-            getItemLayout={(_, i) => ({
-              length: height,
-              offset: height * i,
-              index: i,
-            })}
-            initialNumToRender={2}
-            maxToRenderPerBatch={2}
-            windowSize={3}
-            extraData={`${active}-${muted}-${foreground}-${!!detail}-${favorites.join(",")}`}
-            onMomentumScrollEnd={(e) =>
-              setActive(Math.round(e.nativeEvent.contentOffset.y / height))
-            }
-            onScroll={(e) => {
-              const i = Math.round(e.nativeEvent.contentOffset.y / height);
-              setActive(i);
-            }}
-            scrollEventThrottle={100}
-            onEndReached={() => void loadFeed()}
-            onEndReachedThreshold={1.5}
-            refreshControl={
-              <RefreshControl
-                refreshing={loading && page > 0}
-                onRefresh={() => void loadFeed(true)}
-                tintColor="#d0f5a8"
-              />
-            }
-            renderItem={({ item, index }) => (
-              <VideoCard
-                item={item}
-                height={height}
-                active={index === active && foreground && !detail}
-                nearby={Math.abs(index - active) <= 1}
-                muted={muted}
-                favorite={favorites.includes(item.property_id)}
-                onMute={() => setMuted((v) => !v)}
-                onFavorite={() => void favorite(item.property_id)}
-                onDetails={() => void openDetail(item.property)}
-                onShare={() => void share(item.property)}
-              />
-            )}
-            ListEmptyComponent={
-              <View style={[s.empty, { height }]}>
-                {loading ? (
-                  <ActivityIndicator color="#d0f5a8" />
-                ) : (
-                  <>
-                    <Text style={s.h2}>Tu próximo recorrido empieza aquí</Text>
-                    <Text style={s.muted}>
-                      {feedError ||
-                        "Todavía no hay videos publicados. Instala los ejemplos locales o sube un MP4 en Mis videos."}
-                    </Text>
-                    <Button
-                      label={feedError ? "Reintentar" : "Ver propiedades"}
-                      onPress={() =>
-                        feedError ? void loadFeed(true) : setTab("catalog")
-                      }
-                    />
-                  </>
-                )}
-              </View>
-            }
-            ListFooterComponent={
-              videos.length > 0 ? (
-                feedError ? (
-                  <View style={s.pad}>
-                    <Text style={s.error}>{feedError}</Text>
-                    <Button
-                      label="Reintentar carga"
-                      onPress={() => void loadFeed()}
-                    />
-                  </View>
-                ) : loading ? (
-                  <ActivityIndicator color="#d0f5a8" style={s.pad} />
-                ) : undefined
+          ListEmptyComponent={
+            <View style={[s.empty, { height }]}>
+              {loading ? (
+                <ActivityIndicator color={videoColors.cyan} />
+              ) : (
+                <>
+                  <Text style={s.h2}>Videos de propiedades</Text>
+                  <Text style={s.muted}>
+                    {feedError || "Todavía no hay videos publicados."}
+                  </Text>
+                  <Button
+                    label={feedError ? "Reintentar" : "Ver propiedades"}
+                    onPress={() =>
+                      feedError ? void loadFeed(true) : setTab("catalog")
+                    }
+                  />
+                </>
+              )}
+            </View>
+          }
+          ListFooterComponent={
+            videos.length > 0 ? (
+              feedError ? (
+                <View style={s.pad}>
+                  <Text style={s.error}>{feedError}</Text>
+                  <Button
+                    label="Reintentar carga"
+                    onPress={() => void loadFeed()}
+                  />
+                </View>
+              ) : loading ? (
+                <ActivityIndicator color={videoColors.cyan} style={s.pad} />
               ) : undefined
-            }
-          />
-        )
+            ) : undefined
+          }
+        />
       )}
     </View>
   );
@@ -815,7 +800,7 @@ function AppContent() {
                   : "¿Qué quieres hacer?"}
               </Text>
               <Text style={s.muted}>
-                Compra, guarda favoritos o publica tu primera propiedad gratis.
+                Compra, guarda favoritos o publica propiedades gratis.
               </Text>
               <Button
                 label="Soy comprador · Ver propiedades"
@@ -874,7 +859,7 @@ function AppContent() {
           )}
           <Text style={s.muted}>
             {IS_PRODUCTION
-              ? "Usa tu correo y contraseña de Propiedades."
+              ? "Usa tu correo y contraseña de Proppix."
               : "Usa la cuenta generada en tmp/mobile-local/credentials.json. Solo funciona en este entorno de pruebas."}
           </Text>
           <Text style={s.label}>Correo</Text>
@@ -1028,12 +1013,12 @@ function AppContent() {
               />
               <Text style={s.h2}>{selected.title}</Text>
               <Text style={s.muted}>
-                Máximo 4 videos activos por propiedad. MP4/H.264, hasta 50 MB.
-                La publicación se oculta si se pausa la propiedad.
+                MP4/H.264, hasta 50 MB. El cupo depende de tu plan. La
+                publicación se oculta si se pausa la propiedad.
               </Text>
               <Button
                 label="Grabar video · 15, 30 o 45 s"
-                disabled={manageBusy || managed.length >= 4}
+                disabled={manageBusy}
                 onPress={() =>
                   router.push({
                     pathname: "/grabar",
@@ -1061,7 +1046,7 @@ function AppContent() {
                 onChangeText={setTitle}
                 maxLength={160}
                 placeholder="Una casa para comenzar otra historia"
-                placeholderTextColor="#78978a"
+                placeholderTextColor={videoColors.muted}
               />
               <Button
                 label={
@@ -1069,9 +1054,7 @@ function AppContent() {
                     ? "Guardando, espera…"
                     : "Vincular video como borrador"
                 }
-                disabled={
-                  manageBusy || !asset || !title.trim() || managed.length >= 4
-                }
+                disabled={manageBusy || !asset || !title.trim()}
                 onPress={() => void upload()}
               />
               <Text style={[s.h2, { marginTop: 24 }]}>
@@ -1118,7 +1101,7 @@ function AppContent() {
               ))}
             </>
           )}
-          {manageBusy && <ActivityIndicator color="#d0f5a8" />}
+          {manageBusy && <ActivityIndicator color={videoColors.cyan} />}
         </>
       )}
       <View style={{ height: 40 }} />
@@ -1130,7 +1113,28 @@ function AppContent() {
         feed: feedScreen,
         catalog: catalogScreen,
         account: accountScreen,
-        manage: manageScreen,
+        manage: socialEnabled ? (
+          <VideoProfile
+            key={videoId ? videoId + ":" + propertyMode : "profile"}
+            pendingVideoId={videoId}
+            propertyMode={propertyMode}
+            propertyFavorite={{ ids: favorites, toggle: favorite }}
+            session={session}
+            onPropertiesChanged={() => {
+              void loadMine();
+              void loadFeed(true);
+            }}
+          />
+        ) : (
+          manageScreen
+        ),
+        videoProfile: (
+          <VideoProfile
+            session={session}
+            userId={userId}
+            propertyFavorite={{ ids: favorites, toggle: favorite }}
+          />
+        ),
         active: tab,
         recorder: recordingRoute ? (
           <VideoRecorder
@@ -1152,8 +1156,24 @@ function AppContent() {
         {!recordingRoute && (
           <View style={s.header}>
             <View>
+              <Image
+                source={require("../assets/icon.png")}
+                style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: 9,
+                  marginBottom: 4,
+                }}
+              />
               <Text style={s.brand}>
-                propiedades<Text style={{ color: "#d0f5a8" }}>.</Text>
+                proppix
+                <Text
+                  style={{
+                    color: videoColors.pink,
+                  }}
+                >
+                  .
+                </Text>
               </Text>
               <Text style={s.headerSub}>
                 Descubre un lugar para tu próxima historia
@@ -1166,6 +1186,17 @@ function AppContent() {
 
         {!recordingRoute && (
           <View style={s.nav}>
+            {socialEnabled && (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Crear video sin propiedad"
+                onPress={() => router.push("/grabar")}
+                style={s.navItem}
+              >
+                <Text style={[s.navIcon, s.active, s.videoCreate]}>＋</Text>
+                <Text style={s.navLabel}>Crear</Text>
+              </Pressable>
+            )}
             {tabs.map((t) => (
               <Pressable
                 accessibilityRole="tab"
@@ -1198,7 +1229,7 @@ function AppContent() {
               />
               {detail && (
                 <>
-                  {detailBusy && <ActivityIndicator color="#d0f5a8" />}
+                  {detailBusy && <ActivityIndicator color={videoColors.cyan} />}
                   {detail.media.map((m) => (
                     <Image
                       key={m.id}
@@ -1275,7 +1306,7 @@ export default function App() {
   );
 }
 const s = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#0b1e21" },
+  safe: { flex: 1, backgroundColor: videoColors.background },
   header: {
     height: 68,
     paddingHorizontal: 22,
@@ -1283,73 +1314,89 @@ const s = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     borderBottomWidth: 1,
-    borderColor: "#284043",
+    borderColor: videoColors.border,
   },
   brand: { fontSize: 24, fontWeight: "800", color: "#fff", letterSpacing: -1 },
-  headerSub: { fontSize: 9, color: "#9eb9af", marginTop: 3 },
+  headerSub: { fontSize: 9, color: videoColors.muted, marginTop: 3 },
   local: {
     fontSize: 10,
     letterSpacing: 2,
-    color: "#c8efaf",
+    color: videoColors.cyan,
     borderWidth: 1,
-    borderColor: "#44604c",
+    borderColor: videoColors.border,
     borderRadius: 6,
     padding: 7,
   },
-  feed: { flex: 1 },
+  feed: { flex: 1, backgroundColor: videoColors.background },
+  videoCreate: { color: videoColors.cyan },
   content: { flex: 1, padding: 22 },
   welcome: { flex: 1, justifyContent: "center", padding: 28, gap: 20 },
   hero: {
     fontSize: 39,
     fontWeight: "800",
-    color: "#f0f6eb",
+    color: videoColors.text,
     letterSpacing: -1,
   },
   eyebrow: {
     fontSize: 10,
     fontWeight: "700",
     letterSpacing: 2,
-    color: "#b7d99f",
+    color: videoColors.cyan,
     marginTop: 10,
     marginBottom: 12,
   },
   h1: {
     fontSize: 31,
     fontWeight: "800",
-    color: "#f2f6ee",
+    color: videoColors.text,
     marginBottom: 20,
     letterSpacing: -1,
   },
-  h2: { fontSize: 17, fontWeight: "700", color: "#f1f7ef", marginBottom: 8 },
-  muted: { fontSize: 14, color: "#a9c0b7", lineHeight: 23, marginBottom: 12 },
-  code: { fontSize: 11, color: "#81a796", marginVertical: 12 },
+  h2: {
+    fontSize: 17,
+    fontWeight: "700",
+    color: videoColors.text,
+    marginBottom: 8,
+  },
+  muted: {
+    fontSize: 14,
+    color: videoColors.muted,
+    lineHeight: 23,
+    marginBottom: 12,
+  },
+  code: { fontSize: 11, color: videoColors.muted, marginVertical: 12 },
   button: {
     padding: 16,
     borderRadius: 14,
-    backgroundColor: "#d0f5a8",
+    backgroundColor: videoColors.cyan,
     alignItems: "center",
     marginVertical: 8,
   },
   secondary: {
-    backgroundColor: "#183739",
+    backgroundColor: videoColors.surface,
     borderWidth: 1,
-    borderColor: "#335451",
+    borderColor: videoColors.border,
   },
-  buttonLabel: { fontWeight: "800", color: "#173427" },
-  label: { fontSize: 13, color: "#c7ddd2", marginTop: 16, marginBottom: 8 },
+  buttonLabel: { fontWeight: "800", color: "#111111" },
+  label: {
+    fontSize: 13,
+    color: videoColors.text,
+    marginTop: 16,
+    marginBottom: 8,
+  },
   input: {
     borderWidth: 1,
-    borderColor: "#385751",
+    borderColor: videoColors.border,
     borderRadius: 12,
     padding: 15,
     color: "#fff",
-    backgroundColor: "#142e30",
+    backgroundColor: videoColors.surface,
     fontSize: 15,
   },
   error: { color: "#ffc7b9", lineHeight: 23, paddingVertical: 10 },
   info: {
     padding: 20,
-    backgroundColor: "#163330",
+    backgroundColor: videoColors.surface,
     borderRadius: 18,
     marginVertical: 24,
   },
@@ -1358,36 +1405,40 @@ const s = StyleSheet.create({
     flexDirection: "row",
     height: 66,
     borderTopWidth: 1,
-    borderColor: "#284043",
+    borderColor: videoColors.border,
   },
   navItem: { flex: 1, justifyContent: "center", alignItems: "center", gap: 3 },
-  navIcon: { color: "#7b9a91", fontSize: 23 },
-  navLabel: { fontSize: 10, color: "#9ab4a9" },
-  active: { color: "#d0f5a8" },
+  navIcon: { color: videoColors.muted, fontSize: 23 },
+  navLabel: { fontSize: 10, color: videoColors.muted },
+  active: { color: videoColors.text },
   propertyCard: {
     borderRadius: 20,
     overflow: "hidden",
-    backgroundColor: "#193438",
+    backgroundColor: videoColors.surface,
     marginBottom: 20,
   },
-  propertyImage: { height: 220, width: "100%", backgroundColor: "#264746" },
+  propertyImage: {
+    height: 220,
+    width: "100%",
+    backgroundColor: videoColors.surface,
+  },
   pad: { padding: 18 },
   accent: {
     fontSize: 24,
     fontWeight: "800",
-    color: "#d0f5a8",
+    color: videoColors.cyan,
     marginBottom: 10,
   },
   demo: {
     fontSize: 10,
-    color: "#c7dcaa",
+    color: videoColors.cyan,
     letterSpacing: 1,
     marginVertical: 10,
   },
   select: {
     padding: 18,
     borderWidth: 1,
-    borderColor: "#34514d",
+    borderColor: videoColors.border,
     borderRadius: 16,
     marginVertical: 8,
   },

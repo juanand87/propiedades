@@ -1,5 +1,11 @@
 import { createContext, ReactNode, useContext } from "react";
-type Screen = "feed" | "catalog" | "manage" | "account" | "recorder";
+type Screen =
+  | "feed"
+  | "catalog"
+  | "manage"
+  | "account"
+  | "recorder"
+  | "videoProfile";
 // State stays in the persistent layout; route components mount only their own UI.
 export const ScreenContext = createContext<
   (Record<Screen, ReactNode> & { active: Screen }) | null

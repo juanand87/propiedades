@@ -1,0 +1,266 @@
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+  ServiceUnavailableException,
+} from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { DataSource } from 'typeorm';
+import { randomUUID } from 'node:crypto';
+import { Actor, text, uuid } from './rules';
+import { EstateService } from './estate.service';
+import {
+  PropertyVideosService,
+  videoJoined,
+  videoVisible,
+} from './property-videos.service';
+
+@Injectable()
+export class VideoSocialService {
+  constructor(
+    private db: DataSource,
+    private config: ConfigService,
+    private videos: PropertyVideosService,
+    private estate: EstateService,
+  ) {}
+  guard() {
+    if (this.config.get('SOCIAL_VIDEOS_ENABLED') !== 'true')
+      throw new ServiceUnavailableException(
+        'El perfil de videos todavía no está habilitado.',
+      );
+  }
+  private async access(id: string, actor?: Actor) {
+    this.guard();
+    const [v] = await this.db.query(
+      `SELECT v.*,(${videoVisible}) can_view,p.title property_title ${videoJoined} WHERE v.id=? AND v.status<>'archived'`,
+      [uuid(id)],
+    );
+    if (
+      !v ||
+      (!Number(v.can_view) &&
+        actor?.id !== v.created_by &&
+        actor?.role !== 'admin')
+    )
+      throw new NotFoundException('Video no disponible.');
+    return v;
+  }
+  async profile(userId: string, actor?: Actor) {
+    this.guard();
+    const [u] = await this.db.query(
+      'SELECT u.id,u.firstName,p.display_name,p.avatar_media_id FROM users u LEFT JOIN estate_video_profiles p ON p.user_id=CONVERT(u.id USING utf8mb4) COLLATE utf8mb4_unicode_ci WHERE u.id=? AND u.isActive=1',
+      [uuid(userId)],
+    );
+    if (!u) throw new NotFoundException('Perfil no disponible.');
+    const [[following], [followers], [likes], [relation]] = await Promise.all([
+      this.db.query(
+        'SELECT COUNT(*) n FROM estate_video_follows WHERE follower_id=?',
+        [userId],
+      ),
+      this.db.query(
+        'SELECT COUNT(*) n FROM estate_video_follows WHERE followed_id=?',
+        [userId],
+      ),
+      this.db.query(
+        `SELECT COUNT(*) n FROM estate_video_likes l JOIN property_videos v ON v.id=l.video_id WHERE v.created_by=? AND v.status<>'archived'`,
+        [userId],
+      ),
+      this.db.query(
+        'SELECT COUNT(*) n FROM estate_video_follows WHERE follower_id=? AND followed_id=?',
+        [actor?.id || '', userId],
+      ),
+    ]);
+    return {
+      id: u.id,
+      display_name: u.display_name || u.firstName,
+      avatar_url: u.avatar_media_id
+        ? this.estate.mediaUrl(u.avatar_media_id, { id: u.id } as Actor)
+        : null,
+      following: Number(following.n),
+      followers: Number(followers.n),
+      likes: Number(likes.n),
+      followed: Number(relation.n) > 0,
+    };
+  }
+  async saveProfile(actor: Actor, body: any) {
+    this.guard();
+    const name = text(body.display_name, 100) || actor.firstName;
+    let avatar: string | null = null;
+    if (body.avatar_media_id) {
+      const [m] = await this.db.query(
+        'SELECT id FROM estate_media WHERE id=? AND owner_id=?',
+        [uuid(body.avatar_media_id), actor.id],
+      );
+      if (!m)
+        throw new ForbiddenException('La foto debe pertenecer a tu cuenta.');
+      avatar = m.id;
+    } else {
+      const [old] = await this.db.query(
+        'SELECT avatar_media_id FROM estate_video_profiles WHERE user_id=?',
+        [actor.id],
+      );
+      avatar = old?.avatar_media_id || null;
+    }
+    await this.db.query(
+      'INSERT INTO estate_video_profiles(user_id,display_name,avatar_media_id) VALUES (?,?,?) ON DUPLICATE KEY UPDATE display_name=VALUES(display_name),avatar_media_id=VALUES(avatar_media_id)',
+      [actor.id, name, avatar],
+    );
+    return this.profile(actor.id, actor);
+  }
+  async gallery(userId: string, q: any, actor?: Actor) {
+    this.guard();
+    await this.profile(userId, actor);
+    const own = actor?.id === userId;
+    const saved = own && q.saved === 'true';
+    const page = Math.max(1, Math.min(10000, parseInt(q.page, 10) || 1));
+    const where = saved
+      ? 'v.id IN (SELECT video_id FROM estate_video_saves WHERE user_id=?)'
+      : 'v.created_by=?';
+    const visibility = own && !saved ? "v.status<>'archived'" : videoVisible;
+    const [count] = await this.db.query(
+      `SELECT COUNT(*) n ${videoJoined} WHERE ${where} AND ${visibility}`,
+      [userId],
+    );
+    const rows = await this.db.query(
+      `SELECT v.id,v.title,v.status,v.property_id,v.created_by,p.title property_title,r.duration_ms,(SELECT COUNT(*) FROM estate_video_likes l WHERE l.video_id=v.id) likes ${videoJoined} LEFT JOIN property_video_recordings r ON r.video_id=v.id WHERE ${where} AND ${visibility} ORDER BY v.created_at DESC,v.id LIMIT 24 OFFSET ?`,
+      [userId, (page - 1) * 24],
+    );
+    const items = await Promise.all(
+      rows.map(async (v: any) => ({
+        ...v,
+        url:
+          own && !saved
+            ? (await this.videos.preview(actor!, v.id)).url
+            : `/api/videos/${v.id}/content`,
+      })),
+    );
+    return {
+      items,
+      total: Number(count.n),
+      page,
+      pages: Math.ceil(Number(count.n) / 24),
+    };
+  }
+  async details(id: string, actor?: Actor) {
+    const v = await this.access(id, actor);
+    const [[likes], [comments], [saves], [mine]] = await Promise.all([
+      this.db.query(
+        'SELECT COUNT(*) n FROM estate_video_likes WHERE video_id=?',
+        [id],
+      ),
+      this.db.query(
+        'SELECT COUNT(*) n FROM estate_video_comments WHERE video_id=?',
+        [id],
+      ),
+      this.db.query(
+        'SELECT COUNT(*) n FROM estate_video_saves WHERE video_id=?',
+        [id],
+      ),
+      this.db.query(
+        'SELECT EXISTS(SELECT 1 FROM estate_video_likes WHERE video_id=? AND user_id=?) liked,EXISTS(SELECT 1 FROM estate_video_saves WHERE video_id=? AND user_id=?) saved',
+        [id, actor?.id || '', id, actor?.id || ''],
+      ),
+    ]);
+    return {
+      id,
+      title: v.title,
+      status: v.status,
+      property_id: v.property_id,
+      property_title: v.property_title,
+      creator: await this.profile(v.created_by, actor),
+      likes: Number(likes.n),
+      comments: Number(comments.n),
+      saves: Number(saves.n),
+      liked: !!Number(mine.liked),
+      saved: !!Number(mine.saved),
+      can_edit: actor?.id === v.created_by || actor?.role === 'admin',
+      share_url: `https://propiedades-eta.vercel.app/descubrir?video=${id}`,
+    };
+  }
+  async reaction(
+    actor: Actor,
+    id: string,
+    kind: 'like' | 'save',
+    active: unknown,
+  ) {
+    await this.access(id, actor);
+    if (typeof active !== 'boolean')
+      throw new BadRequestException(
+        'Indica si quieres activar o quitar la acción.',
+      );
+    const table = kind === 'like' ? 'estate_video_likes' : 'estate_video_saves';
+    await this.db.query(
+      active
+        ? `INSERT IGNORE INTO ${table}(user_id,video_id) VALUES (?,?)`
+        : `DELETE FROM ${table} WHERE user_id=? AND video_id=?`,
+      [actor.id, id],
+    );
+    return this.details(id, actor);
+  }
+  async follow(actor: Actor, id: string, active: unknown) {
+    this.guard();
+    if (id === actor.id)
+      throw new BadRequestException('No puedes seguir tu propio perfil.');
+    if (typeof active !== 'boolean')
+      throw new BadRequestException('Acción inválida.');
+    await this.profile(id, actor);
+    await this.db.query(
+      active
+        ? 'INSERT IGNORE INTO estate_video_follows(follower_id,followed_id) VALUES (?,?)'
+        : 'DELETE FROM estate_video_follows WHERE follower_id=? AND followed_id=?',
+      [actor.id, id],
+    );
+    return this.profile(id, actor);
+  }
+  async comments(id: string, actor?: Actor) {
+    await this.access(id, actor);
+    return this.db.query(
+      'SELECT c.id,c.body,c.created_at,c.user_id,COALESCE(p.display_name,u.firstName) display_name FROM estate_video_comments c JOIN users u ON CONVERT(u.id USING utf8mb4) COLLATE utf8mb4_unicode_ci=c.user_id LEFT JOIN estate_video_profiles p ON p.user_id=c.user_id WHERE c.video_id=? AND u.isActive=1 ORDER BY c.created_at DESC,c.id LIMIT 100',
+      [id],
+    );
+  }
+  async comment(actor: Actor, id: string, body: any, ip: string) {
+    await this.access(id, actor);
+    this.estate.throttle(`video-comment:${actor.id}:${ip}`, 15, 60000);
+    const message = text(body.body, 2000);
+    if (!message) throw new BadRequestException('Escribe un comentario.');
+    await this.db.query(
+      'INSERT INTO estate_video_comments(id,video_id,user_id,body) VALUES (?,?,?,?)',
+      [randomUUID(), id, actor.id, message],
+    );
+    return this.comments(id, actor);
+  }
+  async link(actor: Actor, id: string, propertyId: unknown) {
+    const video = await this.access(id, actor);
+    if (video.created_by !== actor.id && actor.role !== 'admin')
+      throw new ForbiddenException('Solo puedes editar tus videos.');
+    const target = propertyId === null ? null : uuid(propertyId);
+    if (target) await this.estate.get(target, actor);
+    await this.db.transaction(async (tx) => {
+      if (target)
+        await tx.query('SELECT id FROM properties WHERE id=? FOR UPDATE', [
+          target,
+        ]);
+      const [current] = await tx.query(
+        'SELECT created_by,status FROM property_videos WHERE id=? FOR UPDATE',
+        [id],
+      );
+      if (!current || current.status === 'archived')
+        throw new NotFoundException('Video no disponible.');
+      if (current.created_by !== actor.id && actor.role !== 'admin')
+        throw new ForbiddenException();
+      // Linking is an explicit edit; review publication separately rather than exposing a draft property.
+      await tx.query(
+        "UPDATE property_videos SET property_id=?,status='draft' WHERE id=?",
+        [target, id],
+      );
+    });
+    return this.details(id, actor);
+  }
+  async download(actor: Actor, id: string) {
+    const v = await this.access(id, actor);
+    return Number(v.can_view)
+      ? { url: `/api/videos/${id}/content` }
+      : this.videos.preview(actor, id);
+  }
+}

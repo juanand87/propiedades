@@ -143,6 +143,8 @@ async function main() {
       "utf8",
     ),
   );
+  await db.query(await fs.readFile(path.join(root, 'database/PERFILES_Y_VIDEOS_SOCIALES.sql'), 'utf8'));
+  await db.query(await fs.readFile(path.join(root, 'database/PLANES_MEMBRESIA.sql'), 'utf8'));
   const spaces = {
     SPACES_IMAGES_ENABLED: "false",
     SPACES_VIDEOS_ENABLED: "false",
@@ -233,6 +235,7 @@ async function main() {
     ADMIN_RECOVERY_ENABLED: "false",
     PROPERTY_VIDEOS_ENABLED: "true",
     USER_ONBOARDING_ENABLED: "true",
+    SOCIAL_VIDEOS_ENABLED: "true",
     GOOGLE_AUTH_ENABLED: "false",
     PORT: "3328",
     LOCAL_MOBILE_SANDBOX: "true",

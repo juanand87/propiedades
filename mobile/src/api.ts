@@ -25,10 +25,10 @@ export type Property = {
 };
 export type Video = {
   id: string;
-  property_id: string;
+  property_id: string | null;
   title: string;
   url: string;
-  property: Property;
+  property: Property | null;
 };
 export type ManagedVideo = {
   id: string;
@@ -85,7 +85,7 @@ if (!allowed.includes(API_URL))
   );
 export function mediaUrl(url: string) {
   if (
-    !/^\/api\/(media|videos)\/[a-f0-9-]{36}(\/content)?(\?signature=[^\s]*)?$/i.test(
+    !/^\/api\/(media|videos)\/[a-f0-9-]{36}(\/(content|preview))?(\?signature=[^\s]*)?$/i.test(
       url,
     )
   )

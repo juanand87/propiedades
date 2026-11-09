@@ -18,6 +18,20 @@ import { PropertyVideosService } from './property-videos.service';
 @Controller()
 export class PropertyVideosController {
   constructor(private videos: PropertyVideosService) {}
+  @Post('manage/videos')
+  @UseGuards(EstateGuard)
+  @UseInterceptors(
+    FileInterceptor('file', {
+      limits: { files: 1, fileSize: 50 * 1024 * 1024 },
+    }),
+  )
+  uploadStandalone(
+    @Req() req: any,
+    @Body() body: any,
+    @UploadedFile() file: any,
+  ) {
+    return this.videos.upload(req.user, null, body, file);
+  }
   @Get('mobile/environment') environment() {
     return this.videos.environment();
   }
