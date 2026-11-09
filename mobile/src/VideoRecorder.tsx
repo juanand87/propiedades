@@ -528,6 +528,7 @@ export function VideoRecorder({
           style={StyleSheet.absoluteFill}
           facing={facing}
           mode="video"
+          ratio="16:9"
           videoQuality="720p"
           videoBitrate={3_000_000}
           mute={silent || !micPermission?.granted}

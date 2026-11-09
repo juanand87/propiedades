@@ -151,6 +151,7 @@ function AppContent() {
     [loading, setLoading] = useState(false),
     [feedError, setFeedError] = useState(""),
     [active, setActive] = useState(0),
+    [readyVideoId, setReadyVideoId] = useState<string | null>(null),
     [height, setHeight] = useState(1),
     [muted, setMuted] = useState(true),
     [foreground, setForeground] = useState(AppState.currentState === "active");
@@ -654,7 +655,7 @@ function AppContent() {
           initialNumToRender={2}
           maxToRenderPerBatch={2}
           windowSize={3}
-          extraData={`${active}-${muted}-${foreground}-${!!detail}-${favorites.join(",")}`}
+          extraData={`${active}-${readyVideoId}-${muted}-${foreground}-${!!detail}-${favorites.join(",")}`}
           onMomentumScrollEnd={(e) =>
             setActive(Math.round(e.nativeEvent.contentOffset.y / height))
           }
@@ -677,7 +678,14 @@ function AppContent() {
               item={item}
               height={height}
               active={index === active && foreground && !detail}
-              nearby={Math.abs(index - active) <= 1}
+              nearby={
+                index === active ||
+                (foreground &&
+                  !detail &&
+                  index === active + 1 &&
+                  readyVideoId === videos[active]?.id)
+              }
+              onReady={setReadyVideoId}
               muted={muted}
               social={socialEnabled}
               session={session}

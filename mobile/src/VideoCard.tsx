@@ -17,15 +17,24 @@ function Player({
   url,
   active,
   muted,
+  onReady,
 }: {
   url: string;
   active: boolean;
   muted: boolean;
+  onReady: () => void;
 }) {
-  const player = useVideoPlayer(mediaUrl(url), (p) => {
-    p.loop = true;
-    p.muted = muted;
-  });
+  const player = useVideoPlayer(
+    { uri: mediaUrl(url), contentType: "progressive" },
+    (p) => {
+      p.bufferOptions = {
+        minBufferForPlayback: 1.25,
+        preferredForwardBufferDuration: 8,
+      };
+      p.loop = true;
+      p.muted = muted;
+    },
+  );
   const [error, setError] = useState(""),
     [loading, setLoading] = useState(() => player.status === "loading"),
     [paused, setPaused] = useState(false);
@@ -39,13 +48,15 @@ function Player({
     else player.pause();
   }, [active, paused, player]);
   useEffect(() => {
+    if (active && player.status === "readyToPlay") onReady();
     const sub = player.addListener("statusChange", (e) => {
+      if (active && e.status === "readyToPlay") onReady();
       setLoading(e.status === "loading");
       if (e.status === "error") setError("No se pudo reproducir este video.");
       else setError("");
     });
     return () => sub.remove();
-  }, [player]);
+  }, [active, onReady, player]);
   return (
     <Pressable
       style={StyleSheet.absoluteFill}
@@ -73,7 +84,10 @@ function Player({
               setPaused(false);
               setLoading(true);
               void player
-                .replaceAsync(mediaUrl(url))
+                .replaceAsync({
+                  uri: mediaUrl(url),
+                  contentType: "progressive",
+                })
                 .then(() => {
                   if (active) player.play();
                 })
@@ -94,6 +108,7 @@ export function VideoCard({
   height,
   active,
   nearby,
+  onReady,
   muted,
   favorite,
   onMute,
@@ -107,6 +122,7 @@ export function VideoCard({
   height: number;
   active: boolean;
   nearby: boolean;
+  onReady: (id: string) => void;
   muted: boolean;
   favorite: boolean;
   onMute: () => void;
@@ -126,7 +142,14 @@ export function VideoCard({
           resizeMode="cover"
         />
       )}
-      {nearby && <Player url={item.url} active={active} muted={muted} />}
+      {nearby && (
+        <Player
+          url={item.url}
+          active={active}
+          muted={muted}
+          onReady={() => onReady(item.id)}
+        />
+      )}
       <View pointerEvents="none" style={styles.shade} />
       {!social && (
         <View style={styles.actions}>
