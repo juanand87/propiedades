@@ -178,6 +178,30 @@ export function VideoProfile({
       .catch(() => {});
     return () => controller.abort();
   }, [own, token, videosRefresh]);
+  const [followersOpen, setFollowersOpen] = useState(false);
+  const [followers, setFollowers] = useState<
+    { id: string; display_name: string }[]
+  >([]);
+  const [followersPage, setFollowersPage] = useState(1);
+  const [followersMore, setFollowersMore] = useState(false);
+  async function showFollowers(next = 1) {
+    if (!target) return;
+    if (next === 1) {
+      setFollowers([]);
+      setFollowersMore(false);
+      setFollowersOpen(true);
+    }
+    await run(async () => {
+      const result = await api<{ items: typeof followers; has_more: boolean }>(
+        `/video-profiles/${target}/followers?page=${next}`,
+      );
+      setFollowers((previous) =>
+        next === 1 ? result.items : [...previous, ...result.items],
+      );
+      setFollowersPage(next);
+      setFollowersMore(result.has_more);
+    });
+  }
   const [profile, setProfile] = useState<VideoProfileData | null>(null),
     [videos, setVideos] = useState<ProfileVideo[]>([]),
     [page, setPage] = useState(0),
@@ -396,10 +420,16 @@ export function VideoProfile({
             [profile?.likes || 0, "Me gusta"],
           ] as const
         ).map(([n, label]) => (
-          <View key={label} style={s.counter}>
+          <Pressable
+            key={label}
+            style={s.counter}
+            disabled={label !== "Seguidores" || busy}
+            accessibilityRole={label === "Seguidores" ? "button" : undefined}
+            onPress={() => void showFollowers()}
+          >
             <Text style={s.counterNumber}>{n}</Text>
             <Text style={s.muted}>{label}</Text>
-          </View>
+          </Pressable>
         ))}
       </View>
       {own ? (
@@ -463,6 +493,46 @@ export function VideoProfile({
   );
   return (
     <View style={s.root}>
+      <Modal
+        visible={followersOpen}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setFollowersOpen(false)}
+      >
+        <View style={s.overlay}>
+          <View style={[s.dialog, { maxHeight: "80%" }]}>
+            <Text style={s.title}>Seguidores</Text>
+            {error ? <Text style={s.error}>{error}</Text> : null}
+            <ScrollView>
+              {followers.map((person) => (
+                <View key={person.id}>
+                  {button(
+                    person.display_name,
+                    () => {
+                      setFollowersOpen(false);
+                      router.push({
+                        pathname: "/perfil/[userId]",
+                        params: { userId: person.id },
+                      });
+                    },
+                    true,
+                  )}
+                </View>
+              ))}
+              {!busy && !followers.length && !error && (
+                <Text style={s.muted}>Todavía no hay seguidores.</Text>
+              )}
+              {followersMore &&
+                button(
+                  "Cargar más",
+                  () => void showFollowers(followersPage + 1),
+                )}
+            </ScrollView>
+            {busy && <ActivityIndicator />}
+            {button("Cerrar", () => setFollowersOpen(false), true)}
+          </View>
+        </View>
+      </Modal>
       {own && quota && (
         <Text style={[s.muted, { paddingHorizontal: 16, paddingVertical: 8 }]}>
           {quota.plan === "free"

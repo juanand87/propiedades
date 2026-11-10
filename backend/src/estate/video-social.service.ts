@@ -212,10 +212,23 @@ export class VideoSocialService {
     );
     return this.profile(id, actor);
   }
+  async followers(id: string, rawPage: string) {
+    await this.profile(id);
+    const page = Math.max(1, Math.min(10000, parseInt(rawPage, 10) || 1));
+    const rows = await this.db.query(
+      `SELECT u.id,COALESCE(p.display_name,u.firstName) display_name
+       FROM estate_video_follows f
+       JOIN users u ON CONVERT(u.id USING utf8mb4) COLLATE utf8mb4_unicode_ci=f.follower_id
+       LEFT JOIN estate_video_profiles p ON p.user_id=f.follower_id
+       WHERE f.followed_id=? AND u.isActive=1 ORDER BY f.created_at DESC,f.follower_id LIMIT 25 OFFSET ?`,
+      [id, (page - 1) * 24],
+    );
+    return { items: rows.slice(0, 24), has_more: rows.length > 24 };
+  }
   async comments(id: string, actor?: Actor) {
     await this.access(id, actor);
     return this.db.query(
-      'SELECT c.id,c.body,c.created_at,c.user_id,COALESCE(p.display_name,u.firstName) display_name FROM estate_video_comments c JOIN users u ON CONVERT(u.id USING utf8mb4) COLLATE utf8mb4_unicode_ci=c.user_id LEFT JOIN estate_video_profiles p ON p.user_id=c.user_id WHERE c.video_id=? AND u.isActive=1 ORDER BY c.created_at DESC,c.id LIMIT 100',
+      'SELECT c.id,c.body,c.created_at,c.user_id,r.parent_id,COALESCE(pp.display_name,pu.firstName) parent_name,COALESCE(p.display_name,u.firstName) display_name FROM estate_video_comments c LEFT JOIN estate_video_comment_replies r ON r.comment_id=c.id LEFT JOIN estate_video_comments parent ON parent.id=r.parent_id LEFT JOIN users pu ON CONVERT(pu.id USING utf8mb4) COLLATE utf8mb4_unicode_ci=parent.user_id AND pu.isActive=1 LEFT JOIN estate_video_profiles pp ON pp.user_id=parent.user_id AND pu.id IS NOT NULL JOIN users u ON CONVERT(u.id USING utf8mb4) COLLATE utf8mb4_unicode_ci=c.user_id LEFT JOIN estate_video_profiles p ON p.user_id=c.user_id WHERE c.video_id=? AND u.isActive=1 ORDER BY c.created_at DESC,c.id LIMIT 100',
       [id],
     );
   }
@@ -224,10 +237,29 @@ export class VideoSocialService {
     this.estate.throttle(`video-comment:${actor.id}:${ip}`, 15, 60000);
     const message = text(body.body, 2000);
     if (!message) throw new BadRequestException('Escribe un comentario.');
-    await this.db.query(
-      'INSERT INTO estate_video_comments(id,video_id,user_id,body) VALUES (?,?,?,?)',
-      [randomUUID(), id, actor.id, message],
-    );
+    const parentId = body.parent_id == null ? null : uuid(body.parent_id);
+    await this.db.transaction(async (tx) => {
+      if (parentId) {
+        const [parent] = await tx.query(
+          'SELECT id FROM estate_video_comments WHERE id=? AND video_id=?',
+          [parentId, id],
+        );
+        if (!parent)
+          throw new NotFoundException(
+            'Comentario no disponible en este video.',
+          );
+      }
+      const commentId = randomUUID();
+      await tx.query(
+        'INSERT INTO estate_video_comments(id,video_id,user_id,body) VALUES (?,?,?,?)',
+        [commentId, id, actor.id, message],
+      );
+      if (parentId)
+        await tx.query(
+          'INSERT INTO estate_video_comment_replies(comment_id,parent_id) VALUES (?,?)',
+          [commentId, parentId],
+        );
+    });
     return this.comments(id, actor);
   }
   async link(actor: Actor, id: string, propertyId: unknown) {

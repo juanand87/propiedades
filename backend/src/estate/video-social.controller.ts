@@ -41,6 +41,10 @@ export class VideoSocialController {
   saveProfile(@Body() body: any, @Req() req: any) {
     return this.social.saveProfile(req.user, body);
   }
+  @Get('video-profiles/:id/followers')
+  followers(@Param('id') id: string, @Query('page') page: string) {
+    return this.social.followers(id, page);
+  }
   @Post('video-profiles/:id/follow')
   @UseGuards(EstateGuard)
   follow(@Param('id') id: string, @Body() body: any, @Req() req: any) {

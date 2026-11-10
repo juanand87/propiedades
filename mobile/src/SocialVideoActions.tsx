@@ -44,8 +44,18 @@ export function SocialVideoActions({
   const [busy, setBusy] = useState(false);
   const [title, setTitle] = useState("");
   const [comment, setComment] = useState("");
+  const [reply, setReply] = useState<{
+    id: string;
+    display_name: string;
+  } | null>(null);
   const [comments, setComments] = useState<
-    { id: string; display_name: string; body: string }[]
+    {
+      id: string;
+      display_name: string;
+      body: string;
+      parent_id?: string;
+      parent_name?: string;
+    }[]
   >([]);
   const [properties, setProperties] = useState<Property[]>([]);
   const [propertyPage, setPropertyPage] = useState(0);
@@ -94,6 +104,7 @@ export function SocialVideoActions({
     setPropertyPages(r.pages);
   }
   async function openComments() {
+    setReply(null);
     setPanel("comments");
     await run(async () =>
       setComments(await api(`/videos/${videoId}/comments`, { token })),
@@ -175,6 +186,41 @@ export function SocialVideoActions({
             </View>
           )}
         </Pressable>
+        {data &&
+          session?.user.id !== data.creator.id &&
+          option(data.creator.followed ? "Siguiendo" : "+ Seguir", () => {
+            if (!requireSession()) return;
+            void run(async () => {
+              const creator = await api<VideoSocialData["creator"]>(
+                `/video-profiles/${data.creator.id}/follow`,
+                {
+                  method: "POST",
+                  token,
+                  body: { active: !data.creator.followed },
+                },
+              );
+              setData({ ...data, creator });
+            });
+          })}
+        {action(
+          "heart",
+          `${data?.likes ?? 0} Me gusta`,
+          () => {
+            if (!data || !requireSession()) return;
+            void run(async () => {
+              setData(
+                await api<VideoSocialData>(`/videos/${videoId}/like`, {
+                  method: "POST",
+                  token,
+                  body: { active: !data.liked },
+                }),
+              );
+              onChanged?.();
+            });
+          },
+          data?.liked,
+          data?.liked ? "Quitar me gusta al video" : "Dar me gusta al video",
+        )}
         {action(
           "comment",
           String(data?.comments ?? 0),
@@ -401,9 +447,22 @@ export function SocialVideoActions({
                   {comments.map((c) => (
                     <View key={c.id} style={s.comment}>
                       <Text style={s.name}>{c.display_name}</Text>
+                      {c.parent_id && (
+                        <Text style={s.muted}>
+                          En respuesta a {c.parent_name || "un comentario"}
+                        </Text>
+                      )}
                       <Text style={s.white}>{c.body}</Text>
+                      {option("Responder", () => {
+                        if (requireSession()) setReply(c);
+                      })}
                     </View>
                   ))}
+                  {reply &&
+                    option(
+                      "Respondiendo a " + reply.display_name + " · Cancelar",
+                      () => setReply(null),
+                    )}
                   <TextInput
                     accessibilityLabel="Escribe un comentario"
                     placeholder="Escribe un comentario…"
@@ -420,10 +479,11 @@ export function SocialVideoActions({
                           await api(`/videos/${videoId}/comments`, {
                             method: "POST",
                             token,
-                            body: { body: comment },
+                            body: { body: comment, parent_id: reply?.id },
                           }),
                         );
                         setComment("");
+                        setReply(null);
                         setData(
                           await api(`/videos/${videoId}/social`, { token }),
                         );

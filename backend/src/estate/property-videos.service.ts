@@ -1,3 +1,4 @@
+import { compressVideo } from './video-compression';
 import {
   Injectable,
   BadRequestException,
@@ -232,6 +233,7 @@ export class PropertyVideosService {
         );
       }
       const duration = validateVideoProbe(metadata, limit);
+      const stored = await compressVideo(filename, file.buffer, duration);
       if (this.storage.enabled) {
         const key = this.storage.objectKey(videoId);
         await this.db.query(
@@ -240,11 +242,11 @@ export class PropertyVideosService {
             videoId,
             key,
             this.storage.config!.bucket,
-            createHash('sha256').update(file.buffer).digest('hex'),
+            createHash('sha256').update(stored).digest('hex'),
           ],
         );
         objectCreated = true;
-        await this.storage.put(key, file.buffer);
+        await this.storage.put(key, stored);
       }
       await this.db.transaction(async (tx) => {
         const [p] = id
@@ -312,7 +314,7 @@ export class PropertyVideosService {
             id,
             actor.id,
             title,
-            file.buffer.length,
+            stored.length,
             publish ? 'published' : 'draft',
           ],
         );
@@ -331,6 +333,7 @@ export class PropertyVideosService {
           title,
           status: publish ? 'published' : 'draft',
           duration_ms: duration,
+          size_bytes: stored.length,
           reused: false,
         };
       });
