@@ -89,14 +89,15 @@ describe('message push delivery', () => {
     });
     jest.spyOn(global, 'fetch').mockResolvedValue({
       ok: true,
-      json: () => Promise.resolve({
-        data: {
-          'receipt-1': {
-            status: 'error',
-            details: { error: 'DeviceNotRegistered' },
+      json: () =>
+        Promise.resolve({
+          data: {
+            'receipt-1': {
+              status: 'error',
+              details: { error: 'DeviceNotRegistered' },
+            },
           },
-        },
-      }),
+        }),
     } as Response);
     await service.flush();
     expect(query).toHaveBeenCalledWith(
