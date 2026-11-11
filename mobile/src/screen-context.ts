@@ -2,6 +2,7 @@ import { createContext, ReactNode, useContext } from "react";
 type Screen =
   | "feed"
   | "catalog"
+  | "messages"
   | "manage"
   | "account"
   | "recorder"

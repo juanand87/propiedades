@@ -114,6 +114,7 @@ export function VideoCard({
   onMute,
   onFavorite,
   onDetails,
+  onContact,
   onShare,
   social = false,
   session = null,
@@ -128,6 +129,7 @@ export function VideoCard({
   onMute: () => void;
   onFavorite: () => void;
   onDetails: () => void;
+  onContact?: () => void;
   onShare: () => void;
   social?: boolean;
   session?: Session | null;
@@ -199,7 +201,9 @@ export function VideoCard({
           videoId={item.id}
           session={session}
           propertyActions={
-            p ? { favorite, onFavorite, onDetails, onShare } : undefined
+            p
+              ? { favorite, onFavorite, onDetails, onContact, onShare }
+              : undefined
           }
         />
       )}
@@ -232,6 +236,15 @@ export function VideoCard({
               ? "Video ilustrativo. No corresponde a una oferta real."
               : p.advertiser.name}
           </Text>
+          {onContact && (
+            <Pressable
+              accessibilityRole="button"
+              onPress={onContact}
+              style={styles.button}
+            >
+              <Text style={styles.buttonText}>Consultar al vendedor</Text>
+            </Pressable>
+          )}
         </View>
       )}
     </View>

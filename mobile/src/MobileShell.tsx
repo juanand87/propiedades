@@ -53,8 +53,12 @@ import { VideoRecorder } from "./VideoRecorder";
 import { SellerPanel } from "./SellerPanel";
 import { ContactProperty } from "./ContactProperty";
 import { VideoProfile } from "./VideoProfile";
+import { PropertyCatalog } from "./PropertyCatalog";
+import { ProppixBrand } from "./ProppixBrand";
+import { ProppixIcon, ProppixIconName } from "./ProppixIcon";
+import { clampVideoOffset } from "./video-paging";
 
-type Tab = "feed" | "catalog" | "manage" | "account";
+type Tab = "feed" | "catalog" | "manage" | "messages" | "account";
 const sessionKey = IS_PRODUCTION
   ? "propiedades-production-session"
   : "propiedades-local-session";
@@ -91,24 +95,36 @@ function Button({
 function AppContent() {
   const pathname = usePathname(),
     router = useRouter();
-  const routes: Record<Tab, "/" | "/propiedades" | "/mis-videos" | "/cuenta"> =
-    {
-      feed: "/",
-      catalog: "/propiedades",
-      manage: "/mis-videos",
-      account: "/cuenta",
-    };
+  const routes: Record<
+    Tab,
+    "/" | "/propiedades" | "/mis-videos" | "/mensajes" | "/cuenta"
+  > = {
+    feed: "/",
+    catalog: "/propiedades",
+    manage: "/mis-videos",
+    account: "/cuenta",
+    messages: "/mensajes",
+  };
   const propertyRoute = pathname.startsWith("/property/");
   const recordingRoute = pathname === "/grabar";
   const profileRoute = pathname.startsWith("/perfil/");
-  const { propertyId, from, userId, videoId, propertyMode } =
-    useGlobalSearchParams<{
-      propertyId?: string;
-      from?: Tab;
-      userId?: string;
-      videoId?: string;
-      propertyMode?: "new" | "link";
-    }>();
+  const {
+    propertyId,
+    from,
+    userId,
+    videoId,
+    propertyMode,
+    profileSection,
+    contact,
+  } = useGlobalSearchParams<{
+    propertyId?: string;
+    from?: Tab;
+    userId?: string;
+    videoId?: string;
+    propertyMode?: "new" | "link";
+    profileSection?: "properties";
+    contact?: "1";
+  }>();
   const tab: Tab = propertyRoute
     ? from && from in routes
       ? from
@@ -119,9 +135,12 @@ function AppContent() {
         ? "catalog"
         : pathname === "/mis-videos"
           ? "manage"
-          : pathname === "/cuenta"
-            ? "account"
-            : "feed";
+          : pathname === "/mensajes"
+            ? "messages"
+            : pathname === "/cuenta"
+              ? "account"
+              : "feed";
+  const [accountMenu, setAccountMenu] = useState(false);
   const [ready, setReady] = useState(false),
     [error, setError] = useState(""),
     [booting, setBooting] = useState(false);
@@ -156,15 +175,11 @@ function AppContent() {
     [muted, setMuted] = useState(true),
     [foreground, setForeground] = useState(AppState.currentState === "active");
   const feedRef = useRef<FlatList<Video>>(null),
+    feedDragIndex = useRef(0),
     busy = useRef(false),
     feedGeneration = useRef(0),
     mounted = useRef(true),
     favoriteBusy = useRef(false);
-  const [catalog, setCatalog] = useState<Property[]>([]),
-    [catalogPage, setCatalogPage] = useState(0),
-    [catalogPages, setCatalogPages] = useState(1),
-    [catalogBusy, setCatalogBusy] = useState(false),
-    [catalogError, setCatalogError] = useState("");
   const [email, setEmail] = useState(
       IS_PRODUCTION ? "" : "mobile-admin@qa.invalid",
     ),
@@ -254,8 +269,8 @@ function AppContent() {
       );
       setPage(data.page);
       setPages(data.pages);
-      if (data.total === 0) await loadCatalog(true);
       if (reset) {
+        feedDragIndex.current = 0;
         setActive(0);
         feedRef.current?.scrollToOffset({ offset: 0, animated: false });
       }
@@ -266,30 +281,8 @@ function AppContent() {
       setLoading(false);
     }
   }
-  async function loadCatalog(reset = false) {
-    if (catalogBusy) return;
-    setCatalogBusy(true);
-    setCatalogError("");
-    try {
-      const data = await api<Page<Property>>(
-        `/properties?limit=12&page=${reset ? 1 : catalogPage + 1}&sort=recent`,
-      );
-      setCatalog((v) =>
-        reset
-          ? data.items
-          : [...v, ...data.items.filter((x) => !v.some((p) => p.id === x.id))],
-      );
-      setCatalogPage(data.page);
-      setCatalogPages(data.pages);
-    } catch (e) {
-      setCatalogError(message(e));
-    } finally {
-      setCatalogBusy(false);
-    }
-  }
   const onReady = useEffectEvent(() => {
     void loadFeed(true);
-    void loadCatalog(true);
   });
   useEffect(() => {
     if (ready) {
@@ -337,11 +330,15 @@ function AppContent() {
       favoriteBusy.current = false;
     }
   }
-  function openDetail(p: Property) {
+  function openDetail(p: Property, contactSeller = false) {
     setDetail(p);
     router.push({
       pathname: "/property/[propertyId]",
-      params: { propertyId: p.id, from: tab },
+      params: {
+        propertyId: p.id,
+        from: tab,
+        ...(contactSeller && { contact: "1" }),
+      },
     });
   }
   useEffect(() => {
@@ -600,15 +597,16 @@ function AppContent() {
       setManageBusy(false);
     }
   }
-  const tabs: { key: Tab; label: string; icon: string }[] = [
-    { key: "feed", label: "Descubrir", icon: "▶" },
-    { key: "catalog", label: "Propiedades", icon: "⌂" },
-    {
-      key: "manage",
-      label: socialEnabled ? "Perfil" : "Mis videos",
-      icon: socialEnabled ? "○" : "＋",
-    },
-    { key: "account", label: "Cuenta", icon: "○" },
+  const tabs: {
+    key: Tab | "publish";
+    label: string;
+    icon?: ProppixIconName;
+  }[] = [
+    { key: "feed", label: "Inicio", icon: "home" },
+    { key: "catalog", label: "Propiedades" },
+    { key: "publish", label: "Publicar", icon: "plus" },
+    { key: "messages", label: "Mensajes", icon: "messages" },
+    { key: "manage", label: "Perfil", icon: "profile" },
   ];
   if (!ready)
     return (
@@ -645,6 +643,10 @@ function AppContent() {
           keyExtractor={(v) => v.id}
           pagingEnabled
           snapToInterval={height}
+          snapToAlignment="start"
+          disableIntervalMomentum
+          bounces={false}
+          overScrollMode="never"
           decelerationRate="fast"
           showsVerticalScrollIndicator={false}
           getItemLayout={(_, i) => ({
@@ -656,14 +658,40 @@ function AppContent() {
           maxToRenderPerBatch={2}
           windowSize={3}
           extraData={`${active}-${readyVideoId}-${muted}-${foreground}-${!!detail}-${favorites.join(",")}`}
-          onMomentumScrollEnd={(e) =>
-            setActive(Math.round(e.nativeEvent.contentOffset.y / height))
-          }
-          onScroll={(e) => {
-            const i = Math.round(e.nativeEvent.contentOffset.y / height);
-            setActive(i);
+          onScrollBeginDrag={() => {
+            feedDragIndex.current = active;
           }}
-          scrollEventThrottle={100}
+          onMomentumScrollEnd={(e) => {
+            const bounded = clampVideoOffset(
+              e.nativeEvent.contentOffset.y,
+              height,
+              feedDragIndex.current,
+              videos.length,
+            );
+            const next = Math.round(bounded / height);
+            setActive(next);
+            if (Math.abs(e.nativeEvent.contentOffset.y - next * height) > 1)
+              feedRef.current?.scrollToOffset({
+                offset: next * height,
+                animated: false,
+              });
+          }}
+          onScroll={(e) => {
+            const offset = e.nativeEvent.contentOffset.y;
+            const bounded = clampVideoOffset(
+              offset,
+              height,
+              feedDragIndex.current,
+              videos.length,
+            );
+            if (Math.abs(bounded - offset) > 1)
+              feedRef.current?.scrollToOffset({
+                offset: bounded,
+                animated: false,
+              });
+            setActive(Math.round(bounded / height));
+          }}
+          scrollEventThrottle={16}
           onEndReached={() => void loadFeed()}
           onEndReachedThreshold={1.5}
           refreshControl={
@@ -697,6 +725,13 @@ function AppContent() {
               onDetails={() => {
                 if (item.property) void openDetail(item.property);
               }}
+              onContact={
+                item.property && !item.property.is_demo
+                  ? () => {
+                      if (item.property) openDetail(item.property, true);
+                    }
+                  : undefined
+              }
               onShare={() => {
                 if (item.property) void share(item.property);
               }}
@@ -742,50 +777,11 @@ function AppContent() {
     </View>
   );
   const catalogScreen = (
-    <ScrollView
-      style={s.content}
-      refreshControl={
-        <RefreshControl
-          refreshing={catalogBusy}
-          onRefresh={() => void loadCatalog(true)}
-        />
-      }
-    >
-      <Text style={s.eyebrow}>EL MISMO CATÁLOGO, OTRA EXPERIENCIA</Text>
-      <Text style={s.h1}>Encuentra tu lugar</Text>
-      {!!catalogError && <Text style={s.error}>{catalogError}</Text>}
-      {catalog.map((p) => (
-        <Pressable
-          accessibilityRole="button"
-          key={p.id}
-          style={s.propertyCard}
-          onPress={() => void openDetail(p)}
-        >
-          {!!p.media[0] && (
-            <Image
-              source={{ uri: mediaUrl(p.media[0].url) }}
-              style={s.propertyImage}
-            />
-          )}
-          <View style={s.pad}>
-            <Text style={s.accent}>{price(p)}</Text>
-            <Text style={s.h2}>{p.title}</Text>
-            <Text style={s.muted}>
-              {p.commune_name} · {p.region_name}
-            </Text>
-            {p.is_demo && <Text style={s.demo}>EJEMPLO · DATOS FICTICIOS</Text>}
-          </View>
-        </Pressable>
-      ))}
-      {catalogPage < catalogPages && (
-        <Button
-          label={catalogBusy ? "Cargando…" : "Ver más propiedades"}
-          disabled={catalogBusy}
-          onPress={() => void loadCatalog(false)}
-        />
-      )}
-      <View style={{ height: 30 }} />
-    </ScrollView>
+    <PropertyCatalog
+      favorites={favorites}
+      onFavorite={(id) => void favorite(id)}
+      onOpen={openDetail}
+    />
   );
   const accountScreen = (
     <ScrollView style={s.content} keyboardShouldPersistTaps="handled">
@@ -1120,10 +1116,27 @@ function AppContent() {
       value={{
         feed: feedScreen,
         catalog: catalogScreen,
+        messages: (
+          <View style={s.messageScreen}>
+            <View style={s.messageIcon}>
+              <ProppixIcon name="messages" size={43} color="#31c8ee" />
+            </View>
+            <Text style={s.h1}>Mensajes</Text>
+            <Text style={[s.muted, { textAlign: "center" }]}>
+              Próximamente podrás conversar aquí. Por ahora puedes enviar
+              consultas desde cada propiedad.
+            </Text>
+          </View>
+        ),
         account: accountScreen,
         manage: socialEnabled ? (
           <VideoProfile
-            key={videoId ? videoId + ":" + propertyMode : "profile"}
+            key={
+              videoId
+                ? videoId + ":" + propertyMode
+                : profileSection || "profile"
+            }
+            initialSection={profileSection}
             pendingVideoId={videoId}
             propertyMode={propertyMode}
             propertyFavorite={{ ids: favorites, toggle: favorite }}
@@ -1159,69 +1172,148 @@ function AppContent() {
         ) : null,
       }}
     >
-      <SafeAreaView style={s.safe} edges={["top", "left", "right", "bottom"]}>
+      <SafeAreaView
+        style={s.safe}
+        edges={
+          recordingRoute
+            ? ["top", "left", "right", "bottom"]
+            : ["top", "left", "right"]
+        }
+      >
         <StatusBar style="light" />
-        {!recordingRoute && (
+        {!recordingRoute && tab !== "catalog" && (
           <View style={s.header}>
-            <View>
-              <Image
-                source={require("../assets/icon.png")}
-                style={{
-                  width: 36,
-                  height: 36,
-                  borderRadius: 9,
-                  marginBottom: 4,
-                }}
-              />
-              <Text style={s.brand}>
-                proppix
-                <Text
-                  style={{
-                    color: videoColors.pink,
-                  }}
-                >
-                  .
-                </Text>
-              </Text>
-              <Text style={s.headerSub}>
-                Descubre un lugar para tu próxima historia
-              </Text>
+            <ProppixBrand compact />
+            <View
+              style={{ flexDirection: "row", alignItems: "center", gap: 12 }}
+            >
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Buscar propiedades"
+                onPress={() => setTab("catalog")}
+                style={{ padding: 9 }}
+              >
+                <ProppixIcon name="search" size={25} />
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Abrir menú"
+                onPress={() => setAccountMenu(true)}
+                style={{ padding: 9 }}
+              >
+                <ProppixIcon name="menu" size={25} />
+              </Pressable>
             </View>
-            <Text style={s.local}>{IS_PRODUCTION ? "APP" : "LOCAL"}</Text>
           </View>
         )}
+        <Modal
+          visible={accountMenu}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setAccountMenu(false)}
+        >
+          <Pressable
+            style={{
+              flex: 1,
+              backgroundColor: "#0009",
+              paddingTop: 64,
+              paddingHorizontal: 16,
+              alignItems: "flex-end",
+            }}
+            onPress={() => setAccountMenu(false)}
+          >
+            <View
+              style={{
+                backgroundColor: videoColors.surface,
+                padding: 12,
+                borderRadius: 16,
+                width: 225,
+              }}
+            >
+              <Button
+                label="Cuenta"
+                secondary
+                onPress={() => {
+                  setAccountMenu(false);
+                  setTab("account");
+                }}
+              />
+              <Button
+                label="Mi Perfil"
+                secondary
+                onPress={() => {
+                  setAccountMenu(false);
+                  setTab("manage");
+                }}
+              />
+              <Button
+                label="Mis Propiedades"
+                secondary
+                onPress={() => {
+                  setAccountMenu(false);
+                  if (!session) setTab("account");
+                  else
+                    router.replace({
+                      pathname: "/mis-videos",
+                      params: { profileSection: "properties" },
+                    });
+                }}
+              />
+            </View>
+          </Pressable>
+        </Modal>
         <Slot />
 
         {!recordingRoute && (
-          <View style={s.nav}>
-            {socialEnabled && (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Crear video sin propiedad"
-                onPress={() => router.push("/grabar")}
-                style={s.navItem}
-              >
-                <Text style={[s.navIcon, s.active, s.videoCreate]}>＋</Text>
-                <Text style={s.navLabel}>Crear</Text>
-              </Pressable>
-            )}
-            {tabs.map((t) => (
-              <Pressable
-                accessibilityRole="tab"
-                accessibilityState={{ selected: tab === t.key }}
-                key={t.key}
-                onPress={() => setTab(t.key)}
-                style={s.navItem}
-              >
-                <Text style={[s.navIcon, tab === t.key && s.active]}>
-                  {t.icon}
-                </Text>
-                <Text style={[s.navLabel, tab === t.key && s.active]}>
-                  {t.label}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
+          <SafeAreaView edges={["bottom"]} style={s.navSafe}>
+            <View accessibilityRole="tablist" style={s.nav}>
+              {tabs.map((item) => {
+                const selectedTab = tab === item.key;
+                const color = selectedTab ? "#0866f5" : "#0b295a";
+                return (
+                  <Pressable
+                    accessibilityRole={
+                      item.key === "publish" ? "button" : "tab"
+                    }
+                    accessibilityState={{ selected: selectedTab }}
+                    accessibilityLabel={item.label}
+                    key={item.key}
+                    style={s.navItem}
+                    onPress={() =>
+                      item.key === "publish"
+                        ? router.push("/grabar")
+                        : setTab(item.key)
+                    }
+                  >
+                    {item.key === "publish" ? (
+                      <View style={s.publishCircle}>
+                        <ProppixIcon name="plus" size={31} />
+                      </View>
+                    ) : item.key === "catalog" ? (
+                      <Text style={[s.propertyNavIcon, { color }]}>P</Text>
+                    ) : (
+                      <ProppixIcon
+                        name={item.icon!}
+                        size={25}
+                        color={color}
+                        filled={selectedTab}
+                      />
+                    )}
+                    <Text
+                      style={[
+                        s.navLabel,
+                        { color },
+                        selectedTab && { fontWeight: "700" },
+                      ]}
+                    >
+                      {item.label}
+                    </Text>
+                    {selectedTab && <View style={s.navIndicator} />}
+                  </Pressable>
+                );
+              })}
+            </View>
+          </SafeAreaView>
         )}
         <Modal
           visible={propertyRoute && !!detail}
@@ -1229,7 +1321,7 @@ function AppContent() {
           onRequestClose={closeDetail}
         >
           <SafeAreaView style={s.safe}>
-            <ScrollView style={s.content}>
+            <ScrollView style={s.content} keyboardShouldPersistTaps="handled">
               <Button
                 label="← Volver al recorrido"
                 secondary
@@ -1238,6 +1330,16 @@ function AppContent() {
               {detail && (
                 <>
                   {detailBusy && <ActivityIndicator color={videoColors.cyan} />}
+                  {contact === "1" && (
+                    <>
+                      <Text style={s.h2}>{detail.title}</Text>
+                      <ContactProperty
+                        key={detail.id}
+                        property={detail}
+                        session={session}
+                      />
+                    </>
+                  )}
                   {detail.media.map((m) => (
                     <Image
                       key={m.id}
@@ -1255,11 +1357,13 @@ function AppContent() {
                   <Text style={s.accent}>{price(detail)}</Text>
                   <Text style={s.muted}>{detail.description}</Text>
                   <Text style={s.h2}>{detail.advertiser.name}</Text>
-                  <ContactProperty
-                    key={detail.id}
-                    property={detail}
-                    session={session}
-                  />
+                  {contact !== "1" && (
+                    <ContactProperty
+                      key={detail.id}
+                      property={detail}
+                      session={session}
+                    />
+                  )}
                   {detail.is_demo ? (
                     <View style={s.info}>
                       <Text style={s.demo}>PUBLICACIÓN DE EJEMPLO</Text>
@@ -1316,13 +1420,12 @@ export default function App() {
 const s = StyleSheet.create({
   safe: { flex: 1, backgroundColor: videoColors.background },
   header: {
-    height: 68,
-    paddingHorizontal: 22,
+    height: 72,
+    paddingHorizontal: 20,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    borderBottomWidth: 1,
-    borderColor: videoColors.border,
+    backgroundColor: "#052b65",
   },
   brand: { fontSize: 24, fontWeight: "800", color: "#fff", letterSpacing: -1 },
   headerSub: { fontSize: 9, color: videoColors.muted, marginTop: 3 },
@@ -1409,15 +1512,60 @@ const s = StyleSheet.create({
     marginVertical: 24,
   },
   empty: { padding: 30, justifyContent: "center", alignItems: "stretch" },
+  navSafe: {
+    backgroundColor: "#fff",
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+  },
   nav: {
     flexDirection: "row",
-    height: 66,
-    borderTopWidth: 1,
-    borderColor: videoColors.border,
+    height: 74,
+    paddingHorizontal: 5,
   },
-  navItem: { flex: 1, justifyContent: "center", alignItems: "center", gap: 3 },
+  navItem: {
+    flex: 1,
+    justifyContent: "flex-end",
+    paddingBottom: 13,
+    alignItems: "center",
+    gap: 6,
+  },
+  publishCircle: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: "#0866f5",
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: -15,
+    borderWidth: 3,
+    borderColor: "#fff",
+  },
+  propertyNavIcon: { fontSize: 29, fontWeight: "800", lineHeight: 29 },
+  navIndicator: {
+    position: "absolute",
+    height: 3,
+    backgroundColor: "#0866f5",
+    borderRadius: 2,
+    bottom: 3,
+    width: 43,
+  },
+  messageScreen: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 30,
+  },
+  messageIcon: {
+    width: 88,
+    height: 88,
+    borderRadius: 28,
+    backgroundColor: "#0c315e",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 24,
+  },
   navIcon: { color: videoColors.muted, fontSize: 23 },
-  navLabel: { fontSize: 10, color: videoColors.muted },
+  navLabel: { fontSize: 10, color: "#0b295a" },
   active: { color: videoColors.text },
   propertyCard: {
     borderRadius: 20,

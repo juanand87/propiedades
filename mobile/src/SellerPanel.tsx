@@ -1,3 +1,4 @@
+import { formatClpInput, parseClpInput } from "./clp";
 import { videoColors } from "./video-colors";
 import { useEffect, useState } from "react";
 import {
@@ -8,6 +9,7 @@ import {
   Image,
   StyleSheet,
   Alert,
+  Linking,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import { File } from "expo-file-system";
@@ -23,6 +25,14 @@ type Catalog = {
   }[];
 };
 type Allowance = { can_create: boolean; used: number; message: string };
+const publicationLabels: Record<string, string> = {
+  draft: "Borrador",
+  pending_review: "En revisión",
+  published: "Publicada",
+  paused: "Pausada",
+  rejected: "Rechazada",
+  archived: "Archivada",
+};
 type Lead = {
   id: string;
   title: string;
@@ -68,6 +78,7 @@ export function SellerPanel({
     [picker, setPicker] = useState<string | null>(null),
     [search, setSearch] = useState(""),
     [showMessages, setShowMessages] = useState(false);
+  const [loadingLeads, setLoadingLeads] = useState(false);
   const [list, setList] = useState<Page<Property> | null>(null);
   const token = session.access_token;
   const [linked, setLinked] = useState(false);
@@ -79,14 +90,12 @@ export function SellerPanel({
       api<Allowance>("/me/publication-allowance", { token }),
       api<Catalog>("/catalog"),
       api<typeof stats>("/manage/stats", { token }),
-      api<Lead[]>("/manage/inquiries", { token }),
     ])
-      .then(([a, c, s, l]) => {
+      .then(([a, c, s]) => {
         if (live) {
           setAllowance(a);
           setCatalog(c);
           setStats(s);
-          setLeads(l);
         }
       })
       .catch((e) => {
@@ -110,17 +119,24 @@ export function SellerPanel({
     setForm((v) => ({
       ...v,
       [key]: value,
+      ...(key === "price_unit" && value === "CLP"
+        ? { price_amount: (v.price_amount || "").split(".")[0] }
+        : {}),
       ...(key === "region_id" ? { commune_id: "" } : {}),
     }));
+  const clpPrice = (key: string) =>
+    key === "price_amount" && form.price_unit === "CLP";
   const field = (key: string, label: string, numeric = false) => (
     <View key={key}>
       <Text style={s.text}>{label}</Text>
       <TextInput
         accessibilityLabel={label}
         style={s.input}
-        value={form[key] || ""}
-        onChangeText={(v) => set(key, v)}
-        keyboardType={numeric ? "decimal-pad" : "default"}
+        value={clpPrice(key) ? formatClpInput(form[key]) : form[key] || ""}
+        onChangeText={(v) => set(key, clpPrice(key) ? parseClpInput(v) : v)}
+        keyboardType={
+          clpPrice(key) ? "number-pad" : numeric ? "decimal-pad" : "default"
+        }
         multiline={key === "description"}
         maxLength={key === "description" ? 30000 : 180}
       />
@@ -376,6 +392,12 @@ export function SellerPanel({
                   ? void linkExistingProperty(p.id)
                   : void editProperty(p.id),
               )}
+              {p.publication_status && (
+                <Text style={s.text}>
+                  {publicationLabels[p.publication_status] ||
+                    p.publication_status}
+                </Text>
+              )}
             </View>
           ))}
           {list.page < list.pages &&
@@ -492,10 +514,24 @@ export function SellerPanel({
       )}
       {button(
         showMessages ? "Ocultar mensajes" : "Ver mensajes recibidos",
-        () => setShowMessages(!showMessages),
+        () => {
+          setShowMessages(!showMessages);
+          if (!showMessages && !loadingLeads) {
+            setError("");
+            setLoadingLeads(true);
+            void api<Lead[]>("/manage/inquiries", { token })
+              .then(setLeads)
+              .catch((e) =>
+                Alert.alert("No se pudieron cargar las consultas", e.message),
+              )
+              .finally(() => setLoadingLeads(false));
+          }
+        },
       )}
       {showMessages &&
-        (leads.length ? (
+        (loadingLeads ? (
+          <Text style={s.text}>Cargando consultas…</Text>
+        ) : leads.length ? (
           leads.map((l) => (
             <View key={l.id} style={s.card}>
               <Text style={s.title}>{l.title}</Text>
@@ -503,9 +539,27 @@ export function SellerPanel({
                 {l.name}: {l.message}
               </Text>
               <Text style={s.text}>
-                {l.email} · {l.phone}
+                {[l.email, l.phone].filter(Boolean).join(" · ")}
               </Text>
               <Text style={s.text}>Estado: {l.status}</Text>
+              {!!l.email &&
+                button("Responder por correo", () => {
+                  const address = encodeURIComponent(l.email).replace(
+                    /%40/g,
+                    "@",
+                  );
+                  const subject = encodeURIComponent(
+                    `Consulta Proppix · ${l.title}`,
+                  );
+                  void Linking.openURL(
+                    `mailto:${address}?subject=${subject}`,
+                  ).catch(() =>
+                    Alert.alert(
+                      "Correo no disponible",
+                      `Puedes escribir a ${l.email}.`,
+                    ),
+                  );
+                })}
               {button("Marcar como contactado", () => {
                 setBusy(true);
                 api("/manage/inquiries/" + l.id, {

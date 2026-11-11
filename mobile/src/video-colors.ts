@@ -1,9 +1,9 @@
 export const videoColors = {
-  background: "#000000",
-  surface: "#151515",
-  border: "#2b2b2b",
+  background: "#041e48",
+  surface: "#0c315e",
+  border: "#35547a",
   text: "#ffffff",
-  muted: "#a8a8a8",
-  pink: "#ff2d55",
-  cyan: "#25f4ee",
+  muted: "#b9cbe1",
+  pink: "#0866f5",
+  cyan: "#31c8ee",
 };

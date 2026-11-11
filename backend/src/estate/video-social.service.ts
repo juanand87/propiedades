@@ -212,18 +212,39 @@ export class VideoSocialService {
     );
     return this.profile(id, actor);
   }
-  async followers(id: string, rawPage: string) {
+  async followers(
+    id: string,
+    rawPage: string,
+    direction: 'followers' | 'following' = 'followers',
+    query = '',
+  ) {
     await this.profile(id);
     const page = Math.max(1, Math.min(10000, parseInt(rawPage, 10) || 1));
+    const following = direction === 'following';
+    const other = following ? 'followed_id' : 'follower_id';
+    const owner = following ? 'follower_id' : 'followed_id';
+    const search = text(query, 100);
     const rows = await this.db.query(
-      `SELECT u.id,COALESCE(p.display_name,u.firstName) display_name
+      `SELECT u.id,p.avatar_media_id,COALESCE(p.display_name,u.firstName) display_name
        FROM estate_video_follows f
-       JOIN users u ON CONVERT(u.id USING utf8mb4) COLLATE utf8mb4_unicode_ci=f.follower_id
-       LEFT JOIN estate_video_profiles p ON p.user_id=f.follower_id
-       WHERE f.followed_id=? AND u.isActive=1 ORDER BY f.created_at DESC,f.follower_id LIMIT 25 OFFSET ?`,
-      [id, (page - 1) * 24],
+       JOIN users u ON CONVERT(u.id USING utf8mb4) COLLATE utf8mb4_unicode_ci=f.${other}
+       LEFT JOIN estate_video_profiles p ON p.user_id=f.${other}
+       WHERE f.${owner}=? AND u.isActive=1 AND LOCATE(?,COALESCE(p.display_name,u.firstName))>0
+       ORDER BY f.created_at DESC,f.${other} LIMIT 25 OFFSET ?`,
+      [id, search, (page - 1) * 24],
     );
-    return { items: rows.slice(0, 24), has_more: rows.length > 24 };
+    return {
+      items: rows
+        .slice(0, 24)
+        .map(({ id, display_name, avatar_media_id }) => ({
+          id,
+          display_name,
+          avatar_url: avatar_media_id
+            ? this.estate.mediaUrl(avatar_media_id, { id } as Actor)
+            : null,
+        })),
+      has_more: rows.length > 24,
+    };
   }
   async comments(id: string, actor?: Actor) {
     await this.access(id, actor);

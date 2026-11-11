@@ -34,6 +34,7 @@ export function SocialVideoActions({
     favorite: boolean;
     onFavorite: () => void;
     onDetails: () => void;
+    onContact?: () => void;
     onShare: () => void;
   };
 }) {
@@ -280,6 +281,8 @@ export function SocialVideoActions({
                 params: { propertyId: data.property_id! },
               }),
             )}
+        {propertyActions?.onContact &&
+          option("Consultar al vendedor", propertyActions.onContact)}
       </View>
       {!!error && !panel && (
         <View style={s.inlineError}>

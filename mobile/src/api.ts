@@ -13,6 +13,9 @@ export type Property = {
   bedrooms: number | null;
   bathrooms: number | null;
   built_area: string | null;
+  land_area?: string | null;
+  type_id?: string;
+  operation_type?: string;
   publication_status?: string;
   is_demo: boolean;
   media: { id: string; url: string; alt_text: string }[];

@@ -40,6 +40,9 @@ async function main() {
       'utf8',
     );
     await db.query(migration);
+    await db.query(
+      fs.readFileSync(path.join(root, 'database/PLANES_MEMBRESIA.sql'), 'utf8'),
+    );
     // Simulate a compatible legacy users table with a different collation.
     // This is exclusively the disposable instance validated by the guard above.
     await db.query(
@@ -304,6 +307,13 @@ async function main() {
       null,
       one.access_token,
     );
+    await call('POST', '/manage/properties', payload, one.access_token, 403);
+    await call(
+      'PATCH',
+      '/admin/users/' + one.user.id,
+      { membership_plan: 'basic' },
+      admin,
+    );
     await call(
       'POST',
       '/manage/properties',
@@ -355,6 +365,11 @@ async function main() {
       admin,
     );
     const pub = await call('GET', '/properties/' + p.id);
+    const saleListings = await call('GET', '/properties?operation_type=sale');
+    assert.ok(saleListings.items.some((item) => item.id === p.id));
+    const rentalListings = await call('GET', '/properties?operation_type=rent');
+    assert.ok(!rentalListings.items.some((item) => item.id === p.id));
+    assertions += 2;
     await call(
       'PATCH',
       '/manage/properties/' + p.id,

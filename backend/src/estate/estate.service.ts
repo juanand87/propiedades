@@ -745,6 +745,7 @@ export class EstateService {
       'advertiser_id',
       'price_unit',
       'availability',
+      'operation_type',
     ])
       if (q[key]) {
         where.push(`p.${key}=?`);

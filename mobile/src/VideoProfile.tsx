@@ -148,6 +148,7 @@ export function VideoProfile({
   onPropertiesChanged,
   pendingVideoId,
   propertyMode,
+  initialSection,
   propertyFavorite,
 }: {
   session: Session | null;
@@ -155,6 +156,7 @@ export function VideoProfile({
   onPropertiesChanged?: () => void;
   pendingVideoId?: string;
   propertyMode?: "new" | "link";
+  initialSection?: "properties";
   propertyFavorite?: PropertyFavorite;
 }) {
   const router = useRouter();
@@ -180,20 +182,31 @@ export function VideoProfile({
   }, [own, token, videosRefresh]);
   const [followersOpen, setFollowersOpen] = useState(false);
   const [followers, setFollowers] = useState<
-    { id: string; display_name: string }[]
+    { id: string; display_name: string; avatar_url?: string | null }[]
   >([]);
   const [followersPage, setFollowersPage] = useState(1);
   const [followersMore, setFollowersMore] = useState(false);
-  async function showFollowers(next = 1) {
-    if (!target) return;
+  const [relation, setRelation] = useState<"followers" | "following">(
+    "followers",
+  );
+  const [relationSearch, setRelationSearch] = useState("");
+  const [appliedSearch, setAppliedSearch] = useState("");
+  async function showFollowers(
+    next = 1,
+    direction = relation,
+    query = relationSearch,
+  ) {
+    if (!target || busy) return;
+    setRelation(direction);
     if (next === 1) {
+      setAppliedSearch(query);
       setFollowers([]);
       setFollowersMore(false);
       setFollowersOpen(true);
     }
     await run(async () => {
       const result = await api<{ items: typeof followers; has_more: boolean }>(
-        `/video-profiles/${target}/followers?page=${next}`,
+        `/video-profiles/${target}/${direction}?page=${next}&q=${encodeURIComponent(query)}`,
       );
       setFollowers((previous) =>
         next === 1 ? result.items : [...previous, ...result.items],
@@ -209,7 +222,7 @@ export function VideoProfile({
     [loading, setLoading] = useState(false),
     [error, setError] = useState("");
   const [section, setSection] = useState<"videos" | "saved" | "properties">(
-    pendingVideoId ? "properties" : "videos",
+    pendingVideoId || initialSection === "properties" ? "properties" : "videos",
   );
   const [viewer, setViewer] = useState<number | null>(null),
     [active, setActive] = useState(0),
@@ -373,7 +386,34 @@ export function VideoProfile({
     <View style={s.header}>
       {userId && button("← Volver", () => router.back(), true)}
       <View style={s.topline}>
-        <Text style={s.title}>{profile?.display_name || "Tu perfil"}</Text>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={own ? "Cambiar foto de perfil" : "Foto de perfil"}
+          disabled={!own || busy}
+          onPress={() => void choosePhoto()}
+          style={s.avatarWrap}
+        >
+          {profile?.avatar_url ? (
+            <Image
+              source={{ uri: mediaUrl(profile.avatar_url) }}
+              style={s.avatar}
+            />
+          ) : (
+            <View style={s.avatar}>
+              <Text style={s.initial}>
+                {profile?.display_name.slice(0, 1) || "P"}
+              </Text>
+            </View>
+          )}
+          {own && (
+            <View style={s.camera}>
+              <Text>✎</Text>
+            </View>
+          )}
+        </Pressable>
+        <Text numberOfLines={1} style={[s.title, { flex: 1 }]}>
+          {profile?.display_name || "Tu perfil"}
+        </Text>
         {own && (
           <Pressable
             accessibilityLabel="Editar nombre de perfil"
@@ -382,36 +422,10 @@ export function VideoProfile({
               setEditProfile(true);
             }}
           >
-            <Text style={s.gear}>☰</Text>
+            <Text style={s.gear}>✎</Text>
           </Pressable>
         )}
       </View>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={own ? "Cambiar foto de perfil" : "Foto de perfil"}
-        disabled={!own || busy}
-        onPress={() => void choosePhoto()}
-        style={s.avatarWrap}
-      >
-        {profile?.avatar_url ? (
-          <Image
-            source={{ uri: mediaUrl(profile.avatar_url) }}
-            style={s.avatar}
-          />
-        ) : (
-          <View style={s.avatar}>
-            <Text style={s.initial}>
-              {profile?.display_name.slice(0, 1) || "P"}
-            </Text>
-          </View>
-        )}
-        {own && (
-          <View style={s.camera}>
-            <Text>✎</Text>
-          </View>
-        )}
-      </Pressable>
-      <Text style={s.handle}>@{profile?.display_name || "propiedades"}</Text>
       <View style={s.counters}>
         {(
           [
@@ -423,9 +437,16 @@ export function VideoProfile({
           <Pressable
             key={label}
             style={s.counter}
-            disabled={label !== "Seguidores" || busy}
-            accessibilityRole={label === "Seguidores" ? "button" : undefined}
-            onPress={() => void showFollowers()}
+            disabled={label === "Me gusta" || busy}
+            accessibilityRole={label !== "Me gusta" ? "button" : undefined}
+            onPress={() => {
+              setRelationSearch("");
+              void showFollowers(
+                1,
+                label === "Siguiendo" ? "following" : "followers",
+                "",
+              );
+            }}
           >
             <Text style={s.counterNumber}>{n}</Text>
             <Text style={s.muted}>{label}</Text>
@@ -495,42 +516,108 @@ export function VideoProfile({
     <View style={s.root}>
       <Modal
         visible={followersOpen}
-        transparent
         animationType="slide"
         onRequestClose={() => setFollowersOpen(false)}
       >
-        <View style={s.overlay}>
-          <View style={[s.dialog, { maxHeight: "80%" }]}>
-            <Text style={s.title}>Seguidores</Text>
-            {error ? <Text style={s.error}>{error}</Text> : null}
-            <ScrollView>
-              {followers.map((person) => (
-                <View key={person.id}>
-                  {button(
-                    person.display_name,
-                    () => {
-                      setFollowersOpen(false);
-                      router.push({
-                        pathname: "/perfil/[userId]",
-                        params: { userId: person.id },
-                      });
-                    },
-                    true,
-                  )}
-                </View>
-              ))}
-              {!busy && !followers.length && !error && (
-                <Text style={s.muted}>Todavía no hay seguidores.</Text>
-              )}
-              {followersMore &&
+        <View style={[s.root, { paddingTop: 36, paddingHorizontal: 16 }]}>
+          <View style={[s.row, { alignItems: "center" }]}>
+            {button("← Volver", () => setFollowersOpen(false), true)}
+            <Text style={s.title} numberOfLines={1}>
+              {profile?.display_name}
+            </Text>
+          </View>
+          <View style={s.tabs}>
+            {(["followers", "following"] as const).map((kind) => (
+              <Pressable
+                key={kind}
+                disabled={busy}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: relation === kind }}
+                style={[s.tab, relation === kind && s.selectedTab]}
+                onPress={() => {
+                  setRelationSearch("");
+                  void showFollowers(1, kind, "");
+                }}
+              >
+                <Text style={s.light}>
+                  {kind === "followers"
+                    ? `${profile?.followers ?? 0} seguidores`
+                    : `${profile?.following ?? 0} siguiendo`}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+          <View style={[s.row, { alignItems: "center", marginVertical: 10 }]}>
+            <TextInput
+              style={[s.input, { flex: 1 }]}
+              accessibilityLabel="Buscar usuario"
+              placeholder="Buscar usuario"
+              placeholderTextColor={videoColors.muted}
+              value={relationSearch}
+              onChangeText={setRelationSearch}
+              onSubmitEditing={() => void showFollowers()}
+              returnKeyType="search"
+            />
+            {button("Buscar", () => void showFollowers(), true)}
+          </View>
+          {error ? <Text style={s.error}>{error}</Text> : null}
+          <FlatList
+            data={followers}
+            keyExtractor={(person) => person.id}
+            keyboardShouldPersistTaps="handled"
+            renderItem={({ item: person }) => (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`Ver perfil de ${person.display_name}`}
+                style={[s.row, { alignItems: "center", paddingVertical: 10 }]}
+                onPress={() => {
+                  setFollowersOpen(false);
+                  router.push({
+                    pathname: "/perfil/[userId]",
+                    params: { userId: person.id },
+                  });
+                }}
+              >
+                {person.avatar_url ? (
+                  <Image
+                    source={{ uri: mediaUrl(person.avatar_url) }}
+                    style={s.avatar}
+                  />
+                ) : (
+                  <View style={s.avatar}>
+                    <Text style={s.initial}>
+                      {person.display_name.slice(0, 1)}
+                    </Text>
+                  </View>
+                )}
+                <Text style={[s.light, { flex: 1 }]}>
+                  {person.display_name}
+                </Text>
+                <Text style={s.muted}>Ver perfil ›</Text>
+              </Pressable>
+            )}
+            ListEmptyComponent={
+              !busy && !error ? (
+                <Text style={s.muted}>No se encontraron usuarios.</Text>
+              ) : undefined
+            }
+            ListFooterComponent={
+              busy ? (
+                <ActivityIndicator />
+              ) : followersMore ? (
                 button(
                   "Cargar más",
-                  () => void showFollowers(followersPage + 1),
-                )}
-            </ScrollView>
-            {busy && <ActivityIndicator />}
-            {button("Cerrar", () => setFollowersOpen(false), true)}
-          </View>
+                  () =>
+                    void showFollowers(
+                      followersPage + 1,
+                      relation,
+                      appliedSearch,
+                    ),
+                  true,
+                )
+              ) : undefined
+            }
+          />
         </View>
       </Modal>
       {own && quota && (
@@ -746,26 +833,27 @@ const s = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 16,
     alignItems: "center",
-    gap: 14,
+    gap: 8,
   },
   topline: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    gap: 12,
     width: "100%",
   },
   title: { color: "#fff", fontSize: 24, fontWeight: "800" },
   gear: { color: videoColors.cyan, fontSize: 25, padding: 8 },
   avatarWrap: { position: "relative" },
   avatar: {
-    width: 88,
-    height: 88,
-    borderRadius: 44,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: videoColors.surface,
     alignItems: "center",
     justifyContent: "center",
   },
-  initial: { color: videoColors.cyan, fontSize: 38, fontWeight: "800" },
+  initial: { color: videoColors.cyan, fontSize: 20, fontWeight: "800" },
   camera: {
     position: "absolute",
     bottom: 0,
