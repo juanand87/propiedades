@@ -57,6 +57,8 @@ import { PropertyCatalog } from "./PropertyCatalog";
 import { ProppixBrand } from "./ProppixBrand";
 import { ProppixIcon, ProppixIconName } from "./ProppixIcon";
 import { clampVideoOffset } from "./video-paging";
+import { prepareVideoCache, useVideoPreload } from "./useVideoPreload";
+import { MessagesScreen } from "./MessagesScreen";
 
 type Tab = "feed" | "catalog" | "manage" | "messages" | "account";
 const sessionKey = IS_PRODUCTION
@@ -116,6 +118,8 @@ function AppContent() {
     propertyMode,
     profileSection,
     contact,
+    conversationId,
+    recipientId,
   } = useGlobalSearchParams<{
     propertyId?: string;
     from?: Tab;
@@ -124,6 +128,8 @@ function AppContent() {
     propertyMode?: "new" | "link";
     profileSection?: "properties";
     contact?: "1";
+    conversationId?: string;
+    recipientId?: string;
   }>();
   const tab: Tab = propertyRoute
     ? from && from in routes
@@ -170,10 +176,11 @@ function AppContent() {
     [loading, setLoading] = useState(false),
     [feedError, setFeedError] = useState(""),
     [active, setActive] = useState(0),
-    [readyVideoId, setReadyVideoId] = useState<string | null>(null),
     [height, setHeight] = useState(1),
-    [muted, setMuted] = useState(true),
     [foreground, setForeground] = useState(AppState.currentState === "active");
+  const feedVisible =
+    ready && foreground && tab === "feed" && !propertyRoute && !detail;
+  const preparedVideos = useVideoPreload(videos, active, feedVisible);
   const feedRef = useRef<FlatList<Video>>(null),
     feedDragIndex = useRef(0),
     busy = useRef(false),
@@ -218,6 +225,7 @@ function AppContent() {
     setBooting(true);
     setError("");
     try {
+      await prepareVideoCache();
       await checkEnvironment();
       setReady(true);
     } catch (e) {
@@ -260,7 +268,7 @@ function AppContent() {
         : feedGeneration.current,
       next = reset ? 1 : page + 1;
     try {
-      const data = await api<Page<Video>>(`/videos?page=${next}`);
+      const data = await api<Page<Video>>(`/videos?limit=12&page=${next}`);
       if (generation !== feedGeneration.current || !mounted.current) return;
       setVideos((v) =>
         reset
@@ -281,6 +289,21 @@ function AppContent() {
       setLoading(false);
     }
   }
+  const topUpFeed = useEffectEvent(() => {
+    void loadFeed();
+  });
+  useEffect(() => {
+    if (
+      !feedVisible ||
+      loading ||
+      feedError ||
+      page >= pages ||
+      videos.length - active > 10
+    )
+      return;
+    const timer = setTimeout(() => topUpFeed(), 200);
+    return () => clearTimeout(timer);
+  }, [feedVisible, loading, feedError, page, pages, videos.length, active]);
   const onReady = useEffectEvent(() => {
     void loadFeed(true);
   });
@@ -657,7 +680,7 @@ function AppContent() {
           initialNumToRender={2}
           maxToRenderPerBatch={2}
           windowSize={3}
-          extraData={`${active}-${readyVideoId}-${muted}-${foreground}-${!!detail}-${favorites.join(",")}`}
+          extraData={[active, preparedVideos, foreground, detail, favorites]}
           onScrollBeginDrag={() => {
             feedDragIndex.current = active;
           }}
@@ -706,19 +729,16 @@ function AppContent() {
               item={item}
               height={height}
               active={index === active && foreground && !detail}
-              nearby={
-                index === active ||
-                (foreground &&
-                  !detail &&
-                  index === active + 1 &&
-                  readyVideoId === videos[active]?.id)
+              player={
+                feedVisible &&
+                index === active &&
+                preparedVideos.get(item.id)?.url === item.url
+                  ? preparedVideos.get(item.id)?.player
+                  : undefined
               }
-              onReady={setReadyVideoId}
-              muted={muted}
               social={socialEnabled}
               session={session}
               favorite={favorites.includes(item.property_id || "")}
-              onMute={() => setMuted((v) => !v)}
               onFavorite={() => {
                 if (item.property_id) void favorite(item.property_id);
               }}
@@ -1117,16 +1137,18 @@ function AppContent() {
         feed: feedScreen,
         catalog: catalogScreen,
         messages: (
-          <View style={s.messageScreen}>
-            <View style={s.messageIcon}>
-              <ProppixIcon name="messages" size={43} color="#31c8ee" />
-            </View>
-            <Text style={s.h1}>Mensajes</Text>
-            <Text style={[s.muted, { textAlign: "center" }]}>
-              Próximamente podrás conversar aquí. Por ahora puedes enviar
-              consultas desde cada propiedad.
-            </Text>
-          </View>
+          <MessagesScreen
+            key={[
+              session?.user.id,
+              conversationId,
+              recipientId,
+              propertyId,
+            ].join(":")}
+            session={session}
+            conversationId={conversationId}
+            recipientId={recipientId}
+            propertyId={propertyId}
+          />
         ),
         account: accountScreen,
         manage: socialEnabled ? (

@@ -2,6 +2,7 @@ import { videoColors } from "./video-colors";
 import { useState } from "react";
 import { View, Text, TextInput, Pressable } from "react-native";
 import { api, Property, Session } from "./api";
+import { useRouter } from "expo-router";
 export function ContactProperty({
   property,
   session,
@@ -9,6 +10,7 @@ export function ContactProperty({
   property: Property;
   session: Session | null;
 }) {
+  const router = useRouter();
   const [message, setMessage] = useState(""),
     [consent, setConsent] = useState(false),
     [busy, setBusy] = useState(false),
@@ -22,6 +24,25 @@ export function ContactProperty({
     );
   return (
     <View style={{ gap: 12, marginVertical: 18 }}>
+      <Pressable
+        accessibilityRole="button"
+        style={{
+          padding: 15,
+          borderRadius: 24,
+          backgroundColor: "#0866f5",
+          alignItems: "center",
+        }}
+        onPress={() =>
+          router.push({
+            pathname: "/mensajes",
+            params: { propertyId: property.id },
+          })
+        }
+      >
+        <Text style={{ color: "#fff", fontWeight: "700" }}>
+          Enviar mensaje en Proppix
+        </Text>
+      </Pressable>
       <Text style={{ color: "#fff", fontWeight: "700", fontSize: 18 }}>
         Enviar mensaje al vendedor
       </Text>

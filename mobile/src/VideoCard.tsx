@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -7,7 +7,7 @@ import {
   Text,
   View,
 } from "react-native";
-import { useVideoPlayer, VideoView } from "expo-video";
+import { VideoPlayer, VideoView } from "expo-video";
 import { mediaUrl, Video, Session } from "./api";
 import { videoColors } from "./video-colors";
 import { videoIcons } from "./video-icons";
@@ -15,53 +15,40 @@ import { SocialVideoActions } from "./SocialVideoActions";
 
 function Player({
   url,
-  active,
-  muted,
-  onReady,
+  player,
+  paused,
+  onPause,
 }: {
   url: string;
-  active: boolean;
-  muted: boolean;
-  onReady: () => void;
+  player: VideoPlayer;
+  paused: boolean;
+  onPause: () => void;
 }) {
-  const player = useVideoPlayer(
-    { uri: mediaUrl(url), contentType: "progressive" },
-    (p) => {
-      p.bufferOptions = {
-        minBufferForPlayback: 1.25,
-        preferredForwardBufferDuration: 8,
-      };
-      p.loop = true;
-      p.muted = muted;
-    },
-  );
   const [error, setError] = useState(""),
-    [loading, setLoading] = useState(() => player.status === "loading"),
-    [paused, setPaused] = useState(false);
+    [loading, setLoading] = useState(() => player.status === "loading");
+  const playingAllowed = useRef(!paused);
   useEffect(() => {
-    // expo-video exposes a native mutable setter, not a React state object.
-    // eslint-disable-next-line react-hooks/immutability
-    player.muted = muted;
-  }, [muted, player]);
-  useEffect(() => {
-    if (active && !paused) player.play();
+    playingAllowed.current = !paused;
+    if (!paused) player.play();
     else player.pause();
-  }, [active, paused, player]);
+    return () => {
+      playingAllowed.current = false;
+    };
+  }, [paused, player]);
   useEffect(() => {
-    if (active && player.status === "readyToPlay") onReady();
-    const sub = player.addListener("statusChange", (e) => {
-      if (active && e.status === "readyToPlay") onReady();
-      setLoading(e.status === "loading");
-      if (e.status === "error") setError("No se pudo reproducir este video.");
-      else setError("");
+    const sub = player.addListener("statusChange", (event) => {
+      setLoading(event.status === "loading");
+      setError(
+        event.status === "error" ? "No se pudo reproducir este video." : "",
+      );
     });
     return () => sub.remove();
-  }, [active, onReady, player]);
+  }, [player]);
   return (
     <Pressable
       style={StyleSheet.absoluteFill}
       accessibilityLabel={paused ? "Reproducir video" : "Pausar video"}
-      onPress={() => setPaused((v) => !v)}
+      onPress={onPause}
     >
       <VideoView
         style={StyleSheet.absoluteFill}
@@ -81,15 +68,15 @@ function Player({
             accessibilityRole="button"
             onPress={() => {
               setError("");
-              setPaused(false);
               setLoading(true);
               void player
                 .replaceAsync({
                   uri: mediaUrl(url),
                   contentType: "progressive",
+                  useCaching: true,
                 })
                 .then(() => {
-                  if (active) player.play();
+                  if (playingAllowed.current) player.play();
                 })
                 .catch(() =>
                   setError("Video no disponible. Desliza para continuar."),
@@ -107,11 +94,8 @@ export function VideoCard({
   item,
   height,
   active,
-  nearby,
-  onReady,
-  muted,
+  player,
   favorite,
-  onMute,
   onFavorite,
   onDetails,
   onContact,
@@ -122,11 +106,8 @@ export function VideoCard({
   item: Video;
   height: number;
   active: boolean;
-  nearby: boolean;
-  onReady: (id: string) => void;
-  muted: boolean;
+  player?: VideoPlayer;
   favorite: boolean;
-  onMute: () => void;
   onFavorite: () => void;
   onDetails: () => void;
   onContact?: () => void;
@@ -135,22 +116,32 @@ export function VideoCard({
   session?: Session | null;
 }) {
   const p = item.property;
+  const [paused, setPaused] = useState(false);
+  useEffect(() => {
+    if (!active) {
+      const timer = setTimeout(() => setPaused(false), 0);
+      return () => clearTimeout(timer);
+    }
+  }, [active]);
   return (
     <View style={[styles.card, { height }]}>
-      {!nearby && !!p?.media[0] && (
+      {(!active || !player) && !!p?.media[0] && (
         <Image
           source={{ uri: mediaUrl(p.media[0].url) }}
           style={StyleSheet.absoluteFill}
           resizeMode="cover"
         />
       )}
-      {nearby && (
+      {active && player && (
         <Player
           url={item.url}
-          active={active}
-          muted={muted}
-          onReady={() => onReady(item.id)}
+          player={player}
+          paused={paused}
+          onPause={() => setPaused((value) => !value)}
         />
+      )}
+      {active && !player && (
+        <ActivityIndicator style={styles.center} color="#fff" />
       )}
       <View pointerEvents="none" style={styles.shade} />
       {!social && (
@@ -183,38 +174,20 @@ export function VideoCard({
             />
             <Text style={styles.small}>Compartir</Text>
           </Pressable>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={muted ? "Activar sonido" : "Silenciar video"}
-            onPress={onMute}
-            style={styles.circle}
-          >
-            <Text style={styles.action}>{muted ? "♪̸" : "♪"}</Text>
-            <Text style={styles.small}>
-              {muted ? "Sin sonido" : "Con sonido"}
-            </Text>
-          </Pressable>
         </View>
       )}
       {social && active && (
         <SocialVideoActions
           videoId={item.id}
           session={session}
+          paused={paused}
+          onResume={() => setPaused(false)}
           propertyActions={
             p
               ? { favorite, onFavorite, onDetails, onContact, onShare }
               : undefined
           }
         />
-      )}
-      {social && (
-        <Pressable
-          accessibilityLabel={muted ? "Activar sonido" : "Silenciar video"}
-          onPress={onMute}
-          style={{ position: "absolute", top: 20, right: 15, padding: 12 }}
-        >
-          <Text style={styles.white}>{muted ? "♪̸" : "♪"}</Text>
-        </Pressable>
       )}
       {!social && p && (
         <View style={styles.copy}>

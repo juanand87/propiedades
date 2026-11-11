@@ -88,7 +88,7 @@ export class PropertyVideosService {
   async feed(q: any) {
     this.guard();
     const page = Math.max(1, Math.min(10000, Number.parseInt(q.page, 10) || 1));
-    const limit = 5;
+    const limit = Math.max(1, Math.min(20, Number.parseInt(q.limit, 10) || 5));
     const type =
       typeof q.type_id === 'string' && q.type_id.length <= 30 ? q.type_id : '';
     const videoId = q.video_id ? uuid(q.video_id) : null;

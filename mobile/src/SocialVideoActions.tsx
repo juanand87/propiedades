@@ -16,7 +16,7 @@ import { Directory, File, Paths } from "expo-file-system";
 import { useRouter } from "expo-router";
 import { api, mediaUrl, Page, Property, Session } from "./api";
 import { videoColors } from "./video-colors";
-import { videoIcons } from "./video-icons";
+import { ProppixIcon } from "./ProppixIcon";
 import { VideoSocialData } from "./social-types";
 
 export function SocialVideoActions({
@@ -25,10 +25,14 @@ export function SocialVideoActions({
   onChanged,
   propertyActions,
   propertyFavorite,
+  paused = false,
+  onResume,
 }: {
   videoId: string;
   session: Session | null;
   onChanged?: () => void;
+  paused?: boolean;
+  onResume?: () => void;
   propertyFavorite?: { ids: string[]; toggle: (id: string) => void };
   propertyActions?: {
     favorite: boolean;
@@ -129,7 +133,7 @@ export function SocialVideoActions({
     });
   }
   const action = (
-    icon: "comment" | "heart" | "share",
+    icon: "comment" | "heart" | "share" | "bookmark",
     label: string,
     fn: () => void,
     selected = false,
@@ -140,9 +144,20 @@ export function SocialVideoActions({
       accessibilityLabel={accessibility}
       disabled={busy}
       onPress={fn}
-      style={s.action}
+      accessibilityState={{ selected, disabled: busy }}
+      style={({ pressed }) => [
+        s.action,
+        pressed && { opacity: 0.7, transform: [{ scale: 0.92 }] },
+      ]}
     >
-      <Image source={videoIcons[icon]} style={{ width: 34, height: 34 }} />
+      <View style={s.actionIcon}>
+        <ProppixIcon
+          name={icon}
+          size={icon === "bookmark" ? 29 : 37}
+          color={selected ? videoColors.cyan : "#fff"}
+          filled={icon !== "bookmark" || selected}
+        />
+      </View>
       <Text style={[s.count, selected && { color: videoColors.cyan }]}>
         {label}
       </Text>
@@ -187,25 +202,50 @@ export function SocialVideoActions({
             </View>
           )}
         </Pressable>
-        {data &&
-          session?.user.id !== data.creator.id &&
-          option(data.creator.followed ? "Siguiendo" : "+ Seguir", () => {
-            if (!requireSession()) return;
-            void run(async () => {
-              const creator = await api<VideoSocialData["creator"]>(
-                `/video-profiles/${data.creator.id}/follow`,
-                {
-                  method: "POST",
-                  token,
-                  body: { active: !data.creator.followed },
-                },
-              );
-              setData({ ...data, creator });
-            });
-          })}
+        {data && session?.user.id !== data.creator.id && (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={
+              data.creator.followed
+                ? "Dejar de seguir al creador"
+                : "Seguir al creador"
+            }
+            accessibilityState={{
+              selected: data.creator.followed,
+              disabled: busy,
+            }}
+            disabled={busy}
+            style={[s.follow, data.creator.followed && s.following]}
+            onPress={() => {
+              if (!requireSession()) return;
+              void run(async () => {
+                const creator = await api<VideoSocialData["creator"]>(
+                  `/video-profiles/${data.creator.id}/follow`,
+                  {
+                    method: "POST",
+                    token,
+                    body: { active: !data.creator.followed },
+                  },
+                );
+                setData({ ...data, creator });
+              });
+            }}
+          >
+            <ProppixIcon
+              name={data.creator.followed ? "check" : "plus"}
+              size={13}
+              color={data.creator.followed ? "#fff" : "#052553"}
+            />
+            <Text
+              style={[s.followText, data.creator.followed && { color: "#fff" }]}
+            >
+              {data.creator.followed ? "Siguiendo" : "Seguir"}
+            </Text>
+          </Pressable>
+        )}
         {action(
           "heart",
-          `${data?.likes ?? 0} Me gusta`,
+          String(data?.likes ?? 0),
           () => {
             if (!data || !requireSession()) return;
             void run(async () => {
@@ -231,7 +271,7 @@ export function SocialVideoActions({
         )}
         {propertyActions &&
           action(
-            "heart",
+            "bookmark",
             propertyActions.favorite ? "Guardado" : "Guardar",
             propertyActions.onFavorite,
             propertyActions.favorite,
@@ -243,7 +283,7 @@ export function SocialVideoActions({
           propertyFavorite &&
           propertyId &&
           action(
-            "heart",
+            "bookmark",
             saved ? "Guardado" : "Guardar",
             () => propertyFavorite.toggle(propertyId),
             saved,
@@ -287,6 +327,61 @@ export function SocialVideoActions({
       {!!error && !panel && (
         <View style={s.inlineError}>
           <Text style={s.white}>{error}</Text>
+        </View>
+      )}
+      {paused && data && session?.user.id === data.creator.id && (
+        <View style={s.pausedOptions}>
+          <Text style={s.pausedTitle}>Tu video, tu propiedad</Text>
+          {!!data.property_title && (
+            <Text style={s.pausedSubtitle} numberOfLines={2}>
+              {data.property_title}
+            </Text>
+          )}
+          <Pressable
+            accessibilityRole="button"
+            style={s.createProperty}
+            onPress={() =>
+              router.push({
+                pathname: "/mis-videos",
+                params: {
+                  videoId,
+                  propertyMode: "new",
+                  profileSection: "properties",
+                },
+              })
+            }
+          >
+            <ProppixIcon name="plus" size={19} />
+            <Text style={s.propertyActionText}>Crear propiedad en Proppix</Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            style={s.linkProperty}
+            onPress={() =>
+              router.push({
+                pathname: "/mis-videos",
+                params: {
+                  videoId,
+                  propertyMode: "link",
+                  profileSection: "properties",
+                },
+              })
+            }
+          >
+            <ProppixIcon name="house" size={19} />
+            <Text style={s.propertyActionText}>
+              Enlazar a una propiedad existente
+            </Text>
+          </Pressable>
+          {onResume && (
+            <Pressable
+              accessibilityRole="button"
+              style={s.resume}
+              onPress={onResume}
+            >
+              <Text style={s.propertyActionText}>Continuar viendo</Text>
+            </Pressable>
+          )}
         </View>
       )}
       <Modal
@@ -505,13 +600,75 @@ export function SocialVideoActions({
 const s = StyleSheet.create({
   rail: {
     position: "absolute",
-    right: 10,
-    bottom: 110,
+    right: 7,
+    bottom: 100,
     alignItems: "center",
-    gap: 14,
-    width: 66,
+    gap: 9,
+    width: 76,
   },
-  action: { alignItems: "center", minWidth: 48, minHeight: 48 },
+  action: { alignItems: "center", minWidth: 60, minHeight: 53, gap: 3 },
+  actionIcon: {
+    width: 46,
+    height: 40,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 23,
+    backgroundColor: "#00142b22",
+  },
+  follow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 3,
+    backgroundColor: videoColors.cyan,
+    paddingVertical: 7,
+    paddingHorizontal: 9,
+    borderRadius: 16,
+    minHeight: 30,
+  },
+  following: {
+    backgroundColor: "#092954bb",
+    borderWidth: 1,
+    borderColor: "#ffffff88",
+  },
+  followText: { color: "#052553", fontSize: 10, fontWeight: "800" },
+  pausedOptions: {
+    position: "absolute",
+    top: "28%",
+    left: 16,
+    right: 92,
+    backgroundColor: "#062951f2",
+    borderColor: "#ffffff33",
+    borderWidth: 1,
+    borderRadius: 23,
+    padding: 17,
+    gap: 12,
+  },
+  pausedTitle: { color: "#fff", fontSize: 19, fontWeight: "800" },
+  pausedSubtitle: { color: videoColors.muted, fontSize: 12 },
+  createProperty: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+    padding: 13,
+    backgroundColor: "#0866f5",
+    borderRadius: 15,
+  },
+  linkProperty: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+    padding: 13,
+    backgroundColor: "#174778",
+    borderRadius: 15,
+  },
+  propertyActionText: {
+    color: "#fff",
+    fontSize: 12,
+    fontWeight: "700",
+    flexShrink: 1,
+  },
+  resume: { alignItems: "center", padding: 8 },
   icon: {
     color: "#fff",
     fontSize: 35,
@@ -522,6 +679,7 @@ const s = StyleSheet.create({
   count: {
     color: "#fff",
     fontSize: 12,
+    fontWeight: "700",
     textShadowColor: "#000",
     textShadowRadius: 3,
   },

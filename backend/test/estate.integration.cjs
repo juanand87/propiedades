@@ -43,6 +43,16 @@ async function main() {
     await db.query(
       fs.readFileSync(path.join(root, 'database/PLANES_MEMBRESIA.sql'), 'utf8'),
     );
+    for (const file of [
+      'SPACES_VIDEOS_PROPIEDADES.sql',
+      'PERFILES_Y_VIDEOS_SOCIALES.sql',
+      'MENSAJES_PROPPIX.sql',
+      'MENSAJES_PROPPIX.sql',
+    ]) {
+      await db.query(
+        fs.readFileSync(path.join(root, 'database', file), 'utf8'),
+      );
+    }
     // Simulate a compatible legacy users table with a different collation.
     // This is exclusively the disposable instance validated by the guard above.
     await db.query(
@@ -439,6 +449,225 @@ async function main() {
       two.access_token,
       403,
     );
+    assert.equal((await call('GET', '/messages/capabilities')).enabled, true);
+    await call('GET', '/messages/conversations', null, null, 401);
+    const chat = await call(
+      'POST',
+      '/messages/conversations',
+      { recipient_id: two.user.id },
+      one.access_token,
+      201,
+    );
+    const reverseChat = await call(
+      'POST',
+      '/messages/conversations',
+      { property_id: p.id },
+      two.access_token,
+      201,
+    );
+    assert.equal(chat.id, reverseChat.id);
+    await call(
+      'POST',
+      '/messages/conversations',
+      { recipient_id: one.user.id },
+      one.access_token,
+      400,
+    );
+    await call('GET', '/messages/conversations/' + chat.id, null, admin, 404);
+    await call(
+      'POST',
+      '/messages/conversations/' + chat.id,
+      { body: 'Privado', client_id: crypto.randomUUID() },
+      admin,
+      404,
+    );
+    const outgoing = {
+      body: 'Consulta privada sobre mi próximo hogar <texto>',
+      client_id: crypto.randomUUID(),
+    };
+    const delivered = await Promise.all(
+      [0, 1].map(() =>
+        call(
+          'POST',
+          '/messages/conversations/' + chat.id,
+          outgoing,
+          one.access_token,
+          201,
+        ),
+      ),
+    );
+    assert.equal(delivered[0].id, delivered[1].id);
+    await call(
+      'POST',
+      '/messages/conversations/' + chat.id,
+      { ...outgoing, body: 'Otro contenido con el mismo envío' },
+      one.access_token,
+      409,
+    );
+    const firstHistory = await call(
+      'GET',
+      '/messages/conversations/' + chat.id,
+      null,
+      two.access_token,
+    );
+    assert.equal(firstHistory.items.length, 1);
+    assert.equal(firstHistory.items[0].body, outgoing.body);
+    let recipientInbox = await call(
+      'GET',
+      '/messages/conversations',
+      null,
+      two.access_token,
+    );
+    assert.equal(recipientInbox.items[0].unread, 1);
+    await call(
+      'POST',
+      '/messages/conversations/' + chat.id + '/read',
+      { last_message_id: delivered[0].id },
+      two.access_token,
+      201,
+    );
+    recipientInbox = await call(
+      'GET',
+      '/messages/conversations',
+      null,
+      two.access_token,
+    );
+    assert.equal(recipientInbox.items[0].unread, 0);
+    const reply = await call(
+      'POST',
+      '/messages/conversations/' + chat.id,
+      { body: 'Sí, conversemos por Proppix.', client_id: crypto.randomUUID() },
+      two.access_token,
+      201,
+    );
+    const nextMessages = await call(
+      'GET',
+      '/messages/conversations/' + chat.id + '?after=' + delivered[0].id,
+      null,
+      one.access_token,
+    );
+    assert.equal(nextMessages.items.length, 1);
+    assert.equal(nextMessages.items[0].id, reply.id);
+    await call(
+      'POST',
+      '/messages/conversations/' + chat.id + '/read',
+      { last_message_id: '999999999999' },
+      two.access_token,
+      400,
+    );
+    await call(
+      'POST',
+      '/messages/conversations/' + chat.id,
+      { body: 'x'.repeat(4001), client_id: crypto.randomUUID() },
+      two.access_token,
+      400,
+    );
+    const chatOther = await call(
+      'POST',
+      '/messages/conversations',
+      { recipient_id: two.user.id },
+      admin,
+      201,
+    );
+    const foreignMessage = await call(
+      'POST',
+      '/messages/conversations/' + chatOther.id,
+      { body: 'Otra conversación', client_id: crypto.randomUUID() },
+      admin,
+      201,
+    );
+    await call(
+      'POST',
+      '/messages/conversations/' + chat.id + '/read',
+      { last_message_id: foreignMessage.id },
+      two.access_token,
+      400,
+    );
+    for (let index = 0; index < 60; index++)
+      await db.query(
+        'INSERT INTO estate_direct_messages(conversation_id,sender_id,client_id,body,created_at) VALUES (?,?,?,?,UTC_TIMESTAMP()-INTERVAL 2 MINUTE)',
+        [
+          chat.id,
+          index % 2 ? one.user.id : two.user.id,
+          crypto.randomUUID(),
+          'Historial ' + index,
+        ],
+      );
+    await db.query(
+      'UPDATE estate_conversations SET last_message_id=(SELECT MAX(id) FROM estate_direct_messages WHERE conversation_id=?) WHERE id=?',
+      [chat.id, chat.id],
+    );
+    const historyPage = await call(
+      'GET',
+      '/messages/conversations/' + chat.id,
+      null,
+      one.access_token,
+    );
+    assert.equal(historyPage.items.length, 50);
+    assert.equal(historyPage.has_more, true);
+    const olderMessages = await call(
+      'GET',
+      '/messages/conversations/' +
+        chat.id +
+        '?before=' +
+        historyPage.items[0].id,
+      null,
+      one.access_token,
+    );
+    assert.equal(olderMessages.items.length, 12);
+    assert.equal(olderMessages.has_more, false);
+    await call(
+      'POST',
+      '/messages/conversations/' + chat.id + '/read',
+      { last_message_id: foreignMessage.id },
+      two.access_token,
+      400,
+    );
+    const catchUp = await call(
+      'GET',
+      '/messages/conversations/' + chat.id + '?after=' + delivered[0].id,
+      null,
+      two.access_token,
+    );
+    assert.equal(catchUp.items.length, 50);
+    assert.equal(catchUp.has_more, true);
+    const catchUpEnd = await call(
+      'GET',
+      '/messages/conversations/' +
+        chat.id +
+        '?after=' +
+        catchUp.items.at(-1).id,
+      null,
+      two.access_token,
+    );
+    assert.equal(catchUpEnd.items.length, 11);
+    assert.equal(catchUpEnd.has_more, false);
+    assertions += 4;
+    const allMessageIds = [...olderMessages.items, ...historyPage.items].map(
+      (item) => item.id,
+    );
+    assert.equal(new Set(allMessageIds).size, 62);
+    for (let index = 0; index < 29; index++)
+      await db.query(
+        'INSERT INTO estate_direct_messages(conversation_id,sender_id,client_id,body,created_at) VALUES (?,?,?,?,UTC_TIMESTAMP())',
+        [chat.id, one.user.id, crypto.randomUUID(), 'Límite ' + index],
+      );
+    await call(
+      'POST',
+      '/messages/conversations/' + chat.id,
+      { body: 'Límite alcanzado', client_id: crypto.randomUUID() },
+      one.access_token,
+      429,
+    );
+    await db.query(
+      fs.readFileSync(path.join(root, 'database/MENSAJES_PROPPIX.sql'), 'utf8'),
+    );
+    const [[preservedMessages]] = await db.query(
+      'SELECT COUNT(*) n FROM estate_direct_messages WHERE conversation_id=?',
+      [chat.id],
+    );
+    assert.equal(Number(preservedMessages.n), 91);
+    assertions += 17;
     const signature = new URL('http://qa' + media.url).searchParams.get(
       'signature',
     );

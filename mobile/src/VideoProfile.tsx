@@ -26,11 +26,19 @@ import { SocialVideoActions } from "./SocialVideoActions";
 import { SellerPanel } from "./SellerPanel";
 
 function VideoThumbnail({ video }: { video: ProfileVideo }) {
-  const player = useVideoPlayer(mediaUrl(video.url), (p) => {
-    p.muted = true;
-    p.pause();
-    p.currentTime = 0.1;
-  });
+  const player = useVideoPlayer(
+    { uri: mediaUrl(video.url), useCaching: true, contentType: "progressive" },
+    (p) => {
+      p.muted = true;
+      p.pause();
+      p.currentTime = 0.1;
+      p.bufferOptions = {
+        minBufferForPlayback: 0.25,
+        preferredForwardBufferDuration: 0.25,
+        maxBufferBytes: 256 * 1024,
+      };
+    },
+  );
   return (
     <VideoView
       style={StyleSheet.absoluteFill}
@@ -59,9 +67,19 @@ function FullVideoPlayer({
   const [paused, setPaused] = useState(false),
     [foreground, setForeground] = useState(AppState.currentState === "active"),
     [error, setError] = useState("");
-  const player = useVideoPlayer(mediaUrl(video.url), (p) => {
-    p.loop = true;
-  });
+  const player = useVideoPlayer(
+    { uri: mediaUrl(video.url), useCaching: true, contentType: "progressive" },
+    (p) => {
+      p.loop = true;
+      p.muted = false;
+      p.volume = 1;
+      p.bufferOptions = {
+        minBufferForPlayback: 0.75,
+        preferredForwardBufferDuration: 8,
+        maxBufferBytes: 8 * 1024 * 1024,
+      };
+    },
+  );
   useEffect(() => {
     const sub = AppState.addEventListener("change", (s) =>
       setForeground(s === "active"),
@@ -104,6 +122,8 @@ function FullVideoPlayer({
         session={session}
         onChanged={onChanged}
         propertyFavorite={propertyFavorite}
+        paused={paused}
+        onResume={() => setPaused(false)}
       />
     </View>
   );
@@ -479,6 +499,17 @@ export function VideoProfile({
           Tus videos primero. Vincular una propiedad es opcional.
         </Text>
       )}
+      {!own &&
+        profile &&
+        button(
+          "Enviar mensaje",
+          () =>
+            router.push({
+              pathname: "/mensajes",
+              params: { recipientId: profile.id },
+            }),
+          true,
+        )}
       {error && (
         <Text accessibilityRole="alert" style={s.error}>
           {error}

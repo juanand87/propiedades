@@ -17,6 +17,11 @@ export type ProppixIconName =
   | "arrow"
   | "plus"
   | "messages"
+  | "comment"
+  | "share"
+  | "bookmark"
+  | "check"
+  | "refresh"
   | "profile"
   | "menu"
   | "close";
@@ -41,6 +46,13 @@ const paths: Partial<Record<ProppixIconName, string>> = {
   arrow: "M4 12h16m-6-6 6 6-6 6",
   plus: "M12 4v16M4 12h16",
   messages: "M21 11a9 9 0 0 1-9 9H5l-3 2 1-6a9 9 0 1 1 18-5Z",
+  comment:
+    "M22 10.5C22 5.8 17.5 2 12 2S2 5.8 2 10.5 6.5 19 12 19h1l6 3-1-5c2.5-1.5 4-3.6 4-6.5Z",
+  share: "m22 8-9-7v5C5 6 2 11 2 21c3-6 7-8 11-8v5Z",
+  bookmark: "M5 3h14v19l-7-5-7 5Z",
+  check: "m4 12 5 5L20 6",
+  refresh:
+    "M20 7V2m0 5h-5M4 17v5m0-5h5M5 7a8 8 0 0 1 13-2l2 2M4 17l2 2a8 8 0 0 0 13-2",
   profile: "M3 22v-2a7 7 0 0 1 7-7h4a7 7 0 0 1 7 7v2Z",
   menu: "M3 5h18M3 12h18M3 19h18",
   close: "m6 6 12 12M6 18 18 6",
@@ -68,10 +80,7 @@ export function ProppixIcon({
       strokeLinecap="round"
       strokeLinejoin="round"
     >
-      <Path
-        d={paths[name]}
-        fill={filled && (name === "home" || name === "heart") ? color : "none"}
-      />
+      <Path d={paths[name]} fill={filled ? color : "none"} />
       {name === "search" && <Circle cx={10} cy={10} r={7} />}
       {name === "pin" && <Circle cx={12} cy={10} r={2} />}
       {name === "profile" && <Circle cx={12} cy={6} r={4} />}
@@ -80,6 +89,20 @@ export function ProppixIcon({
           <Circle cx={8} cy={11} r={0.6} fill={color} />
           <Circle cx={12} cy={11} r={0.6} fill={color} />
           <Circle cx={16} cy={11} r={0.6} fill={color} />
+        </>
+      )}
+      {name === "comment" && (
+        <>
+          {[6, 10, 14, 18].map((x) => (
+            <Circle
+              key={x}
+              cx={x}
+              cy={10.5}
+              r={1}
+              fill="#17334c"
+              stroke="none"
+            />
+          ))}
         </>
       )}
       {name === "filters" && (
