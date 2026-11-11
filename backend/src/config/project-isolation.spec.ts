@@ -18,6 +18,31 @@ const env = {
 };
 
 describe('aislamiento de Propiedades', () => {
+  it('permite FCM y OAuth solo por HTTPS con credenciales configuradas, sin abrir otras integraciones', () => {
+    const firebase = {
+      ...env,
+      FIREBASE_SERVICE_ACCOUNT_BASE64: 'configured-secret',
+    };
+    for (const host of ['fcm.googleapis.com', 'oauth2.googleapis.com']) {
+      expect(() =>
+        assertConnectionAllowed([{ host, port: 443 }], firebase),
+      ).not.toThrow();
+      expect(() =>
+        assertConnectionAllowed([{ host, port: 443 }], env),
+      ).toThrow();
+      expect(() =>
+        assertConnectionAllowed([{ host, port: 80 }], firebase),
+      ).toThrow();
+    }
+    for (const host of [
+      'evil.googleapis.com',
+      'fcm.googleapis.com.example.test',
+      'exp.host',
+    ])
+      expect(() =>
+        assertConnectionAllowed([{ host, port: 443 }], firebase),
+      ).toThrow();
+  });
   const shared = {
     ...env,
     DB_HOST: 'mundobeat-example.db.ondigitalocean.com',

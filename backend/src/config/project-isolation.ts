@@ -147,11 +147,22 @@ export function assertConnectionAllowed(args: any[], env: Record<string, any>) {
     ['oauth2.googleapis.com', 'www.googleapis.com'].includes(host) &&
     Number(options?.port) === 443 &&
     !options?.path;
+  const isFirebaseMessaging =
+    env.PROJECT_ID === 'propiedades' &&
+    Boolean(
+      env.FIREBASE_SERVICE_ACCOUNT_BASE64 ||
+      env.FIREBASE_SERVICE_ACCOUNT_JSON ||
+      env.FIREBASE_SERVICE_ACCOUNT_FILE,
+    ) &&
+    ['oauth2.googleapis.com', 'fcm.googleapis.com'].includes(host) &&
+    Number(options?.port) === 443 &&
+    !options?.path;
   if (
     env.INTEGRATIONS_ENABLED !== 'true' &&
     !isDatabase &&
     !isImageSpaces &&
-    !isGoogleAuth
+    !isGoogleAuth &&
+    !isFirebaseMessaging
   ) {
     throw new Error('Integraciones externas deshabilitadas en Propiedades.');
   }
