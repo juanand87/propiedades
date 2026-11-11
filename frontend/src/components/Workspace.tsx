@@ -1,4 +1,5 @@
 "use client";
+import { formatClpInput, parseClpInput } from "@/lib/clp";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -608,6 +609,9 @@ function PropertyEditor({ root, id }: { root: string; id?: string }) {
     setForm((prev: any) => ({
       ...prev,
       [k]: v,
+      ...(k === "price_unit" && v === "CLP"
+        ? { price_amount: String(prev.price_amount ?? "").split(".")[0] }
+        : {}),
       ...(k === "region_id" ? { commune_id: "" } : {}),
     }));
   const select = (
@@ -632,11 +636,14 @@ function PropertyEditor({ root, id }: { root: string; id?: string }) {
       </select>
     </label>
   );
+  const clpPrice = (key: string) =>
+    key === "price_amount" && form.price_unit === "CLP";
   const number = (key: string) => (
     <label key={key}>
       {numberLabels[key]}
       <input
-        type="number"
+        type={clpPrice(key) ? "text" : "number"}
+        inputMode={clpPrice(key) ? "numeric" : undefined}
         min={key === "floor_number" ? -20 : 0}
         step={
           [
@@ -650,8 +657,13 @@ function PropertyEditor({ root, id }: { root: string; id?: string }) {
             ? "0.0001"
             : "1"
         }
-        value={form[key] ?? ""}
-        onChange={(e) => set(key, e.target.value)}
+        value={clpPrice(key) ? formatClpInput(form[key]) : (form[key] ?? "")}
+        onChange={(e) =>
+          set(
+            key,
+            clpPrice(key) ? parseClpInput(e.target.value) : e.target.value,
+          )
+        }
       />
     </label>
   );
