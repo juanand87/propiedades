@@ -38,6 +38,7 @@ export class PushService implements OnModuleInit, OnModuleDestroy {
       provider: string;
       configured: boolean;
       google_ready: boolean;
+      credential_status?: string;
     }>;
   };
   private testTimes = new Map<string, number>();
@@ -140,11 +141,24 @@ export class PushService implements OnModuleInit, OnModuleDestroy {
     const result = (async () => {
       try {
         this.credentials();
-      } catch {
+      } catch (error) {
+        const present = Boolean(
+          this.config.get('FIREBASE_SERVICE_ACCOUNT_BASE64') ||
+          this.config.get('FIREBASE_SERVICE_ACCOUNT_JSON') ||
+          this.config.get('FIREBASE_SERVICE_ACCOUNT_FILE'),
+        );
         return {
           provider: 'fcm-direct',
           configured: false,
           google_ready: false,
+          credential_status: !present
+            ? 'missing_in_backend'
+            : error instanceof SyntaxError
+              ? 'invalid_json_or_base64'
+              : error instanceof Error &&
+                  error.message.includes('no corresponde')
+                ? 'project_mismatch'
+                : 'invalid_service_account',
         };
       }
       try {

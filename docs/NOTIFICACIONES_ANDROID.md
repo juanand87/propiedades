@@ -19,3 +19,9 @@ La cola guarda mensajes junto al envío, aplica reintentos con espera creciente 
 
 - https://firebase.google.com/docs/cloud-messaging/send/v1-api
 - https://firebase.google.com/docs/cloud-messaging/error-codes
+
+## Diagnóstico y prueba con la misma cuenta
+
+GET /api/messages/capabilities incluye push.configured y push.google_ready. google_ready comprueba desde el servidor una solicitud validate_only de FCM, sin enviar avisos. La respuesta está almacenada hasta 60 segundos.
+
+En la app, Mensajes → Probar aviso en mi teléfono envía a los dispositivos del usuario autenticado. No requiere otro usuario ni crea conversaciones consigo mismo. Se puede repetir cada 30 segundos y desactivar con PUSH_SELF_TEST_ENABLED=false. FCM accepted confirma que Google aceptó el envío; la recepción física se comprueba en el teléfono. Los comentarios propios no disparan automáticamente este aviso de prueba.

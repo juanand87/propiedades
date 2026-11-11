@@ -94,6 +94,22 @@ describe('message push delivery', () => {
     expect(payload.message.data.test).toBe('true');
     await expect(service.testOwnDevices(actor)).rejects.toThrow('30 segundos');
   });
+  it.each([
+    [{}, 'missing_in_backend'],
+    [
+      { FIREBASE_SERVICE_ACCOUNT_BASE64: 'invalid-base64' },
+      'invalid_json_or_base64',
+    ],
+  ])('reports a safe credential diagnostic', async (config, expected) => {
+    const service = new PushService(
+      {} as DataSource,
+      new ConfigService(config),
+    );
+    const health = await service.health();
+    expect(health.configured).toBe(false);
+    expect(health.credential_status).toBe(expected);
+    expect(JSON.stringify(health)).not.toContain('private_key');
+  });
   it.each([false, true])(
     'sends directly to Google with base64=%s',
     async (base64) => {
