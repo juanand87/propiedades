@@ -89,7 +89,10 @@ export class PushService implements OnModuleInit, OnModuleDestroy {
   private credentials() {
     if (this.auth && this.projectId)
       return { auth: this.auth, projectId: this.projectId };
-    const raw = this.config.get<string>('FIREBASE_SERVICE_ACCOUNT_JSON');
+    const encoded = this.config.get<string>('FIREBASE_SERVICE_ACCOUNT_BASE64');
+    const raw = encoded
+      ? Buffer.from(encoded.trim(), 'base64').toString('utf8')
+      : this.config.get<string>('FIREBASE_SERVICE_ACCOUNT_JSON');
     const file = this.config.get<string>('FIREBASE_SERVICE_ACCOUNT_FILE');
     if (!raw && !file)
       throw new ServiceUnavailableException(

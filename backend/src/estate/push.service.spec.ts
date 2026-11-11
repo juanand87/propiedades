@@ -5,7 +5,7 @@ import { PushService } from './push.service';
 
 describe('message push delivery', () => {
   const token = 'fcm_local_test_token_0123456789';
-  function setup(overrides = {}, device = true) {
+  function setup(overrides = {}, device = true, base64 = false) {
     const row = {
       message_id: '5',
       token,
@@ -37,16 +37,23 @@ describe('message push delivery', () => {
       query,
       createQueryRunner: () => runner,
     } as unknown as DataSource;
+    const credential = JSON.stringify({
+      project_id: 'proppix-test',
+      client_email: 'test@proppix-test.iam.gserviceaccount.com',
+      private_key: '-----BEGIN PRIVATE KEY-----test',
+    });
     return {
       service: new PushService(
         db,
         new ConfigService({
           FIREBASE_PROJECT_ID: 'proppix-test',
-          FIREBASE_SERVICE_ACCOUNT_JSON: JSON.stringify({
-            project_id: 'proppix-test',
-            client_email: 'test@proppix-test.iam.gserviceaccount.com',
-            private_key: '-----BEGIN PRIVATE KEY-----test',
-          }),
+          ...(base64
+            ? {
+                FIREBASE_SERVICE_ACCOUNT_BASE64:
+                  Buffer.from(credential).toString('base64'),
+                FIREBASE_SERVICE_ACCOUNT_JSON: 'invalid old JSON',
+              }
+            : { FIREBASE_SERVICE_ACCOUNT_JSON: credential }),
         }),
       ),
       query,
@@ -59,36 +66,36 @@ describe('message push delivery', () => {
       .mockResolvedValue({ token: 'test-access-token' });
   });
   afterEach(() => jest.restoreAllMocks());
-  it('sends a conversation link without leaking message text directly to Google', async () => {
-    const { service, query, runner } = setup();
-    const network = jest.spyOn(global, 'fetch').mockResolvedValue({
-      ok: true,
-      json: () =>
-        Promise.resolve({ name: 'projects/proppix-test/messages/receipt-1' }),
-    } as Response);
-    await service.flush();
-    const payload = JSON.parse(network.mock.calls[0][1]!.body as string) as {
-      message: {
-        data: { conversationId: string };
-        notification: { body: string };
+  it.each([false, true])(
+    'sends directly to Google with base64=%s',
+    async (base64) => {
+      const { service, query, runner } = setup({}, true, base64);
+      const network = jest.spyOn(global, 'fetch').mockResolvedValue({
+        ok: true,
+        json: () =>
+          Promise.resolve({ name: 'projects/proppix-test/messages/receipt-1' }),
+      } as Response);
+      await service.flush();
+      const payload = JSON.parse(network.mock.calls[0][1]!.body as string) as {
+        message: {
+          data: { conversationId: string };
+          notification: { body: string };
+        };
       };
-    };
-    expect(network.mock.calls[0][0]).toBe(
-      'https://fcm.googleapis.com/v1/projects/proppix-test/messages:send',
-    );
-    expect(payload.message.data.conversationId).toBe('chat');
-    expect(payload.message.notification.body).toBe(
-      'Tienes un mensaje nuevo. Toca para abrir la conversación.',
-    );
-    expect(query).toHaveBeenCalledWith(expect.stringContaining('SET status='), [
-      'done',
-      null,
-      60,
-      '5',
-      token,
-    ]);
-    expect(runner.release).toHaveBeenCalled();
-  });
+      expect(network.mock.calls[0][0]).toBe(
+        'https://fcm.googleapis.com/v1/projects/proppix-test/messages:send',
+      );
+      expect(payload.message.data.conversationId).toBe('chat');
+      expect(payload.message.notification.body).toBe(
+        'Tienes un mensaje nuevo. Toca para abrir la conversación.',
+      );
+      expect(query).toHaveBeenCalledWith(
+        expect.stringContaining('SET status='),
+        ['done', null, 60, '5', token],
+      );
+      expect(runner.release).toHaveBeenCalled();
+    },
+  );
   it.each([{ low_read_id: '5' }, { low_read_id: '9' }])(
     'skips messages already read: %o',
     async (read) => {

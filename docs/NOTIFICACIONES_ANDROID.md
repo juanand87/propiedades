@@ -7,7 +7,7 @@ Proppix envía desde DigitalOcean a Firebase Cloud Messaging HTTP v1. No usa Exp
 1. Registrar el paquete Android cl.proppix.app en el proyecto Firebase proppix-66fe8.
 2. Guardar google-services.json en C:/xampp/htdocs/propiedades/mobile/google-services.json. Se incorpora automáticamente al generar Android.
 3. Guardar la clave privada de la cuenta de servicio FUERA del repositorio. Nunca incluirla en el APK ni pegarla en el chat.
-4. En DigitalOcean, componente backend → Settings → Environment Variables, añadir FIREBASE_PROJECT_ID=proppix-66fe8 y FIREBASE_SERVICE_ACCOUNT_JSON con el JSON completo de la cuenta de servicio como valor cifrado/secret de ejecución. No usar EXPO_PUBLIC_ para esa credencial. Para ejecución local del backend se admite FIREBASE_SERVICE_ACCOUNT_FILE con una ruta privada absoluta.
+4. En DigitalOcean, componente backend → Settings → Environment Variables, añadir FIREBASE_PROJECT_ID=proppix-66fe8 y FIREBASE_SERVICE_ACCOUNT_BASE64 con el contenido de C:/Users/Juan/.config/proppix/firebase-digitalocean-base64.txt (la cuenta de servicio codificada en Base64) como valor cifrado/secret de ejecución. No usar EXPO_PUBLIC_ para esa credencial. Para ejecución local del backend se admite FIREBASE_SERVICE_ACCOUNT_FILE con una ruta privada absoluta.
 5. La cuenta debe tener permiso cloudmessaging.messages.create (rol Firebase Cloud Messaging API Admin). La API Firebase Cloud Messaging HTTP v1 debe estar habilitada.
 6. Ejecutar database/NOTIFICACIONES_Y_PORTADAS.sql (ya ejecutado según confirmación). No cambia el esquema al pasar de Expo Push Service a FCM.
 7. Compilar y firmar localmente el APK con google-services.json. Instalar la actualización, iniciar sesión y aceptar el permiso de notificaciones.
