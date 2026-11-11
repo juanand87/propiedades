@@ -1,25 +1,21 @@
-# Notificaciones de mensajes de Proppix
+# Notificaciones Android con Firebase directo
 
-Se usa Expo Push Service con Firebase Cloud Messaging V1 para Android. La aplicación solicita permiso, registra el dispositivo de la sesión y abre la conversación al tocar el aviso. El servidor guarda el envío en una cola junto con el mensaje, comprueba recibos, reintenta fallos temporales y retira dispositivos inválidos. No incluye el texto privado del chat en la pantalla bloqueada. El cierre de sesión retira el dispositivo antes de borrar la sesión.
+Proppix envía desde DigitalOcean a Firebase Cloud Messaging HTTP v1. No usa Expo Push Service ni requiere cargar credenciales en Expo. El APK se compila localmente. Se conserva la librería local expo-notifications para registrar el token FCM y mostrar/abrir los avisos.
 
-## Activación
+## Configuración
 
-1. Ejecutar `database/NOTIFICACIONES_Y_PORTADAS.sql` en la base `propiedades`. Es repetible y no borra datos.
-2. En https://console.firebase.google.com crear un proyecto Proppix. Añadir una aplicación Android con paquete **cl.proppix.app**.
-3. Descargar la configuración de esa aplicación, `google-services.json`, y guardarla en **C:/xampp/htdocs/propiedades/mobile/google-services.json**. También se admite una ruta en la variable `GOOGLE_SERVICES_JSON`. `mobile/app.config.js` la incorpora al generar Android. No pegar archivos ni claves en el chat.
-4. En Firebase → Configuración del proyecto → Cuentas de servicio → Generar nueva clave privada. Guardar esa credencial fuera del repositorio.
-5. En el proyecto **Proppix** de https://expo.dev → Credentials → Android → **cl.proppix.app** → FCM V1 service account key, cargar esa clave. Es distinta de `google-services.json`. Alternativamente, desde `mobile`, ejecutar `npx eas-cli@latest credentials`, elegir Android y configurar la clave de Push Notifications FCM V1.
-6. Generar Android con Expo prebuild y compilar/firmar el APK de nuevo. No hace falta usar la cola de compilaciones de Expo: FCM funciona también con el APK local.
-7. Instalar la actualización en un Android con Google Play Services, entrar en la cuenta y aceptar el permiso de notificaciones. En Mensajes debe aparecer “Notificaciones de mensajes activas”.
-8. Desde otra cuenta enviar un mensaje con el teléfono receptor en segundo plano. Comprobar aviso, sonido, apertura del chat y que no se repita por reintentar el envío. Cerrar sesión y comprobar que el dispositivo deja de recibir avisos de esa cuenta.
+1. Registrar el paquete Android cl.proppix.app en el proyecto Firebase proppix-66fe8.
+2. Guardar google-services.json en C:/xampp/htdocs/propiedades/mobile/google-services.json. Se incorpora automáticamente al generar Android.
+3. Guardar la clave privada de la cuenta de servicio FUERA del repositorio. Nunca incluirla en el APK ni pegarla en el chat.
+4. En DigitalOcean, componente backend → Settings → Environment Variables, añadir FIREBASE_PROJECT_ID=proppix-66fe8 y FIREBASE_SERVICE_ACCOUNT_JSON con el JSON completo de la cuenta de servicio como valor cifrado/secret de ejecución. No usar EXPO_PUBLIC_ para esa credencial. Para ejecución local del backend se admite FIREBASE_SERVICE_ACCOUNT_FILE con una ruta privada absoluta.
+5. La cuenta debe tener permiso cloudmessaging.messages.create (rol Firebase Cloud Messaging API Admin). La API Firebase Cloud Messaging HTTP v1 debe estar habilitada.
+6. Ejecutar database/NOTIFICACIONES_Y_PORTADAS.sql (ya ejecutado según confirmación). No cambia el esquema al pasar de Expo Push Service a FCM.
+7. Compilar y firmar localmente el APK con google-services.json. Instalar la actualización, iniciar sesión y aceptar el permiso de notificaciones.
+8. Enviar un mensaje desde otra cuenta con el receptor en segundo plano. Verificar aviso, sonido y apertura del chat. Cerrar sesión y comprobar que ya no recibe avisos de esa cuenta.
 
-DigitalOcean usa las variables de Spaces existentes para las portadas. El trabajador de avisos arranca en producción cada 10 segundos; se puede desactivar con `PUSH_NOTIFICATIONS_ENABLED=false`. Si el proyecto Expo exige autenticación adicional para Push Service, configurar `EXPO_ACCESS_TOKEN` solo en el servidor.
-
-## Portadas
-
-Los videos nuevos generan un JPEG de hasta 480 × 640 conservando su proporción, guardado en `property_video_posters`. La galería usa imágenes, sin crear reproductores para las miniaturas. Los videos anteriores generan su portada la primera vez que se solicita; se limita a dos trabajos simultáneos por proceso. Las portadas de borradores requieren una firma del propietario y las públicas comprueban que el video siga publicado.
+La cola guarda mensajes junto al envío, aplica reintentos con espera creciente y retira tokens UNREGISTERED. El estado done significa aceptado por FCM, no confirma lectura ni entrega física al teléfono. Los avisos no muestran texto privado del mensaje en la pantalla bloqueada. Los tokens antiguos de Expo quedan fuera del nuevo envío; iniciar sesión con el APK nuevo registra el token nativo de Google.
 
 ## Referencias
 
-- https://docs.expo.dev/push-notifications/fcm-credentials/
-- https://docs.expo.dev/push-notifications/sending-notifications/
+- https://firebase.google.com/docs/cloud-messaging/send/v1-api
+- https://firebase.google.com/docs/cloud-messaging/error-codes

@@ -1,9 +1,10 @@
+import { JWT } from 'google-auth-library';
 import { ConfigService } from '@nestjs/config';
 import { DataSource } from 'typeorm';
 import { PushService } from './push.service';
 
 describe('message push delivery', () => {
-  const token = 'ExpoPushToken[local_test_0123456789]';
+  const token = 'fcm_local_test_token_0123456789';
   function setup(overrides = {}, device = true) {
     const row = {
       message_id: '5',
@@ -37,31 +38,52 @@ describe('message push delivery', () => {
       createQueryRunner: () => runner,
     } as unknown as DataSource;
     return {
-      service: new PushService(db, new ConfigService({})),
+      service: new PushService(
+        db,
+        new ConfigService({
+          FIREBASE_PROJECT_ID: 'proppix-test',
+          FIREBASE_SERVICE_ACCOUNT_JSON: JSON.stringify({
+            project_id: 'proppix-test',
+            client_email: 'test@proppix-test.iam.gserviceaccount.com',
+            private_key: '-----BEGIN PRIVATE KEY-----test',
+          }),
+        }),
+      ),
       query,
       runner,
     };
   }
+  beforeEach(() => {
+    jest
+      .spyOn(JWT.prototype, 'getAccessToken')
+      .mockResolvedValue({ token: 'test-access-token' });
+  });
   afterEach(() => jest.restoreAllMocks());
-  it('sends a conversation link without leaking message text and saves the receipt ticket', async () => {
+  it('sends a conversation link without leaking message text directly to Google', async () => {
     const { service, query, runner } = setup();
     const network = jest.spyOn(global, 'fetch').mockResolvedValue({
       ok: true,
-      json: () => Promise.resolve({ data: { status: 'ok', id: 'receipt-1' } }),
+      json: () =>
+        Promise.resolve({ name: 'projects/proppix-test/messages/receipt-1' }),
     } as Response);
     await service.flush();
     const payload = JSON.parse(network.mock.calls[0][1]!.body as string) as {
-      data: { conversationId: string };
-      body: string;
+      message: {
+        data: { conversationId: string };
+        notification: { body: string };
+      };
     };
-    expect(payload.data.conversationId).toBe('chat');
-    expect(payload.body).toBe(
+    expect(network.mock.calls[0][0]).toBe(
+      'https://fcm.googleapis.com/v1/projects/proppix-test/messages:send',
+    );
+    expect(payload.message.data.conversationId).toBe('chat');
+    expect(payload.message.notification.body).toBe(
       'Tienes un mensaje nuevo. Toca para abrir la conversación.',
     );
     expect(query).toHaveBeenCalledWith(expect.stringContaining('SET status='), [
-      'receipt',
-      'receipt-1',
-      900,
+      'done',
+      null,
+      60,
       '5',
       token,
     ]);
@@ -82,21 +104,16 @@ describe('message push delivery', () => {
     await service.flush();
     expect(network).not.toHaveBeenCalled();
   });
-  it('removes invalid tokens after checking delivery receipts', async () => {
+  it('removes invalid tokens on the Firebase UNREGISTERED response', async () => {
     const { service, query } = setup({
-      status: 'receipt',
-      ticket: 'receipt-1',
+      status: 'pending',
     });
     jest.spyOn(global, 'fetch').mockResolvedValue({
-      ok: true,
+      ok: false,
+      status: 404,
       json: () =>
         Promise.resolve({
-          data: {
-            'receipt-1': {
-              status: 'error',
-              details: { error: 'DeviceNotRegistered' },
-            },
-          },
+          error: { details: [{ errorCode: 'UNREGISTERED' }] },
         }),
     } as Response);
     await service.flush();

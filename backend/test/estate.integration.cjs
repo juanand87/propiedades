@@ -452,7 +452,7 @@ async function main() {
     );
     assert.equal((await call('GET', '/messages/capabilities')).enabled, true);
     await call('GET', '/messages/conversations', null, null, 401);
-    const pushToken = 'ExpoPushToken[QA_local_only_0123456789]';
+    const pushToken = 'fcm_QA_local_only_0123456789';
     await call('POST', '/messages/devices', { token: pushToken }, null, 401);
     await call('POST', '/messages/devices', { token: 'invalid' }, two.access_token, 400);
     await call('POST', '/messages/devices', { token: pushToken }, two.access_token, 201);

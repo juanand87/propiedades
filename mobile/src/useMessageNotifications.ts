@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import { AppState, Platform } from "react-native";
 import * as Notifications from "expo-notifications";
 import { AndroidImportance } from "expo-notifications";
-import Constants from "expo-constants";
 import { useGlobalSearchParams, usePathname, useRouter } from "expo-router";
 import { api, Session } from "./api";
 
@@ -63,13 +62,9 @@ export function useMessageNotifications(session: Session | null) {
             );
           return;
         }
-        const projectId = Constants.expoConfig?.extra?.eas?.projectId as
-          | string
-          | undefined;
-        if (!projectId) throw new Error("Project unavailable");
-        const { data } = await Notifications.getExpoPushTokenAsync({
-          projectId,
-        });
+        if (Platform.OS !== "android") { setStatus("Notificaciones disponibles por ahora en Android."); return; }
+        const { data } = await Notifications.getDevicePushTokenAsync();
+        if (typeof data !== "string") throw new Error("Invalid device token");
         if (!live || stopping.current) return;
         await api("/messages/devices", {
           method: "POST",
