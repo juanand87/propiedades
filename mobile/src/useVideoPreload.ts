@@ -24,6 +24,7 @@ export function useVideoPreload(
   videos: Video[],
   active: number,
   enabled: boolean,
+  suspended = false,
 ) {
   const owned = useRef(new Map<string, PreparedVideo>());
   const [prepared, setPrepared] = useState(new Map<string, PreparedVideo>());
@@ -98,11 +99,11 @@ export function useVideoPreload(
           };
           entry.role = role;
         }
-        if (role !== "active") entry.player.pause();
+        if (role !== "active" || suspended) entry.player.pause();
       }
     }
     if (changed) setPrepared(new Map(entries));
-  }, [videos, active, enabled, generation]);
+  }, [videos, active, enabled, suspended, generation]);
   useEffect(() => {
     const entries = owned.current;
     return () => {

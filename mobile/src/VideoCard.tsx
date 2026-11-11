@@ -55,7 +55,7 @@ function Player({
         player={player}
         nativeControls={false}
         contentFit="contain"
-        surfaceType="surfaceView"
+        surfaceType="textureView"
       />
       {loading && (
         <ActivityIndicator style={styles.center} color="#fff" size="large" />
@@ -125,9 +125,9 @@ export function VideoCard({
   }, [active]);
   return (
     <View style={[styles.card, { height }]}>
-      {(!active || !player) && !!p?.media[0] && (
+      {(!active || !player) && !!(item.thumbnail_url || p?.media[0]?.url) && (
         <Image
-          source={{ uri: mediaUrl(p.media[0].url) }}
+          source={{ uri: mediaUrl(item.thumbnail_url || p!.media[0].url) }}
           style={StyleSheet.absoluteFill}
           resizeMode="cover"
         />

@@ -46,6 +46,7 @@ async function main() {
     for (const file of [
       'SPACES_VIDEOS_PROPIEDADES.sql',
       'PERFILES_Y_VIDEOS_SOCIALES.sql',
+      'NOTIFICACIONES_Y_PORTADAS.sql',
       'MENSAJES_PROPPIX.sql',
       'MENSAJES_PROPPIX.sql',
     ]) {
@@ -451,6 +452,12 @@ async function main() {
     );
     assert.equal((await call('GET', '/messages/capabilities')).enabled, true);
     await call('GET', '/messages/conversations', null, null, 401);
+    const pushToken = 'ExpoPushToken[QA_local_only_0123456789]';
+    await call('POST', '/messages/devices', { token: pushToken }, null, 401);
+    await call('POST', '/messages/devices', { token: 'invalid' }, two.access_token, 400);
+    await call('POST', '/messages/devices', { token: pushToken }, two.access_token, 201);
+    await call('POST', '/messages/devices', { token: pushToken, enabled: false }, one.access_token, 201);
+    assert.equal((await db.query('SELECT user_id FROM estate_push_devices WHERE token=?', [pushToken]))[0][0].user_id, two.user.id);
     const chat = await call(
       'POST',
       '/messages/conversations',
@@ -497,6 +504,12 @@ async function main() {
       ),
     );
     assert.equal(delivered[0].id, delivered[1].id);
+    const [pushRows] = await db.query('SELECT user_id,status FROM estate_push_deliveries WHERE message_id=?', [delivered[0].id]);
+    assert.equal(pushRows.length, 1);
+    assert.equal(pushRows[0].user_id, two.user.id);
+    assert.equal(pushRows[0].status, 'pending');
+    await call('POST', '/messages/devices', { token: pushToken, enabled: false }, two.access_token, 201);
+    assert.equal((await db.query('SELECT token FROM estate_push_devices WHERE token=?', [pushToken]))[0].length, 0);
     await call(
       'POST',
       '/messages/conversations/' + chat.id,

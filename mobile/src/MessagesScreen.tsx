@@ -18,6 +18,7 @@ import { randomUUID } from "expo-crypto";
 import { api, ApiError, mediaUrl, Session } from "./api";
 import { ProppixIcon } from "./ProppixIcon";
 import { videoColors } from "./video-colors";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 type Person = {
   id: string;
@@ -81,13 +82,18 @@ export function MessagesScreen({
   conversationId,
   recipientId,
   propertyId,
+  notificationStatus,
+  onRetryNotifications,
 }: {
   session: Session | null;
   conversationId?: string;
   recipientId?: string;
   propertyId?: string;
+  notificationStatus?: string;
+  onRetryNotifications?: () => void;
 }) {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const token = session?.access_token;
   const [foreground, setForeground] = useState(
     AppState.currentState === "active",
@@ -375,7 +381,8 @@ export function MessagesScreen({
   return (
     <KeyboardAvoidingView
       style={s.root}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      keyboardVerticalOffset={72 + insets.top}
     >
       <View style={s.heading}>
         {selected && (
@@ -417,12 +424,22 @@ export function MessagesScreen({
           </Pressable>
         </View>
       )}
+      {!selected && !!notificationStatus && (
+        <Pressable
+          accessibilityRole="button"
+          onPress={onRetryNotifications}
+          style={{ padding: 10 }}
+        >
+          <Text style={s.muted}>{notificationStatus}</Text>
+        </Pressable>
+      )}
       {busy && (
         <ActivityIndicator style={{ padding: 8 }} color={videoColors.cyan} />
       )}
       {selected ? (
         <>
           <FlatList
+            style={{ flex: 1 }}
             data={messages}
             inverted
             keyExtractor={(item) => item.id}
@@ -476,6 +493,7 @@ export function MessagesScreen({
                 onChangeText={setText}
                 style={s.input}
                 multiline
+                textAlignVertical="top"
                 maxLength={4000}
                 placeholder="Escribe un mensaje…"
                 placeholderTextColor={videoColors.muted}

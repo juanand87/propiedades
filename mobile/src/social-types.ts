@@ -8,6 +8,7 @@ export type VideoProfileData = {
   followed: boolean;
 };
 export type ProfileVideo = {
+  thumbnail_url?: string;
   created_by: string;
   id: string;
   title: string;

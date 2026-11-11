@@ -318,7 +318,10 @@ export function SocialVideoActions({
             option("Ver propiedad ↗", () =>
               router.push({
                 pathname: "/property/[propertyId]",
-                params: { propertyId: data.property_id! },
+                params: {
+                  propertyId: data.property_id!,
+                  resumeVideoId: videoId,
+                },
               }),
             )}
         {propertyActions?.onContact &&

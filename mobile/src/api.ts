@@ -28,6 +28,7 @@ export type Property = {
 };
 export type Video = {
   id: string;
+  thumbnail_url?: string;
   property_id: string | null;
   title: string;
   url: string;
@@ -88,7 +89,7 @@ if (!allowed.includes(API_URL))
   );
 export function mediaUrl(url: string) {
   if (
-    !/^\/api\/(media|videos)\/[a-f0-9-]{36}(\/(content|preview))?(\?signature=[^\s]*)?$/i.test(
+    !/^\/api\/(media|videos)\/[a-f0-9-]{36}(\/(content|preview|thumbnail))?(\?signature=[^\s]*)?$/i.test(
       url,
     )
   )

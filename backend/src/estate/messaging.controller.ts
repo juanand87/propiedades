@@ -16,11 +16,26 @@ import type {
   HistoryQuery,
 } from './messaging.service';
 import { Actor } from './rules';
+import { PushService } from './push.service';
 type MessageRequest = { user: Actor };
 
 @Controller('messages')
 export class MessagingController {
-  constructor(private messaging: MessagingService) {}
+  constructor(
+    private messaging: MessagingService,
+    private push: PushService,
+  ) {}
+
+  @Post('devices')
+  @UseGuards(EstateGuard)
+  device(
+    @Req() req: MessageRequest,
+    @Body() body: { token?: unknown; enabled?: unknown },
+  ) {
+    return body?.enabled === false
+      ? this.push.unregister(req.user, body.token)
+      : this.push.register(req.user, body?.token);
+  }
 
   @Get('capabilities') capabilities() {
     return this.messaging.capabilities();

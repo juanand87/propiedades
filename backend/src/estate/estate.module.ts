@@ -6,6 +6,7 @@ import { EstateService } from './estate.service';
 import { EstateGuard } from './estate.guard';
 import { MessagingController } from './messaging.controller';
 import { MessagingService } from './messaging.service';
+import { PushService } from './push.service';
 import { DemoService } from './demo.service';
 import { PropertyVideosService } from './property-videos.service';
 import { PropertyVideosController } from './property-videos.controller';
@@ -43,6 +44,7 @@ import {
     GoogleAuthService,
     EstateGuard,
     MessagingService,
+    PushService,
     DemoService,
     PropertyVideosService,
     ImageStorageService,

@@ -128,6 +128,10 @@ export class VideoSocialService {
     const items = await Promise.all(
       rows.map(async (v: any) => ({
         ...v,
+        thumbnail_url:
+          own && !saved
+            ? (await this.videos.preview(actor!, v.id)).thumbnail_url
+            : `/api/videos/${v.id}/thumbnail`,
         url:
           own && !saved
             ? (await this.videos.preview(actor!, v.id)).url
@@ -234,15 +238,13 @@ export class VideoSocialService {
       [id, search, (page - 1) * 24],
     );
     return {
-      items: rows
-        .slice(0, 24)
-        .map(({ id, display_name, avatar_media_id }) => ({
-          id,
-          display_name,
-          avatar_url: avatar_media_id
-            ? this.estate.mediaUrl(avatar_media_id, { id } as Actor)
-            : null,
-        })),
+      items: rows.slice(0, 24).map(({ id, display_name, avatar_media_id }) => ({
+        id,
+        display_name,
+        avatar_url: avatar_media_id
+          ? this.estate.mediaUrl(avatar_media_id, { id } as Actor)
+          : null,
+      })),
       has_more: rows.length > 24,
     };
   }

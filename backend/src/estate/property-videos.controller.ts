@@ -48,6 +48,13 @@ export class PropertyVideosController {
   ) {
     return this.videos.content(id, req.headers.range, res);
   }
+  @Get('videos/:id/thumbnail') thumbnail(
+    @Param('id') id: string,
+    @Query('signature') signature: string,
+    @Res() res: any,
+  ) {
+    return this.videos.thumbnail(id, signature, res);
+  }
   @Get('manage/properties/:id/videos')
   @UseGuards(EstateGuard)
   list(@Req() req: any, @Param('id') id: string) {

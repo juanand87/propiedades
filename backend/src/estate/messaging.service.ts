@@ -13,6 +13,7 @@ import { randomUUID } from 'crypto';
 import { Actor, uuid } from './rules';
 import { EstateService } from './estate.service';
 import { DEMO_ADVERTISER_ID } from './demo-properties';
+import { PushService } from './push.service';
 
 export type NewConversation = { recipient_id?: unknown; property_id?: unknown };
 export type NewMessage = { client_id?: unknown; body?: unknown };
@@ -64,13 +65,17 @@ export class MessagingService {
   constructor(
     private db: DataSource,
     private estate: EstateService,
+    private push: PushService,
   ) {}
 
   async capabilities() {
     const [row] = await this.db.query<CountRow[]>(
       "SELECT COUNT(*) n FROM information_schema.tables WHERE table_schema=DATABASE() AND table_name IN ('estate_conversations','estate_direct_messages','estate_video_profiles')",
     );
-    return { enabled: Number(row.n) === 3 };
+    return {
+      enabled: Number(row.n) === 3,
+      push_tables_ready: await this.push.available(),
+    };
   }
 
   private async ensureAvailable() {
@@ -264,6 +269,7 @@ export class MessagingService {
         'UPDATE estate_conversations SET last_message_id=?,updated_at=UTC_TIMESTAMP(3) WHERE id=?',
         [created.id, id],
       );
+      await this.push.enqueue(tx, created.id, recipient);
       return created;
     });
   }

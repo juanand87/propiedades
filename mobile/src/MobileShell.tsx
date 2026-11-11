@@ -10,7 +10,6 @@ import {
   Alert,
   AppState,
   FlatList,
-  Image,
   Linking,
   Modal,
   Pressable,
@@ -39,7 +38,6 @@ import {
   IS_PRODUCTION,
   checkEnvironment,
   ManagedVideo,
-  mediaUrl,
   Page,
   price,
   Property,
@@ -58,7 +56,10 @@ import { ProppixBrand } from "./ProppixBrand";
 import { ProppixIcon, ProppixIconName } from "./ProppixIcon";
 import { clampVideoOffset } from "./video-paging";
 import { prepareVideoCache, useVideoPreload } from "./useVideoPreload";
+import { randomUUID } from "expo-crypto";
+import { PropertySlideshow } from "./PropertySlideshow";
 import { MessagesScreen } from "./MessagesScreen";
+import { useMessageNotifications } from "./useMessageNotifications";
 
 type Tab = "feed" | "catalog" | "manage" | "messages" | "account";
 const sessionKey = IS_PRODUCTION
@@ -120,6 +121,7 @@ function AppContent() {
     contact,
     conversationId,
     recipientId,
+    resumeVideoId,
   } = useGlobalSearchParams<{
     propertyId?: string;
     from?: Tab;
@@ -130,6 +132,7 @@ function AppContent() {
     contact?: "1";
     conversationId?: string;
     recipientId?: string;
+    resumeVideoId?: string;
   }>();
   const tab: Tab = propertyRoute
     ? from && from in routes
@@ -161,15 +164,19 @@ function AppContent() {
     [favorites, setFavorites] = useState<string[]>([]),
     [detail, setDetail] = useState<Property | null>(null),
     [detailBusy, setDetailBusy] = useState(false);
+  const notifications = useMessageNotifications(session);
   const setTab = (value: Tab) => {
     setDetail(null);
+    if (value === "feed") void loadFeed(true);
     router.replace(routes[value]);
   };
   const closeDetail = useCallback(() => {
     setDetail(null);
-    if (router.canGoBack()) router.back();
+    if (resumeVideoId)
+      router.replace({ pathname: "/", params: { resumeVideoId } });
+    else if (router.canGoBack()) router.back();
     else router.replace("/");
-  }, [router]);
+  }, [router, resumeVideoId]);
   const [videos, setVideos] = useState<Video[]>([]),
     [page, setPage] = useState(0),
     [pages, setPages] = useState(1),
@@ -180,10 +187,18 @@ function AppContent() {
     [foreground, setForeground] = useState(AppState.currentState === "active");
   const feedVisible =
     ready && foreground && tab === "feed" && !propertyRoute && !detail;
-  const preparedVideos = useVideoPreload(videos, active, feedVisible);
+  const preparedVideos = useVideoPreload(
+    videos,
+    active,
+    ready && foreground && tab === "feed",
+    !feedVisible,
+  );
   const feedRef = useRef<FlatList<Video>>(null),
     feedDragIndex = useRef(0),
+    feedDragging = useRef(false),
+    feedSeed = useRef(randomUUID()),
     busy = useRef(false),
+    pendingFeedReset = useRef(false),
     feedGeneration = useRef(0),
     mounted = useRef(true),
     favoriteBusy = useRef(false);
@@ -259,22 +274,33 @@ function AppContent() {
     };
   }, []);
   async function loadFeed(reset = false) {
-    if (busy.current || (!reset && page >= pages)) return;
+    if (busy.current) {
+      if (reset) {
+        pendingFeedReset.current = true;
+        feedGeneration.current++;
+      }
+      return;
+    }
     busy.current = true;
     setLoading(true);
     setFeedError("");
     const generation = reset
         ? ++feedGeneration.current
         : feedGeneration.current,
-      next = reset ? 1 : page + 1;
+      next = reset || page >= pages ? 1 : page + 1;
+    if (next === 1) feedSeed.current = randomUUID();
     try {
-      const data = await api<Page<Video>>(`/videos?limit=12&page=${next}`);
-      if (generation !== feedGeneration.current || !mounted.current) return;
-      setVideos((v) =>
-        reset
-          ? data.items
-          : [...v, ...data.items.filter((x) => !v.some((y) => y.id === x.id))],
+      const data = await api<Page<Video>>(
+        `/videos?limit=12&page=${next}&seed=${feedSeed.current}`,
       );
+      if (generation !== feedGeneration.current || !mounted.current) return;
+      setVideos((previous) => {
+        const incoming = [...data.items];
+        const preceding = reset ? previous[active]?.id : previous.at(-1)?.id;
+        if (next === 1 && incoming.length > 1 && incoming[0]?.id === preceding)
+          incoming.push(incoming.shift()!);
+        return reset ? incoming : [...previous, ...incoming];
+      });
       setPage(data.page);
       setPages(data.pages);
       if (reset) {
@@ -287,17 +313,50 @@ function AppContent() {
     } finally {
       busy.current = false;
       setLoading(false);
+      if (pendingFeedReset.current && mounted.current) {
+        pendingFeedReset.current = false;
+        setTimeout(() => void loadFeed(true), 0);
+      }
     }
   }
   const topUpFeed = useEffectEvent(() => {
     void loadFeed();
   });
   useEffect(() => {
+    if (!ready || propertyRoute || tab !== "feed" || !resumeVideoId) return;
+    const controller = new AbortController();
+    void api<Page<Video>>(
+      `/videos?video_id=${encodeURIComponent(resumeVideoId)}`,
+      { signal: controller.signal },
+    )
+      .then((result) => {
+        if (controller.signal.aborted) return;
+        const video = result.items[0];
+        if (!video) throw new Error("Este video ya no está publicado.");
+        feedGeneration.current++;
+        setVideos((previous) => [
+          video,
+          ...previous.filter((item) => item.id !== video.id),
+        ]);
+        setActive(0);
+        feedDragIndex.current = 0;
+        feedRef.current?.scrollToOffset({ offset: 0, animated: false });
+        router.replace("/");
+      })
+      .catch((error) => {
+        if (!controller.signal.aborted) {
+          Alert.alert("Recorrido no disponible", message(error));
+          router.replace("/");
+        }
+      });
+    return () => controller.abort();
+  }, [ready, propertyRoute, tab, resumeVideoId, router]);
+  useEffect(() => {
     if (
       !feedVisible ||
       loading ||
       feedError ||
-      page >= pages ||
+      (page >= pages && videos.length === 0) ||
       videos.length - active > 10
     )
       return;
@@ -484,6 +543,15 @@ function AppContent() {
     }
   }
   async function logout() {
+    try {
+      await notifications.unregister();
+    } catch {
+      Alert.alert(
+        "No se pudo cerrar sesión",
+        "Conéctate a internet para desactivar los avisos de este dispositivo y reintenta.",
+      );
+      return;
+    }
     authRun.current++;
     await SecureStore.deleteItemAsync(sessionKey);
     setSession(null);
@@ -663,7 +731,8 @@ function AppContent() {
         <FlatList
           ref={feedRef}
           data={videos}
-          keyExtractor={(v) => v.id}
+          keyExtractor={(v, index) => `${v.id}:${index}`}
+          initialScrollIndex={Math.min(active, Math.max(0, videos.length - 1))}
           pagingEnabled
           snapToInterval={height}
           snapToAlignment="start"
@@ -682,9 +751,12 @@ function AppContent() {
           windowSize={3}
           extraData={[active, preparedVideos, foreground, detail, favorites]}
           onScrollBeginDrag={() => {
+            feedDragging.current = true;
             feedDragIndex.current = active;
           }}
           onMomentumScrollEnd={(e) => {
+            if (!feedDragging.current) return;
+            feedDragging.current = false;
             const bounded = clampVideoOffset(
               e.nativeEvent.contentOffset.y,
               height,
@@ -700,6 +772,7 @@ function AppContent() {
               });
           }}
           onScroll={(e) => {
+            if (!feedDragging.current) return;
             const offset = e.nativeEvent.contentOffset.y;
             const bounded = clampVideoOffset(
               offset,
@@ -728,7 +801,7 @@ function AppContent() {
             <VideoCard
               item={item}
               height={height}
-              active={index === active && foreground && !detail}
+              active={index === active && feedVisible}
               player={
                 feedVisible &&
                 index === active &&
@@ -1138,6 +1211,8 @@ function AppContent() {
         catalog: catalogScreen,
         messages: (
           <MessagesScreen
+            notificationStatus={notifications.status}
+            onRetryNotifications={notifications.retry}
             key={[
               session?.user.id,
               conversationId,
@@ -1362,16 +1437,7 @@ function AppContent() {
                       />
                     </>
                   )}
-                  {detail.media.map((m) => (
-                    <Image
-                      key={m.id}
-                      source={{ uri: mediaUrl(m.url) }}
-                      style={[
-                        s.propertyImage,
-                        { marginBottom: 10, borderRadius: 18 },
-                      ]}
-                    />
-                  ))}
+                  <PropertySlideshow key={detail.id} media={detail.media} />
                   <Text style={s.eyebrow}>
                     {detail.commune_name} · {detail.region_name}
                   </Text>

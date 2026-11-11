@@ -1,5 +1,5 @@
 import { videoColors } from "./video-colors";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -26,29 +26,33 @@ import { SocialVideoActions } from "./SocialVideoActions";
 import { SellerPanel } from "./SellerPanel";
 
 function VideoThumbnail({ video }: { video: ProfileVideo }) {
-  const player = useVideoPlayer(
-    { uri: mediaUrl(video.url), useCaching: true, contentType: "progressive" },
-    (p) => {
-      p.muted = true;
-      p.pause();
-      p.currentTime = 0.1;
-      p.bufferOptions = {
-        minBufferForPlayback: 0.25,
-        preferredForwardBufferDuration: 0.25,
-        maxBufferBytes: 256 * 1024,
-      };
+  const [attempt, setAttempt] = useState(0);
+  const retry = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(
+    () => () => {
+      if (retry.current) clearTimeout(retry.current);
     },
+    [],
   );
+  const url = video.thumbnail_url;
+  if (!url) return <View style={StyleSheet.absoluteFill} />;
   return (
-    <VideoView
+    <Image
+      key={attempt}
+      source={{ uri: mediaUrl(url) }}
       style={StyleSheet.absoluteFill}
-      player={player}
-      nativeControls={false}
-      contentFit="cover"
-      surfaceType="textureView"
+      resizeMode="cover"
+      onError={() => {
+        if (attempt < 8)
+          retry.current = setTimeout(
+            () => setAttempt((value) => value + 1),
+            1500 + attempt * 700,
+          );
+      }}
     />
   );
 }
+
 type PropertyFavorite = { ids: string[]; toggle: (id: string) => void };
 
 function FullVideoPlayer({

@@ -1,4 +1,5 @@
 import { compressVideo } from './video-compression';
+import { videoPoster } from './video-poster';
 import {
   Injectable,
   BadRequestException,
@@ -35,6 +36,7 @@ const visible = videoVisible,
   joined = videoJoined;
 @Injectable()
 export class PropertyVideosService {
+  private posterJobs = new Map<string, Promise<Buffer>>();
   private folder = resolve(__dirname, '../../..', 'tmp/mobile-videos');
   constructor(
     private db: DataSource,
@@ -92,6 +94,7 @@ export class PropertyVideosService {
     const type =
       typeof q.type_id === 'string' && q.type_id.length <= 30 ? q.type_id : '';
     const videoId = q.video_id ? uuid(q.video_id) : null;
+    const seed = q.seed ? uuid(q.seed) : null;
     const filter =
         (type ? ' AND p.type_id=?' : '') +
         (q.linked_only === 'true' ? ' AND v.property_id IS NOT NULL' : '') +
@@ -102,14 +105,15 @@ export class PropertyVideosService {
       params,
     );
     const rows = await this.db.query(
-      `SELECT v.id,v.property_id,v.title,v.size_bytes,creator.id creator_id,creator.firstName creator_name,r.duration_ms,r.capture_seconds ${joined} LEFT JOIN property_video_recordings r ON r.video_id=v.id WHERE ${visible}${filter} ORDER BY v.created_at DESC,v.id LIMIT ? OFFSET ?`,
-      [...params, limit, (page - 1) * limit],
+      `SELECT v.id,v.property_id,v.title,v.size_bytes,creator.id creator_id,creator.firstName creator_name,r.duration_ms,r.capture_seconds ${joined} LEFT JOIN property_video_recordings r ON r.video_id=v.id WHERE ${visible}${filter} ORDER BY ${seed ? 'MD5(CONCAT(?,v.id)),v.id' : 'v.created_at DESC,v.id'} LIMIT ? OFFSET ?`,
+      [...params, ...(seed ? [seed] : []), limit, (page - 1) * limit],
     );
     return {
       items: await Promise.all(
         rows.map(async (v: any) => ({
           ...v,
           url: `/api/videos/${v.id}/content`,
+          thumbnail_url: `/api/videos/${v.id}/thumbnail`,
           creator: { id: v.creator_id, display_name: v.creator_name },
           property: v.property_id ? await this.estate.get(v.property_id) : null,
         })),
@@ -151,6 +155,7 @@ export class PropertyVideosService {
     );
     return {
       url: `/api/videos/${id}/preview?signature=${encodeURIComponent(signature)}`,
+      thumbnail_url: `/api/videos/${id}/thumbnail?signature=${encodeURIComponent(signature)}`,
     };
   }
   async previewContent(
@@ -234,6 +239,7 @@ export class PropertyVideosService {
       }
       const duration = validateVideoProbe(metadata, limit);
       const stored = await compressVideo(filename, file.buffer, duration);
+      const poster = await videoPoster(filename);
       if (this.storage.enabled) {
         const key = this.storage.objectKey(videoId);
         await this.db.query(
@@ -322,6 +328,15 @@ export class PropertyVideosService {
           'INSERT INTO property_video_recordings(video_id,duration_ms,capture_seconds,request_id,content_digest) VALUES (?,?,?,?,?)',
           [videoId, duration, limit, requestId, digest],
         );
+        // A missing optional migration must not prevent saving the video.
+        const [posterTable] = await tx.query(
+          "SELECT COUNT(*) n FROM information_schema.tables WHERE table_schema=DATABASE() AND table_name='property_video_posters'",
+        );
+        if (Number(posterTable.n))
+          await tx.query(
+            'INSERT INTO property_video_posters(video_id,jpeg) VALUES (?,?)',
+            [videoId, poster],
+          );
         if (this.storage.enabled)
           await tx.query(
             "UPDATE property_video_objects SET status='ready' WHERE video_id=? AND status='uploading'",
@@ -432,6 +447,93 @@ export class PropertyVideosService {
     );
     if (!v) throw new NotFoundException('Video no disponible.');
     return this.serveContent(id, v.size_bytes, rangeHeader, res);
+  }
+  async thumbnail(id: string, signature: string | undefined, res: any) {
+    this.guard();
+    uuid(id);
+    if (signature) {
+      let payload: { sub: string; videoId: string };
+      try {
+        payload = this.jwt.verify(signature, {
+          audience: 'estate-video-preview',
+        });
+      } catch {
+        throw new UnauthorizedException('Vuelve a abrir el perfil.');
+      }
+      if (payload.videoId !== id) throw new UnauthorizedException();
+      await this.managedVideo(await this.estate.actor(payload.sub), id);
+    } else {
+      const [visibleRow] = await this.db.query(
+        `SELECT v.id ${joined} WHERE v.id=? AND ${visible}`,
+        [id],
+      );
+      if (!visibleRow) throw new NotFoundException('Video no disponible.');
+    }
+    const [saved] = await this.db.query<{ jpeg: Buffer }[]>(
+      'SELECT jpeg FROM property_video_posters WHERE video_id=?',
+      [id],
+    );
+    let jpeg = saved?.jpeg;
+    if (!jpeg) {
+      let job = this.posterJobs.get(id);
+      if (!job) {
+        if (this.posterJobs.size >= 2)
+          throw new ServiceUnavailableException('Portada en preparación.');
+        job = this.createLegacyPoster(id);
+        this.posterJobs.set(id, job);
+        void job.finally(() => this.posterJobs.delete(id)).catch(() => {});
+      }
+      jpeg = await job;
+    }
+    res.set({
+      'Content-Type': 'image/jpeg',
+      'Cache-Control': 'private,max-age=300',
+      'X-Content-Type-Options': 'nosniff',
+    });
+    return res.send(jpeg);
+  }
+  private async createLegacyPoster(id: string) {
+    await mkdir(this.folder, { recursive: true });
+    let filename = resolve(this.folder, id + '.mp4');
+    let temporary = false;
+    try {
+      if (this.storage.enabled) {
+        const [object] = await this.db.query<
+          { object_key: string; bucket: string }[]
+        >(
+          "SELECT object_key,bucket FROM property_video_objects WHERE video_id=? AND status='ready'",
+          [id],
+        );
+        if (!object || object.bucket !== this.storage.config?.bucket)
+          throw new NotFoundException();
+        const response = await fetch(
+          await this.storage.signedRead(object.object_key),
+          { signal: AbortSignal.timeout(30000), redirect: 'error' },
+        );
+        if (!response.ok || !response.body)
+          throw new ServiceUnavailableException();
+        const chunks: Buffer[] = [];
+        let size = 0;
+        for await (const chunk of response.body as any) {
+          size += chunk.length;
+          if (size > 50 * 1024 * 1024)
+            throw new BadRequestException('Video demasiado grande.');
+          chunks.push(Buffer.from(chunk));
+        }
+        filename = resolve(this.folder, randomUUID() + '.poster.mp4');
+        await writeFile(filename, Buffer.concat(chunks), { flag: 'wx' });
+        temporary = true;
+      } else if (this.config.get('NODE_ENV') === 'production')
+        throw new NotFoundException();
+      const jpeg = await videoPoster(filename);
+      await this.db.query(
+        'INSERT IGNORE INTO property_video_posters(video_id,jpeg) VALUES (?,?)',
+        [id, jpeg],
+      );
+      return jpeg;
+    } finally {
+      if (temporary) await unlink(filename).catch(() => {});
+    }
   }
   private async serveContent(
     id: string,

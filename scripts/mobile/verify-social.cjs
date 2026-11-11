@@ -22,6 +22,7 @@ async function main() {
     assert.ok(server.d.replaceAll('\\', '/').toLowerCase().includes('/propiedades/tmp/mobile-local/mysql-data'));
     const [before] = await db.query('SELECT id,property_id,created_by FROM property_videos ORDER BY id');
     for (let i=0;i<2;i++) await db.query(await fs.readFile(path.join(root,'database/PERFILES_Y_VIDEOS_SOCIALES.sql'),'utf8'));
+    for (let i=0;i<2;i++) await db.query(await fs.readFile(path.join(root,'database/NOTIFICACIONES_Y_PORTADAS.sql'),'utf8'));
     const [after] = await db.query('SELECT id,property_id,created_by FROM property_videos ORDER BY id');
     assert.deepEqual(after,before); checks++;
   } finally { await db.end(); }
@@ -53,9 +54,23 @@ async function main() {
   const preview=await call('/manage/videos/'+video.id+'/preview',{token});
   const bytes=await fetch('http://127.0.0.1:3328'+preview.url,{headers:{Range:'bytes=0-99'}});
   check(bytes.status===206&&(await bytes.arrayBuffer()).byteLength===100,'Private Range preview');
+  await call(route+'/thumbnail',{status:404});
+  const thumbnail = await fetch('http://127.0.0.1:3328'+preview.thumbnail_url);
+  check(thumbnail.status===200 && thumbnail.headers.get('content-type').startsWith('image/jpeg'),'Draft poster requires signed access');
+  const metadata = await require(path.join(root,'backend/node_modules/sharp'))(Buffer.from(await thumbnail.arrayBuffer())).metadata();
+  check(metadata.width<=480 && metadata.height<=640,'Poster is a compact image');
   await call('/manage/videos/'+video.id,{method:'PATCH',token,body:{status:'published'}});
   const feed=await call('/videos?video_id='+video.id);
   check(feed.items.length===1&&feed.items[0].property===null,'Published video does not need a property');
+  const publicPoster = await fetch('http://127.0.0.1:3328'+feed.items[0].thumbnail_url);
+  check(publicPoster.status===200,'Published poster is available');
+  const seed=randomUUID();
+  const seededA=await call('/videos?limit=2&seed='+seed),seededB=await call('/videos?limit=2&seed='+seed),seededNext=await call('/videos?limit=2&page=2&seed='+seed);
+  check(JSON.stringify(seededA.items.map(x=>x.id))===JSON.stringify(seededB.items.map(x=>x.id)),'Seeded order remains stable across retries');
+  check(!seededNext.items.some(x=>seededA.items.some(y=>x.id===y.id)),'Seeded pages do not repeat videos');
+  const posterDb = await mysql.createConnection({ host: '127.0.0.1', port: 3327, user: 'root', database: 'propiedades' });
+  try {const [[env]]=await posterDb.query('SELECT @@datadir d,@@port p');assert.equal(Number(env.p),3327);assert.ok(env.d.replaceAll('\\','/').includes('/propiedades/tmp/mobile-local/mysql-data'));await posterDb.query('DELETE FROM property_video_posters WHERE video_id=?',[video.id]);}finally{await posterDb.end();}
+  check((await fetch('http://127.0.0.1:3328'+feed.items[0].thumbnail_url)).status===200,'Legacy poster generated once from existing video');
   await call(route+'/like',{method:'POST',status:401,body:{active:true}});
   for(let i=0;i<2;i++)await call(route+'/like',{method:'POST',status:201,token:viewer,body:{active:true}});
   check((await call(route+'/social',{token:viewer})).likes===1,'Likes are idempotent');
