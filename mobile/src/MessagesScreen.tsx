@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { ComponentRef, useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -92,6 +92,7 @@ export function MessagesScreen({
   onRetryNotifications?: () => void;
 }) {
   const router = useRouter();
+  const messageInput = useRef<ComponentRef<typeof TextInput>>(null);
   const token = session?.access_token;
   const [foreground, setForeground] = useState(
     AppState.currentState === "active",
@@ -465,7 +466,8 @@ export function MessagesScreen({
             data={messages}
             inverted
             keyExtractor={(item) => item.id}
-            keyboardShouldPersistTaps="handled"
+            keyboardShouldPersistTaps="always"
+            keyboardDismissMode="none"
             contentContainerStyle={{ padding: 15, gap: 9 }}
             renderItem={({ item }) => {
               const mine = item.sender_id === session.user.id;
@@ -510,7 +512,10 @@ export function MessagesScreen({
           ) : (
             <View style={s.composer}>
               <TextInput
+                ref={messageInput}
                 accessibilityLabel="Escribir mensaje"
+                blurOnSubmit={false}
+                submitBehavior="newline"
                 value={text}
                 onChangeText={setText}
                 style={s.input}
@@ -526,6 +531,7 @@ export function MessagesScreen({
                   sending ? "Enviando mensaje" : "Enviar mensaje"
                 }
                 disabled={sending || !text.trim()}
+                onPressIn={() => messageInput.current?.focus()}
                 onPress={() => void send()}
                 style={[s.send, (sending || !text.trim()) && { opacity: 0.45 }]}
               >

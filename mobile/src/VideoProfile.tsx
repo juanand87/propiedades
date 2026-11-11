@@ -597,9 +597,10 @@ export function VideoProfile({
           </View>
           {error ? <Text style={s.error}>{error}</Text> : null}
           <FlatList
+            keyboardDismissMode="none"
             data={followers}
             keyExtractor={(person) => person.id}
-            keyboardShouldPersistTaps="handled"
+            keyboardShouldPersistTaps="always"
             renderItem={({ item: person }) => (
               <Pressable
                 accessibilityRole="button"
@@ -682,6 +683,7 @@ export function VideoProfile({
       ) : (
         <FlatList
           key={section}
+          keyboardShouldPersistTaps="always"
           data={videos}
           numColumns={3}
           keyExtractor={(v) => v.id}
@@ -755,6 +757,8 @@ export function VideoProfile({
             <FlatList
               data={videos}
               keyExtractor={(v) => v.id}
+              keyboardShouldPersistTaps="always"
+              keyboardDismissMode="none"
               initialScrollIndex={viewer}
               pagingEnabled
               snapToInterval={height}

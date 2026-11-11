@@ -729,6 +729,8 @@ function AppContent() {
     >
       {height > 1 && (
         <FlatList
+          keyboardShouldPersistTaps="always"
+          keyboardDismissMode="none"
           ref={feedRef}
           data={videos}
           keyExtractor={(v, index) => `${v.id}:${index}`}

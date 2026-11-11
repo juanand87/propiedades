@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
+import { ComponentRef, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
   Image,
+  Keyboard,
   Modal,
   Pressable,
   ScrollView,
@@ -44,6 +45,7 @@ export function SocialVideoActions({
   };
 }) {
   const router = useRouter();
+  const commentInput = useRef<ComponentRef<typeof TextInput>>(null);
   const [data, setData] = useState<VideoSocialData | null>(null);
   const [panel, setPanel] = useState<"edit" | "comments" | null>(null);
   const [error, setError] = useState("");
@@ -413,7 +415,10 @@ export function SocialVideoActions({
                 {error}
               </Text>
             )}
-            <ScrollView keyboardShouldPersistTaps="handled">
+            <ScrollView
+              keyboardShouldPersistTaps="always"
+              keyboardDismissMode="none"
+            >
               {panel === "edit" && (
                 <>
                   {option("Descargar", () => void download())}
@@ -560,9 +565,22 @@ export function SocialVideoActions({
                         </Text>
                       )}
                       <Text style={s.white}>{c.body}</Text>
-                      {option("Responder", () => {
-                        if (requireSession()) setReply(c);
-                      })}
+                      <Pressable
+                        accessibilityRole="button"
+                        disabled={busy}
+                        style={s.option}
+                        onPress={() => {
+                          if (!requireSession()) return;
+                          setReply(c);
+                          if (!Keyboard.isVisible())
+                            commentInput.current?.blur();
+                          requestAnimationFrame(() =>
+                            commentInput.current?.focus(),
+                          );
+                        }}
+                      >
+                        <Text style={s.white}>Responder</Text>
+                      </Pressable>
                     </View>
                   ))}
                 </>
@@ -577,7 +595,10 @@ export function SocialVideoActions({
                   )}
                 <View style={s.composer}>
                   <TextInput
+                    ref={commentInput}
                     accessibilityLabel="Escribe un comentario"
+                    blurOnSubmit={false}
+                    submitBehavior="newline"
                     placeholder="Escribe un comentario…"
                     placeholderTextColor={videoColors.muted}
                     value={comment}
@@ -590,6 +611,7 @@ export function SocialVideoActions({
                   <Pressable
                     accessibilityRole="button"
                     accessibilityLabel="Enviar comentario"
+                    onPressIn={() => commentInput.current?.focus()}
                     disabled={busy || !comment.trim()}
                     style={[
                       s.send,
