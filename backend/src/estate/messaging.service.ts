@@ -76,6 +76,8 @@ export class MessagingService {
       enabled: Number(row.n) === 3,
       push_tables_ready: await this.push.available(),
       push: await this.push.health(),
+      video_comment_notifications: await this.push.videoCommentsAvailable(),
+      self_comment_notifications: this.push.selfActivityEnabled(),
     };
   }
 

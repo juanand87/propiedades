@@ -47,6 +47,7 @@ async function main() {
       'SPACES_VIDEOS_PROPIEDADES.sql',
       'PERFILES_Y_VIDEOS_SOCIALES.sql',
       'NOTIFICACIONES_Y_PORTADAS.sql',
+      'NOTIFICACIONES_COMENTARIOS.sql',
       'MENSAJES_PROPPIX.sql',
       'MENSAJES_PROPPIX.sql',
     ]) {

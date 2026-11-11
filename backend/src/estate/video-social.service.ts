@@ -10,6 +10,7 @@ import { DataSource } from 'typeorm';
 import { randomUUID } from 'node:crypto';
 import { Actor, text, uuid } from './rules';
 import { EstateService } from './estate.service';
+import { PushService } from './push.service';
 import {
   PropertyVideosService,
   videoJoined,
@@ -23,6 +24,7 @@ export class VideoSocialService {
     private config: ConfigService,
     private videos: PropertyVideosService,
     private estate: EstateService,
+    private push: PushService,
   ) {}
   guard() {
     if (this.config.get('SOCIAL_VIDEOS_ENABLED') !== 'true')
@@ -256,21 +258,23 @@ export class VideoSocialService {
     );
   }
   async comment(actor: Actor, id: string, body: any, ip: string) {
-    await this.access(id, actor);
+    const video = await this.access(id, actor);
     this.estate.throttle(`video-comment:${actor.id}:${ip}`, 15, 60000);
     const message = text(body.body, 2000);
     if (!message) throw new BadRequestException('Escribe un comentario.');
     const parentId = body.parent_id == null ? null : uuid(body.parent_id);
     await this.db.transaction(async (tx) => {
+      let parentUserId: string | undefined;
       if (parentId) {
         const [parent] = await tx.query(
-          'SELECT id FROM estate_video_comments WHERE id=? AND video_id=?',
+          'SELECT id,user_id FROM estate_video_comments WHERE id=? AND video_id=?',
           [parentId, id],
         );
         if (!parent)
           throw new NotFoundException(
             'Comentario no disponible en este video.',
           );
+        parentUserId = parent.user_id;
       }
       const commentId = randomUUID();
       await tx.query(
@@ -282,6 +286,12 @@ export class VideoSocialService {
           'INSERT INTO estate_video_comment_replies(comment_id,parent_id) VALUES (?,?)',
           [commentId, parentId],
         );
+      await this.push.enqueueVideoComment(tx, {
+        commentId,
+        ownerId: video.created_by,
+        parentUserId,
+        actorId: actor.id,
+      });
     });
     return this.comments(id, actor);
   }

@@ -24,4 +24,10 @@ La cola guarda mensajes junto al envío, aplica reintentos con espera creciente 
 
 GET /api/messages/capabilities incluye push.configured y push.google_ready. google_ready comprueba desde el servidor una solicitud validate_only de FCM, sin enviar avisos. La respuesta está almacenada hasta 60 segundos.
 
-En la app, Mensajes → Probar aviso en mi teléfono envía a los dispositivos del usuario autenticado. No requiere otro usuario ni crea conversaciones consigo mismo. Se puede repetir cada 30 segundos y desactivar con PUSH_SELF_TEST_ENABLED=false. FCM accepted confirma que Google aceptó el envío; la recepción física se comprueba en el teléfono. Los comentarios propios no disparan automáticamente este aviso de prueba.
+En la app, Mensajes → Probar aviso en mi teléfono envía a los dispositivos del usuario autenticado. No requiere otro usuario ni crea conversaciones consigo mismo. Se puede repetir cada 30 segundos y desactivar con PUSH_SELF_TEST_ENABLED=false. FCM accepted confirma que Google aceptó el envío; la recepción física se comprueba en el teléfono. El botón de prueba es independiente de los eventos de comentarios.
+
+## Comentarios y respuestas
+
+Ejecutar database/NOTIFICACIONES_COMENTARIOS.sql. Se guarda una entrega por comentario y dispositivo en la misma transacción del comentario. Un comentario avisa al dueño del video; una respuesta avisa además al autor del comentario padre. Si ambos destinatarios son el mismo usuario, se envía un único aviso de respuesta. Los comentarios propios generan avisos por ahora; se pueden desactivar con PUSH_SELF_ACTIVITY_ENABLED=false sin cambiar el APK. El trabajador procesa la cola cada 10 segundos, aplica reintentos a errores temporales y elimina dispositivos UNREGISTERED. Comprueba que el video siga accesible al destinatario y que comentario, autor y cuenta receptora existan y estén activos. No se incluye el texto privado del comentario en la pantalla bloqueada.
+
+La versión 1.0.10 ya puede recibir estos avisos: no es necesaria otra instalación para esta activación del backend. El enlace de video se incluye en los datos de FCM para la navegación de las siguientes versiones.

@@ -10,6 +10,15 @@ import { DataSource, EntityManager } from 'typeorm';
 import { JWT } from 'google-auth-library';
 import { readFileSync } from 'node:fs';
 import { Actor } from './rules';
+import { videoJoined, videoVisible } from './property-videos.service';
+
+type VideoDelivery = {
+  comment_id: string;
+  token: string;
+  user_id: string;
+  kind: 'comment' | 'reply';
+  attempts: number;
+};
 
 type Delivery = {
   message_id: string;
@@ -81,6 +90,46 @@ export class PushService implements OnModuleInit, OnModuleDestroy {
       'INSERT IGNORE INTO estate_push_deliveries(message_id,token,user_id) SELECT ?,token,user_id FROM estate_push_devices WHERE user_id=? AND updated_at>UTC_TIMESTAMP()-INTERVAL 90 DAY',
       [messageId, recipient],
     );
+  }
+  async videoCommentsAvailable(
+    db: Pick<DataSource, 'query'> | EntityManager = this.db,
+  ) {
+    const [row] = await db.query<{ n: number }[]>(
+      "SELECT COUNT(*) n FROM information_schema.tables WHERE table_schema=DATABASE() AND table_name='estate_video_push_deliveries'",
+    );
+    return Number(row.n) > 0;
+  }
+  selfActivityEnabled() {
+    return this.config.get('PUSH_SELF_ACTIVITY_ENABLED') !== 'false';
+  }
+  async enqueueVideoComment(
+    tx: EntityManager,
+    input: {
+      commentId: string;
+      ownerId: string;
+      parentUserId?: string;
+      actorId: string;
+    },
+  ) {
+    if (!(await this.videoCommentsAvailable(tx))) return;
+    const recipients = new Map<string, 'comment' | 'reply'>([
+      [input.ownerId.toLowerCase(), 'comment'],
+    ]);
+    if (input.parentUserId)
+      recipients.set(input.parentUserId.toLowerCase(), 'reply');
+    for (const [recipient, kind] of recipients) {
+      if (
+        recipient === input.actorId.toLowerCase() &&
+        !this.selfActivityEnabled()
+      )
+        continue;
+      await tx.query(
+        `INSERT IGNORE INTO estate_video_push_deliveries(comment_id,user_id,token,kind)
+        SELECT ?,d.user_id,d.token,? FROM estate_push_devices d JOIN users u ON CONVERT(u.id USING utf8mb4) COLLATE utf8mb4_unicode_ci=d.user_id
+        WHERE d.user_id=? AND u.isActive=1 AND d.updated_at>UTC_TIMESTAMP()-INTERVAL 90 DAY`,
+        [input.commentId, kind, recipient],
+      );
+    }
   }
   onModuleInit() {
     if (
@@ -247,6 +296,11 @@ export class PushService implements OnModuleInit, OnModuleDestroy {
   private async sendFcm(
     row: Pick<Delivery, 'token' | 'message_id' | 'conversation_id'>,
     test = false,
+    activity?: {
+      videoId: string;
+      commentId: string;
+      kind: 'comment' | 'reply';
+    },
   ) {
     const { auth, projectId } = this.credentials();
     const { token: accessToken } = await auth.getAccessToken();
@@ -263,15 +317,32 @@ export class PushService implements OnModuleInit, OnModuleDestroy {
           message: {
             token: row.token,
             notification: {
-              title: test ? 'Prueba de Proppix' : 'Nuevo mensaje en Proppix',
-              body: test
-                ? 'Las notificaciones de tu cuenta están funcionando.'
-                : 'Tienes un mensaje nuevo. Toca para abrir la conversación.',
+              title: activity
+                ? activity.kind === 'reply'
+                  ? 'Respondieron tu comentario'
+                  : 'Nuevo comentario en tu video'
+                : test
+                  ? 'Prueba de Proppix'
+                  : 'Nuevo mensaje en Proppix',
+              body: activity
+                ? activity.kind === 'reply'
+                  ? 'Recibiste una respuesta en un video de Proppix.'
+                  : 'Tu video recibió un comentario nuevo en Proppix.'
+                : test
+                  ? 'Las notificaciones de tu cuenta están funcionando.'
+                  : 'Tienes un mensaje nuevo. Toca para abrir la conversación.',
             },
             data: {
               conversationId: row.conversation_id,
               messageId: row.message_id,
               ...(test ? { test: 'true' } : {}),
+              ...(activity
+                ? {
+                    videoId: activity.videoId,
+                    commentId: activity.commentId,
+                    type: activity.kind,
+                  }
+                : {}),
             },
             android: {
               priority: 'HIGH',
@@ -281,7 +352,9 @@ export class PushService implements OnModuleInit, OnModuleDestroy {
                 channel_id: 'messages',
                 sound: 'default',
                 icon: 'notification_icon',
-                tag: 'message-' + row.message_id,
+                tag: activity
+                  ? 'video-comment-' + activity.commentId
+                  : 'message-' + row.message_id,
               },
             },
           },
@@ -312,6 +385,60 @@ export class PushService implements OnModuleInit, OnModuleDestroy {
     await this.db.query(
       'UPDATE estate_push_deliveries SET status=?,ticket=?,due_at=TIMESTAMPADD(SECOND,?,UTC_TIMESTAMP(3)) WHERE message_id=? AND token=?',
       [status, ticket, delay, row.message_id, row.token],
+    );
+  }
+  private async flushVideoComments() {
+    if (!(await this.videoCommentsAvailable())) return;
+    const rows = await this.db.query<VideoDelivery[]>(
+      "SELECT comment_id,user_id,token,kind,attempts FROM estate_video_push_deliveries WHERE status='pending' AND due_at<=UTC_TIMESTAMP(3) ORDER BY due_at,comment_id LIMIT 25",
+    );
+    for (const row of rows) {
+      const update = (status: string) =>
+        this.db.query(
+          'UPDATE estate_video_push_deliveries SET status=? WHERE comment_id=? AND token=?',
+          [status, row.comment_id, row.token],
+        );
+      const [event] = await this.db.query<{ video_id: string }[]>(
+        `SELECT c.video_id FROM estate_video_comments c JOIN users author ON CONVERT(author.id USING utf8mb4) COLLATE utf8mb4_unicode_ci=c.user_id AND author.isActive=1 JOIN users recipient ON recipient.id=? AND recipient.isActive=1
+        JOIN estate_push_devices d ON d.user_id=CONVERT(recipient.id USING utf8mb4) COLLATE utf8mb4_unicode_ci AND d.token=?
+        JOIN property_videos ownvideo ON ownvideo.id=c.video_id AND ownvideo.status<>'archived'
+        WHERE c.id=? AND (ownvideo.created_by=? OR EXISTS(SELECT 1 ${videoJoined} WHERE v.id=c.video_id AND ${videoVisible}))`,
+        [row.user_id, row.token, row.comment_id, row.user_id],
+      );
+      if (!event || !validFcmToken(row.token)) {
+        await update('done');
+        continue;
+      }
+      if (row.attempts >= 12) {
+        await update('failed');
+        continue;
+      }
+      await this.db.query(
+        'UPDATE estate_video_push_deliveries SET attempts=attempts+1,due_at=TIMESTAMPADD(SECOND,?,UTC_TIMESTAMP(3)) WHERE comment_id=? AND token=?',
+        [Math.min(3600, 30 * 2 ** row.attempts), row.comment_id, row.token],
+      );
+      try {
+        const result = await this.sendFcm(
+          { token: row.token, message_id: row.comment_id, conversation_id: '' },
+          false,
+          {
+            videoId: event.video_id,
+            commentId: row.comment_id,
+            kind: row.kind,
+          },
+        );
+        if (result === 'unregistered')
+          await this.db.query(
+            'DELETE FROM estate_push_devices WHERE token=? AND user_id=?',
+            [row.token, row.user_id],
+          );
+        await update(result === 'invalid' ? 'failed' : 'done');
+      } catch {
+        /* Leave the durable event pending with its persisted retry time. */
+      }
+    }
+    await this.db.query(
+      "DELETE FROM estate_video_push_deliveries WHERE status IN ('done','failed') AND due_at<UTC_TIMESTAMP()-INTERVAL 7 DAY LIMIT 1000",
     );
   }
   async flush() {
@@ -378,6 +505,7 @@ export class PushService implements OnModuleInit, OnModuleDestroy {
       await this.db.query(
         "DELETE FROM estate_push_deliveries WHERE status IN ('done','failed') AND due_at<UTC_TIMESTAMP()-INTERVAL 7 DAY LIMIT 1000",
       );
+      await this.flushVideoComments();
     } finally {
       if (locked)
         await runner

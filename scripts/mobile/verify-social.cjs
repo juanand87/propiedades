@@ -23,6 +23,7 @@ async function main() {
     const [before] = await db.query('SELECT id,property_id,created_by FROM property_videos ORDER BY id');
     for (let i=0;i<2;i++) await db.query(await fs.readFile(path.join(root,'database/PERFILES_Y_VIDEOS_SOCIALES.sql'),'utf8'));
     for (let i=0;i<2;i++) await db.query(await fs.readFile(path.join(root,'database/NOTIFICACIONES_Y_PORTADAS.sql'),'utf8'));
+    for (let i=0;i<2;i++) await db.query(await fs.readFile(path.join(root,'database/NOTIFICACIONES_COMENTARIOS.sql'),'utf8'));
     const [after] = await db.query('SELECT id,property_id,created_by FROM property_videos ORDER BY id');
     assert.deepEqual(after,before); checks++;
   } finally { await db.end(); }
@@ -33,6 +34,9 @@ async function main() {
     return call('/auth/register',{method:'POST',status:201,body:{email:`qa-social-${kind}-${suffix}@qa.invalid`,password,firstName:`QA Social ${kind}`,lastName:'Local'}});
   }
   const a = await register('A'), b = await register('B'), token=a.access_token, viewer=b.access_token;
+  const tokenA='fcm_local_social_owner_0123456789', tokenB='fcm_local_social_parent_0123456789';
+  await call('/messages/devices',{method:'POST',status:201,token,body:{token:tokenA}});
+  await call('/messages/devices',{method:'POST',status:201,token:viewer,body:{token:tokenB}});
   await call('/me/account-type',{method:'POST',status:201,token,body:{account_type:'seller'}});
   const property = await call('/manage/properties',{method:'POST',status:201,token,body:{title:'Propiedad QA social local',type_id:'house'}});
   const foreign = await call('/manage/properties/'+property.id,{token:viewer,status:403});
@@ -83,6 +87,27 @@ async function main() {
   await call(`/video-profiles/${a.user.id}/follow`,{method:'POST',status:400,token,body:{active:true}});
   await call(route+'/comments',{method:'POST',status:201,token:viewer,body:{body:'Comentario de prueba local'}});
   check((await call(route+'/comments'))[0].body==='Comentario de prueba local','Comments persist');
+  const parent=(await call(route+'/comments'))[0];
+  const ownComments=await call(route+'/comments',{method:'POST',status:201,token,body:{body:'Comentario propio para aviso'}});
+  const ownComment=ownComments.find(c=>c.body==='Comentario propio para aviso');
+  const replies=await call(route+'/comments',{method:'POST',status:201,token,body:{body:'Respuesta QA para dos destinatarios',parent_id:parent.id}});
+  const replyEvent=replies.find(c=>c.body==='Respuesta QA para dos destinatarios');
+  const sameRecipient=await call(route+'/comments',{method:'POST',status:201,token,body:{body:'Respuesta al comentario propio',parent_id:ownComment.id}});
+  const dedupEvent=sameRecipient.find(c=>c.body==='Respuesta al comentario propio');
+  await call(route+'/comments',{method:'POST',status:404,token,body:{body:'Padre inexistente',parent_id:randomUUID()}});
+  const noticeDb=await mysql.createConnection({host:'127.0.0.1',port:3327,user:'root',database:'propiedades'});
+  try {
+    const [[sandbox]]=await noticeDb.query('SELECT @@datadir d,@@port p');assert.equal(Number(sandbox.p),3327);assert.ok(sandbox.d.replaceAll('\\','/').toLowerCase().includes('/propiedades/tmp/mobile-local/mysql-data'));
+    const [ownNotices]=await noticeDb.query('SELECT user_id,kind FROM estate_video_push_deliveries WHERE comment_id=?',[ownComment.id]);
+    check(ownNotices.length===1&&ownNotices[0].user_id===a.user.id&&ownNotices[0].kind==='comment','Own comments enqueue an owner notification');
+    const [replyNotices]=await noticeDb.query('SELECT user_id,kind FROM estate_video_push_deliveries WHERE comment_id=?',[replyEvent.id]);
+    check(replyNotices.length===2&&replyNotices.some(n=>n.user_id===a.user.id&&n.kind==='comment')&&replyNotices.some(n=>n.user_id===b.user.id&&n.kind==='reply'),'Reply enqueues owner and original commenter');
+    const [dedupNotices]=await noticeDb.query('SELECT user_id,kind FROM estate_video_push_deliveries WHERE comment_id=?',[dedupEvent.id]);
+    check(dedupNotices.length===1&&dedupNotices[0].user_id===a.user.id&&dedupNotices[0].kind==='reply','Same owner and parent receives one reply notification');
+    await noticeDb.query(await fs.readFile(path.join(root,'database/NOTIFICACIONES_COMENTARIOS.sql'),'utf8'));
+    const [[preserved]]=await noticeDb.query('SELECT COUNT(*) n FROM estate_video_push_deliveries WHERE comment_id=?',[replyEvent.id]);
+    check(Number(preserved.n)===2,'Repeating migration preserves queued notifications');
+  }finally{await noticeDb.end();}
   await call(route+'/comments',{method:'POST',status:400,token:viewer,body:{body:' '}});
   await call('/manage/videos/'+video.id,{method:'PATCH',token:viewer,status:403,body:{title:'No permitido'}});
   await call('/manage/videos/'+video.id+'/property',{method:'POST',status:403,token:viewer,body:{property_id:property.id}});

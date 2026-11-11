@@ -1,6 +1,6 @@
 import { JWT } from 'google-auth-library';
 import { ConfigService } from '@nestjs/config';
-import { DataSource } from 'typeorm';
+import { DataSource, EntityManager } from 'typeorm';
 import { PushService } from './push.service';
 
 describe('message push delivery', () => {
@@ -109,6 +109,152 @@ describe('message push delivery', () => {
     expect(health.configured).toBe(false);
     expect(health.credential_status).toBe(expected);
     expect(JSON.stringify(health)).not.toContain('private_key');
+  });
+  it('queues self-comments and deduplicates owner and reply recipient', async () => {
+    const { service } = setup();
+    const query = jest.fn((sql: string) =>
+      Promise.resolve(sql.includes('information_schema') ? [{ n: 1 }] : []),
+    );
+    const tx = { query } as unknown as EntityManager;
+    await service.enqueueVideoComment(tx, {
+      commentId: 'comment',
+      ownerId: 'owner',
+      parentUserId: 'owner',
+      actorId: 'owner',
+    });
+    const inserts = query.mock.calls.filter(([sql]) =>
+      sql.startsWith('INSERT'),
+    );
+    expect(inserts).toHaveLength(1);
+    expect(query).toHaveBeenCalledWith(
+      expect.stringContaining('INSERT IGNORE'),
+      ['comment', 'reply', 'owner'],
+    );
+  });
+  it('notifies both video owner and a distinct parent author', async () => {
+    const { service } = setup();
+    const query = jest.fn((sql: string) =>
+      Promise.resolve(sql.includes('information_schema') ? [{ n: 1 }] : []),
+    );
+    await service.enqueueVideoComment({ query } as unknown as EntityManager, {
+      commentId: 'comment',
+      ownerId: 'owner',
+      parentUserId: 'parent',
+      actorId: 'writer',
+    });
+    expect(
+      query.mock.calls.filter(([sql]) => sql.startsWith('INSERT')),
+    ).toHaveLength(2);
+    expect(query).toHaveBeenCalledWith(
+      expect.stringContaining('INSERT IGNORE'),
+      ['comment', 'comment', 'owner'],
+    );
+    expect(query).toHaveBeenCalledWith(
+      expect.stringContaining('INSERT IGNORE'),
+      ['comment', 'reply', 'parent'],
+    );
+  });
+  it('can disable self activity while keeping other recipients', async () => {
+    const service = new PushService(
+      {} as DataSource,
+      new ConfigService({ PUSH_SELF_ACTIVITY_ENABLED: 'false' }),
+    );
+    const query = jest.fn((sql: string) =>
+      Promise.resolve(sql.includes('information_schema') ? [{ n: 1 }] : []),
+    );
+    await service.enqueueVideoComment({ query } as unknown as EntityManager, {
+      commentId: 'comment',
+      ownerId: 'writer',
+      parentUserId: 'parent',
+      actorId: 'writer',
+    });
+    expect(
+      query.mock.calls.filter(([sql]) => sql.startsWith('INSERT')),
+    ).toHaveLength(1);
+    expect(query).toHaveBeenCalledWith(
+      expect.stringContaining('INSERT IGNORE'),
+      ['comment', 'reply', 'parent'],
+    );
+  });
+  it.each(['comment', 'reply'] as const)(
+    'sends a durable video %s notification',
+    async (kind) => {
+      const { service, query } = setup();
+      const event = {
+        comment_id: 'comment-1',
+        user_id: 'recipient',
+        token,
+        kind,
+        attempts: 0,
+      };
+      query.mockImplementation((sql: string) =>
+        Promise.resolve(
+          sql.includes('information_schema')
+            ? [{ n: 2 }]
+            : sql.startsWith('SELECT comment_id')
+              ? [event]
+              : sql.startsWith('SELECT c.video_id')
+                ? [{ video_id: 'video-1' }]
+                : [],
+        ),
+      );
+      const network = jest.spyOn(global, 'fetch').mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ name: 'accepted' }),
+      } as Response);
+      await service.flush();
+      const payload = JSON.parse(network.mock.calls[0][1]!.body as string) as {
+        message: {
+          data: { videoId: string; commentId: string };
+          notification: { title: string };
+        };
+      };
+      expect(payload.message.data.videoId).toBe('video-1');
+      expect(payload.message.data.commentId).toBe('comment-1');
+      expect(payload.message.notification.title).toBe(
+        kind === 'reply'
+          ? 'Respondieron tu comentario'
+          : 'Nuevo comentario en tu video',
+      );
+      expect(query).toHaveBeenCalledWith(
+        expect.stringContaining('SET status=?'),
+        ['done', 'comment-1', token],
+      );
+    },
+  );
+  it('keeps video notifications pending after transient network failure', async () => {
+    const { service, query } = setup();
+    query.mockImplementation((sql: string) =>
+      Promise.resolve(
+        sql.includes('information_schema')
+          ? [{ n: 2 }]
+          : sql.startsWith('SELECT comment_id')
+            ? [
+                {
+                  comment_id: 'comment-1',
+                  user_id: 'recipient',
+                  token,
+                  kind: 'comment',
+                  attempts: 0,
+                },
+              ]
+            : sql.startsWith('SELECT c.video_id')
+              ? [{ video_id: 'video-1' }]
+              : [],
+      ),
+    );
+    jest.spyOn(global, 'fetch').mockRejectedValue(new Error('offline'));
+    await service.flush();
+    expect(query).toHaveBeenCalledWith(
+      expect.stringContaining(
+        'estate_video_push_deliveries SET attempts=attempts+1',
+      ),
+      [30, 'comment-1', token],
+    );
+    expect(query).not.toHaveBeenCalledWith(
+      expect.stringContaining('estate_video_push_deliveries SET status=?'),
+      expect.anything(),
+    );
   });
   it.each([false, true])(
     'sends directly to Google with base64=%s',
