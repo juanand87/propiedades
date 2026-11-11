@@ -24,9 +24,13 @@ export type ProppixIconName =
   | "refresh"
   | "profile"
   | "menu"
-  | "close";
+  | "close"
+  | "play"
+  | "send";
 
 const paths: Partial<Record<ProppixIconName, string>> = {
+  play: "M8 4 21 12 8 20Z",
+  send: "M22 2 9 15M22 2l-8 20-5-7-7-5Z",
   home: "M3 10 12 3l9 7v11h-6v-7H9v7H3Z",
   house: "M2 11 12 3l10 8M5 9v12h14V9M10 21v-7h4v7M3 21h18",
   search: "m16.5 16.5 5 5",

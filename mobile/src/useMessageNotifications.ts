@@ -9,6 +9,7 @@ let visibleConversation: string | undefined;
 Notifications.setNotificationHandler({
   handleNotification: async (notification) => {
     const sameChat =
+      !!visibleConversation &&
       notification.request.content.data?.conversationId === visibleConversation;
     return {
       shouldShowBanner: !sameChat,
@@ -62,7 +63,10 @@ export function useMessageNotifications(session: Session | null) {
             );
           return;
         }
-        if (Platform.OS !== "android") { setStatus("Notificaciones disponibles por ahora en Android."); return; }
+        if (Platform.OS !== "android") {
+          setStatus("Notificaciones disponibles por ahora en Android.");
+          return;
+        }
         const { data } = await Notifications.getDevicePushTokenAsync();
         if (typeof data !== "string") throw new Error("Invalid device token");
         if (!live || stopping.current) return;
@@ -114,6 +118,10 @@ export function useMessageNotifications(session: Session | null) {
         handled.current === response.notification.request.identifier
       )
         return;
+      if (response.notification.request.content.data?.test === "true") {
+        router.push("/mensajes");
+        return;
+      }
       const conversationId =
         response.notification.request.content.data?.conversationId;
       if (

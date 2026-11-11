@@ -75,6 +75,7 @@ export class MessagingService {
     return {
       enabled: Number(row.n) === 3,
       push_tables_ready: await this.push.available(),
+      push: await this.push.health(),
     };
   }
 

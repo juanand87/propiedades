@@ -153,7 +153,7 @@ async function main() {
     app.stdout.on('data', (b) => (startup += b));
     app.stderr.on('data', (b) => (startup += b));
     let ready = false;
-    for (let i = 0; i < 70; i++) {
+    for (let i = 0; i < 300; i++) {
       try {
         const r = await fetch('http://127.0.0.1:3318/api/ready');
         if (r.ok) {

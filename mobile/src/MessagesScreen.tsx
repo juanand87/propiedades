@@ -1,12 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   AppState,
   BackHandler,
   FlatList,
   Image,
-  KeyboardAvoidingView,
-  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -18,7 +17,7 @@ import { randomUUID } from "expo-crypto";
 import { api, ApiError, mediaUrl, Session } from "./api";
 import { ProppixIcon } from "./ProppixIcon";
 import { videoColors } from "./video-colors";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { KeyboardSafeView } from "./KeyboardSafeView";
 
 type Person = {
   id: string;
@@ -93,7 +92,6 @@ export function MessagesScreen({
   onRetryNotifications?: () => void;
 }) {
   const router = useRouter();
-  const insets = useSafeAreaInsets();
   const token = session?.access_token;
   const [foreground, setForeground] = useState(
     AppState.currentState === "active",
@@ -112,6 +110,22 @@ export function MessagesScreen({
     [sending, setSending] = useState(false),
     [older, setOlder] = useState(false);
   const [retry, setRetry] = useState(0);
+  const [testingPush, setTestingPush] = useState(false);
+  async function testNotification() {
+    if (!token || testingPush) return;
+    setTestingPush(true);
+    try {
+      const result = await api<{ message: string }>(
+        "/messages/notifications/test",
+        { method: "POST", token, body: {} },
+      );
+      Alert.alert("Prueba de notificaciones", result.message);
+    } catch (error) {
+      Alert.alert("Notificaciones", messageError(error));
+    } finally {
+      setTestingPush(false);
+    }
+  }
   const cursor = useRef("0"),
     markedRead = useRef("0"),
     earliest = useRef("0"),
@@ -379,11 +393,7 @@ export function MessagesScreen({
       </View>
     );
   return (
-    <KeyboardAvoidingView
-      style={s.root}
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-      keyboardVerticalOffset={72 + insets.top}
-    >
+    <KeyboardSafeView style={s.root}>
       <View style={s.heading}>
         {selected && (
           <Pressable
@@ -431,6 +441,18 @@ export function MessagesScreen({
           style={{ padding: 10 }}
         >
           <Text style={s.muted}>{notificationStatus}</Text>
+        </Pressable>
+      )}
+      {!selected && (
+        <Pressable
+          accessibilityRole="button"
+          disabled={testingPush}
+          onPress={() => void testNotification()}
+          style={{ padding: 12, alignItems: "center" }}
+        >
+          <Text style={s.white}>
+            {testingPush ? "Probando…" : "Probar aviso en mi teléfono"}
+          </Text>
         </Pressable>
       )}
       {busy && (
@@ -510,7 +532,7 @@ export function MessagesScreen({
                 {sending ? (
                   <ActivityIndicator color="#fff" />
                 ) : (
-                  <ProppixIcon name="arrow" />
+                  <ProppixIcon name="send" size={23} />
                 )}
               </Pressable>
             </View>
@@ -586,7 +608,7 @@ export function MessagesScreen({
           }
         />
       )}
-    </KeyboardAvoidingView>
+    </KeyboardSafeView>
   );
 }
 const s = StyleSheet.create({

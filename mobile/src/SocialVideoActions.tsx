@@ -16,6 +16,7 @@ import { Directory, File, Paths } from "expo-file-system";
 import { useRouter } from "expo-router";
 import { api, mediaUrl, Page, Property, Session } from "./api";
 import { videoColors } from "./video-colors";
+import { KeyboardSafeView } from "./KeyboardSafeView";
 import { ProppixIcon } from "./ProppixIcon";
 import { VideoSocialData } from "./social-types";
 
@@ -333,58 +334,63 @@ export function SocialVideoActions({
         </View>
       )}
       {paused && data && session?.user.id === data.creator.id && (
-        <View style={s.pausedOptions}>
-          <Text style={s.pausedTitle}>Tu video, tu propiedad</Text>
-          {!!data.property_title && (
-            <Text style={s.pausedSubtitle} numberOfLines={2}>
-              {data.property_title}
-            </Text>
-          )}
-          <Pressable
-            accessibilityRole="button"
-            style={s.createProperty}
-            onPress={() =>
-              router.push({
-                pathname: "/mis-videos",
-                params: {
-                  videoId,
-                  propertyMode: "new",
-                  profileSection: "properties",
-                },
-              })
-            }
-          >
-            <ProppixIcon name="plus" size={19} />
-            <Text style={s.propertyActionText}>Crear propiedad en Proppix</Text>
-          </Pressable>
-          <Pressable
-            accessibilityRole="button"
-            style={s.linkProperty}
-            onPress={() =>
-              router.push({
-                pathname: "/mis-videos",
-                params: {
-                  videoId,
-                  propertyMode: "link",
-                  profileSection: "properties",
-                },
-              })
-            }
-          >
-            <ProppixIcon name="house" size={19} />
-            <Text style={s.propertyActionText}>
-              Enlazar a una propiedad existente
-            </Text>
-          </Pressable>
-          {onResume && (
+        <View pointerEvents="box-none" style={s.pausedOverlay}>
+          <View style={s.pausedOptions}>
+            <Text style={s.pausedTitle}>Tu video, tu propiedad</Text>
+            {!!data.property_title && (
+              <Text style={s.pausedSubtitle} numberOfLines={2}>
+                {data.property_title}
+              </Text>
+            )}
             <Pressable
               accessibilityRole="button"
-              style={s.resume}
-              onPress={onResume}
+              style={s.createProperty}
+              onPress={() =>
+                router.push({
+                  pathname: "/mis-videos",
+                  params: {
+                    videoId,
+                    propertyMode: "new",
+                    profileSection: "properties",
+                  },
+                })
+              }
             >
-              <Text style={s.propertyActionText}>Continuar viendo</Text>
+              <ProppixIcon name="plus" size={22} color="#0b295a" />
+              <Text style={[s.propertyActionText, { color: "#0b295a" }]}>
+                Crear propiedad en Proppix
+              </Text>
             </Pressable>
-          )}
+            <Pressable
+              accessibilityRole="button"
+              style={s.linkProperty}
+              onPress={() =>
+                router.push({
+                  pathname: "/mis-videos",
+                  params: {
+                    videoId,
+                    propertyMode: "link",
+                    profileSection: "properties",
+                  },
+                })
+              }
+            >
+              <ProppixIcon name="house" size={19} />
+              <Text style={s.propertyActionText}>
+                Enlazar a una propiedad existente
+              </Text>
+            </Pressable>
+            {onResume && (
+              <Pressable
+                accessibilityRole="button"
+                style={s.resume}
+                onPress={onResume}
+              >
+                <ProppixIcon name="play" size={30} color="#fff" filled />
+                <Text style={s.resumeText}>Continuar viendo</Text>
+              </Pressable>
+            )}
+          </View>
         </View>
       )}
       <Modal
@@ -393,7 +399,7 @@ export function SocialVideoActions({
         animationType="slide"
         onRequestClose={() => setPanel(null)}
       >
-        <View style={s.backdrop}>
+        <KeyboardSafeView style={s.backdrop}>
           <View style={s.sheet}>
             <View style={s.heading}>
               <Text style={s.name}>
@@ -559,11 +565,17 @@ export function SocialVideoActions({
                       })}
                     </View>
                   ))}
-                  {reply &&
-                    option(
-                      "Respondiendo a " + reply.display_name + " · Cancelar",
-                      () => setReply(null),
-                    )}
+                </>
+              )}
+            </ScrollView>
+            {panel === "comments" && (
+              <>
+                {reply &&
+                  option(
+                    "Respondiendo a " + reply.display_name + " · Cancelar",
+                    () => setReply(null),
+                  )}
+                <View style={s.composer}>
                   <TextInput
                     accessibilityLabel="Escribe un comentario"
                     placeholder="Escribe un comentario…"
@@ -571,31 +583,48 @@ export function SocialVideoActions({
                     value={comment}
                     onChangeText={setComment}
                     maxLength={2000}
-                    style={s.input}
+                    style={[s.input, s.commentInput]}
+                    multiline
+                    textAlignVertical="top"
                   />
-                  {option("Enviar comentario", () => {
-                    if (requireSession())
-                      void run(async () => {
-                        setComments(
-                          await api(`/videos/${videoId}/comments`, {
-                            method: "POST",
-                            token,
-                            body: { body: comment, parent_id: reply?.id },
-                          }),
-                        );
-                        setComment("");
-                        setReply(null);
-                        setData(
-                          await api(`/videos/${videoId}/social`, { token }),
-                        );
-                        onChanged?.();
-                      });
-                  })}
-                </>
-              )}
-            </ScrollView>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Enviar comentario"
+                    disabled={busy || !comment.trim()}
+                    style={[
+                      s.send,
+                      (busy || !comment.trim()) && { opacity: 0.4 },
+                    ]}
+                    onPress={() => {
+                      if (requireSession())
+                        void run(async () => {
+                          setComments(
+                            await api(`/videos/${videoId}/comments`, {
+                              method: "POST",
+                              token,
+                              body: { body: comment, parent_id: reply?.id },
+                            }),
+                          );
+                          setComment("");
+                          setReply(null);
+                          setData(
+                            await api(`/videos/${videoId}/social`, { token }),
+                          );
+                          onChanged?.();
+                        });
+                    }}
+                  >
+                    {busy ? (
+                      <ActivityIndicator color="#fff" />
+                    ) : (
+                      <ProppixIcon name="send" size={23} />
+                    )}
+                  </Pressable>
+                </View>
+              </>
+            )}
           </View>
-        </View>
+        </KeyboardSafeView>
       </Modal>
     </>
   );
@@ -636,10 +665,8 @@ const s = StyleSheet.create({
   },
   followText: { color: "#052553", fontSize: 10, fontWeight: "800" },
   pausedOptions: {
-    position: "absolute",
-    top: "28%",
-    left: 16,
-    right: 92,
+    width: "90%",
+    maxWidth: 420,
     backgroundColor: "#062951f2",
     borderColor: "#ffffff33",
     borderWidth: 1,
@@ -654,7 +681,7 @@ const s = StyleSheet.create({
     alignItems: "center",
     gap: 7,
     padding: 13,
-    backgroundColor: "#0866f5",
+    backgroundColor: "#fff",
     borderRadius: 15,
   },
   linkProperty: {
@@ -662,7 +689,7 @@ const s = StyleSheet.create({
     alignItems: "center",
     gap: 7,
     padding: 13,
-    backgroundColor: "#174778",
+    backgroundColor: "#0866f5",
     borderRadius: 15,
   },
   propertyActionText: {
@@ -671,7 +698,34 @@ const s = StyleSheet.create({
     fontWeight: "700",
     flexShrink: 1,
   },
-  resume: { alignItems: "center", padding: 8 },
+  pausedOverlay: {
+    ...StyleSheet.absoluteFill,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  resume: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 12,
+    paddingVertical: 17,
+  },
+  resumeText: { color: "#fff", fontSize: 21, fontWeight: "800" },
+  composer: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    gap: 10,
+    paddingTop: 10,
+  },
+  commentInput: { flex: 1, minHeight: 46, maxHeight: 120, marginVertical: 0 },
+  send: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: "#0866f5",
+    alignItems: "center",
+    justifyContent: "center",
+  },
   icon: {
     color: "#fff",
     fontSize: 35,
@@ -711,10 +765,10 @@ const s = StyleSheet.create({
   sheet: {
     backgroundColor: videoColors.surface,
     padding: 20,
-    paddingBottom: 35,
+    paddingBottom: 20,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    maxHeight: "82%",
+    maxHeight: "90%",
   },
   heading: {
     flexDirection: "row",

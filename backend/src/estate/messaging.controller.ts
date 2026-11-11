@@ -40,6 +40,11 @@ export class MessagingController {
   @Get('capabilities') capabilities() {
     return this.messaging.capabilities();
   }
+  @Post('notifications/test')
+  @UseGuards(EstateGuard)
+  testOwn(@Req() req: MessageRequest) {
+    return this.push.testOwnDevices(req.user);
+  }
   @Get('conversations')
   @UseGuards(EstateGuard)
   inbox(@Req() req: MessageRequest, @Query('page') page: string) {

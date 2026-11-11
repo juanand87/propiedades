@@ -66,6 +66,34 @@ describe('message push delivery', () => {
       .mockResolvedValue({ token: 'test-access-token' });
   });
   afterEach(() => jest.restoreAllMocks());
+  it('tests only the authenticated account devices and throttles retries', async () => {
+    const { service, query } = setup();
+    jest.spyOn(service, 'health').mockResolvedValue({
+      provider: 'fcm-direct',
+      configured: true,
+      google_ready: true,
+    });
+    query.mockImplementation((sql: string) =>
+      Promise.resolve(sql.startsWith('SELECT token') ? [{ token }] : []),
+    );
+    const network = jest.spyOn(global, 'fetch').mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ name: 'accepted' }),
+    } as Response);
+    const actor = { id: 'my-account' } as Parameters<
+      PushService['testOwnDevices']
+    >[0];
+    expect((await service.testOwnDevices(actor)).accepted).toBe(1);
+    expect(query).toHaveBeenCalledWith(
+      expect.stringContaining('WHERE user_id=?'),
+      ['my-account'],
+    );
+    const payload = JSON.parse(network.mock.calls[0][1]!.body as string) as {
+      message: { data: { test: string } };
+    };
+    expect(payload.message.data.test).toBe('true');
+    await expect(service.testOwnDevices(actor)).rejects.toThrow('30 segundos');
+  });
   it.each([false, true])(
     'sends directly to Google with base64=%s',
     async (base64) => {

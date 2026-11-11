@@ -32,6 +32,15 @@ export class PushService implements OnModuleInit, OnModuleDestroy {
   private busy = false;
   private auth?: JWT;
   private projectId?: string;
+  private healthCache?: {
+    until: number;
+    result: Promise<{
+      provider: string;
+      configured: boolean;
+      google_ready: boolean;
+    }>;
+  };
+  private testTimes = new Map<string, number>();
   constructor(
     private db: DataSource,
     private config: ConfigService,
@@ -125,7 +134,106 @@ export class PushService implements OnModuleInit, OnModuleDestroy {
     this.projectId = credentials.project_id;
     return { auth: this.auth, projectId: this.projectId };
   }
-  private async sendFcm(row: Delivery) {
+  async health() {
+    if (this.healthCache && this.healthCache.until > Date.now())
+      return this.healthCache.result;
+    const result = (async () => {
+      try {
+        this.credentials();
+      } catch {
+        return {
+          provider: 'fcm-direct',
+          configured: false,
+          google_ready: false,
+        };
+      }
+      try {
+        const { auth, projectId } = this.credentials();
+        const { token } = await auth.getAccessToken();
+        const response = await fetch(
+          'https://fcm.googleapis.com/v1/projects/' +
+            projectId +
+            '/messages:send',
+          {
+            method: 'POST',
+            headers: {
+              Authorization: 'Bearer ' + token,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              validate_only: true,
+              message: {
+                topic: 'proppix-configuration-check',
+                notification: { title: 'Validation', body: 'Dry run' },
+              },
+            }),
+            signal: AbortSignal.timeout(10000),
+          },
+        );
+        return {
+          provider: 'fcm-direct',
+          configured: true,
+          google_ready: response.ok,
+        };
+      } catch {
+        return {
+          provider: 'fcm-direct',
+          configured: true,
+          google_ready: false,
+        };
+      }
+    })();
+    this.healthCache = { until: Date.now() + 60000, result };
+    return result;
+  }
+  async testOwnDevices(actor: Actor) {
+    if (this.config.get('PUSH_SELF_TEST_ENABLED') === 'false')
+      throw new BadRequestException(
+        'La prueba de notificaciones está desactivada.',
+      );
+    const now = Date.now();
+    if ((this.testTimes.get(actor.id) || 0) > now - 30000)
+      throw new BadRequestException(
+        'Espera 30 segundos para repetir la prueba.',
+      );
+    for (const [id, time] of this.testTimes)
+      if (time < now - 60000) this.testTimes.delete(id);
+    this.testTimes.set(actor.id, now);
+    if (!(await this.health()).google_ready)
+      throw new ServiceUnavailableException(
+        'Firebase no está listo en el servidor.',
+      );
+    const devices = await this.db.query<{ token: string }[]>(
+      'SELECT token FROM estate_push_devices WHERE user_id=? ORDER BY updated_at DESC LIMIT 10',
+      [actor.id],
+    );
+    let accepted = 0;
+    for (const device of devices) {
+      if (!validFcmToken(device.token)) continue;
+      const result = await this.sendFcm(
+        { token: device.token, message_id: 'test-' + now, conversation_id: '' },
+        true,
+      );
+      if (result === 'sent') accepted++;
+      else if (result === 'unregistered')
+        await this.db.query(
+          'DELETE FROM estate_push_devices WHERE token=? AND user_id=?',
+          [device.token, actor.id],
+        );
+    }
+    if (!accepted)
+      throw new BadRequestException(
+        'No hay dispositivos activos. Instala la última versión, inicia sesión y activa las notificaciones.',
+      );
+    return {
+      accepted,
+      message: 'Firebase aceptó el aviso de prueba para tu propia cuenta.',
+    };
+  }
+  private async sendFcm(
+    row: Pick<Delivery, 'token' | 'message_id' | 'conversation_id'>,
+    test = false,
+  ) {
     const { auth, projectId } = this.credentials();
     const { token: accessToken } = await auth.getAccessToken();
     if (!accessToken) throw new Error('Firebase authorization unavailable');
@@ -141,12 +249,15 @@ export class PushService implements OnModuleInit, OnModuleDestroy {
           message: {
             token: row.token,
             notification: {
-              title: 'Nuevo mensaje en Proppix',
-              body: 'Tienes un mensaje nuevo. Toca para abrir la conversación.',
+              title: test ? 'Prueba de Proppix' : 'Nuevo mensaje en Proppix',
+              body: test
+                ? 'Las notificaciones de tu cuenta están funcionando.'
+                : 'Tienes un mensaje nuevo. Toca para abrir la conversación.',
             },
             data: {
               conversationId: row.conversation_id,
               messageId: row.message_id,
+              ...(test ? { test: 'true' } : {}),
             },
             android: {
               priority: 'HIGH',
