@@ -187,12 +187,7 @@ function AppContent() {
     [foreground, setForeground] = useState(AppState.currentState === "active");
   const feedVisible =
     ready && foreground && tab === "feed" && !propertyRoute && !detail;
-  const preparedVideos = useVideoPreload(
-    videos,
-    active,
-    ready && foreground && tab === "feed",
-    !feedVisible,
-  );
+  const preparedVideos = useVideoPreload(videos, active, ready, !feedVisible);
   const feedRef = useRef<FlatList<Video>>(null),
     feedDragIndex = useRef(0),
     feedDragging = useRef(false),

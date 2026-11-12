@@ -1,4 +1,3 @@
-import { videoColors } from "./video-colors";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -163,7 +162,7 @@ function FullVideo(props: {
   ) : error ? (
     <Text style={s.playerError}>{error}</Text>
   ) : (
-    <ActivityIndicator color={videoColors.cyan} />
+    <ActivityIndicator color="#0866f5" />
   );
 }
 export function VideoProfile({
@@ -398,7 +397,7 @@ export function VideoProfile({
   }
   if (!target)
     return (
-      <View style={s.center}>
+      <View style={[s.root, s.center]}>
         <Text style={s.title}>Tu perfil de videos</Text>
         <Text style={s.muted}>
           Crea tu cuenta para grabar, guardar y compartir tus historias.
@@ -519,7 +518,7 @@ export function VideoProfile({
           {error}
         </Text>
       )}
-      {busy && <ActivityIndicator color={videoColors.cyan} />}
+      {busy && <ActivityIndicator color="#0866f5" />}
       <View style={s.tabs}>
         {(
           ["videos", ...(own ? ["saved", "properties"] : [])] as (
@@ -587,7 +586,7 @@ export function VideoProfile({
               style={[s.input, { flex: 1 }]}
               accessibilityLabel="Buscar usuario"
               placeholder="Buscar usuario"
-              placeholderTextColor={videoColors.muted}
+              placeholderTextColor="#49658b"
               value={relationSearch}
               onChangeText={setRelationSearch}
               onSubmitEditing={() => void showFollowers()}
@@ -696,7 +695,7 @@ export function VideoProfile({
             <RefreshControl
               refreshing={loading && page > 0}
               onRefresh={() => void load()}
-              tintColor={videoColors.cyan}
+              tintColor="#0866f5"
             />
           }
           onEndReached={() => {
@@ -732,12 +731,12 @@ export function VideoProfile({
                 </Text>
               </View>
             ) : (
-              <ActivityIndicator color={videoColors.cyan} />
+              <ActivityIndicator color="#0866f5" />
             )
           }
           ListFooterComponent={
             loading && page > 0 ? (
-              <ActivityIndicator color={videoColors.cyan} />
+              <ActivityIndicator color="#0866f5" />
             ) : (
               <View style={{ height: 24 }} />
             )
@@ -797,7 +796,7 @@ export function VideoProfile({
             accessibilityLabel="Cerrar video"
             onPress={closeViewer}
           >
-            <Text style={s.light}>← Perfil</Text>
+            <Text style={[s.light, { color: "#fff" }]}>← Perfil</Text>
           </Pressable>
         </View>
       </Modal>
@@ -867,7 +866,7 @@ export function VideoProfile({
   );
 }
 const s = StyleSheet.create({
-  root: { flex: 1, backgroundColor: videoColors.background },
+  root: { flex: 1, backgroundColor: "#fff" },
   header: {
     paddingHorizontal: 20,
     paddingTop: 16,
@@ -881,30 +880,30 @@ const s = StyleSheet.create({
     gap: 12,
     width: "100%",
   },
-  title: { color: "#fff", fontSize: 24, fontWeight: "800" },
-  gear: { color: videoColors.cyan, fontSize: 25, padding: 8 },
+  title: { color: "#10376b", fontSize: 24, fontWeight: "800" },
+  gear: { color: "#0866f5", fontSize: 25, padding: 8 },
   avatarWrap: { position: "relative" },
   avatar: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: videoColors.surface,
+    backgroundColor: "#edf4ff",
     alignItems: "center",
     justifyContent: "center",
   },
-  initial: { color: videoColors.cyan, fontSize: 20, fontWeight: "800" },
+  initial: { color: "#0866f5", fontSize: 20, fontWeight: "800" },
   camera: {
     position: "absolute",
     bottom: 0,
     right: -2,
-    backgroundColor: videoColors.cyan,
+    backgroundColor: "#0866f5",
     width: 28,
     height: 28,
     borderRadius: 14,
     alignItems: "center",
     justifyContent: "center",
   },
-  handle: { color: videoColors.text, fontWeight: "600" },
+  handle: { color: "#10376b", fontWeight: "600" },
   counters: {
     flexDirection: "row",
     justifyContent: "space-around",
@@ -912,37 +911,37 @@ const s = StyleSheet.create({
     paddingVertical: 4,
   },
   counter: { alignItems: "center", gap: 4 },
-  counterNumber: { color: "#fff", fontSize: 22, fontWeight: "800" },
-  muted: { color: videoColors.muted, fontSize: 13 },
-  explainer: { color: videoColors.muted, fontSize: 12, textAlign: "center" },
+  counterNumber: { color: "#10376b", fontSize: 22, fontWeight: "800" },
+  muted: { color: "#49658b", fontSize: 13 },
+  explainer: { color: "#49658b", fontSize: 12, textAlign: "center" },
   row: { flexDirection: "row", gap: 10 },
   button: {
     paddingHorizontal: 18,
     paddingVertical: 13,
     borderRadius: 10,
-    backgroundColor: videoColors.cyan,
+    backgroundColor: "#0866f5",
     marginVertical: 3,
     minHeight: 46,
   },
   secondary: {
-    backgroundColor: videoColors.surface,
+    backgroundColor: "#edf4ff",
     borderWidth: 1,
-    borderColor: videoColors.border,
+    borderColor: "#d3e0f2",
   },
-  buttonText: { color: "#111111", fontWeight: "800", textAlign: "center" },
-  light: { color: "#fff", fontWeight: "600" },
+  buttonText: { color: "#fff", fontWeight: "800", textAlign: "center" },
+  light: { color: "#10376b", fontWeight: "600" },
   tabs: {
     flexDirection: "row",
     width: "100%",
     borderBottomWidth: 1,
-    borderBottomColor: videoColors.border,
+    borderBottomColor: "#d3e0f2",
   },
   tab: { flex: 1, paddingVertical: 16, alignItems: "center" },
-  selectedTab: { borderBottomColor: videoColors.cyan, borderBottomWidth: 3 },
+  selectedTab: { borderBottomColor: "#0866f5", borderBottomWidth: 3 },
   tile: {
     flex: 1 / 3,
     aspectRatio: 0.7,
-    backgroundColor: videoColors.surface,
+    backgroundColor: "#edf4ff",
     margin: 1,
     overflow: "hidden",
   },
@@ -999,7 +998,7 @@ const s = StyleSheet.create({
     backgroundColor: "#401b21",
     padding: 16,
   },
-  error: { color: "#ffb8ab", padding: 12 },
+  error: { color: "#a12b36", padding: 12 },
   overlay: {
     flex: 1,
     backgroundColor: "#0009",
@@ -1007,14 +1006,14 @@ const s = StyleSheet.create({
     padding: 25,
   },
   dialog: {
-    backgroundColor: videoColors.surface,
+    backgroundColor: "#edf4ff",
     borderRadius: 22,
     padding: 22,
     gap: 14,
   },
   input: {
-    backgroundColor: videoColors.surface,
-    color: "#fff",
+    backgroundColor: "#edf4ff",
+    color: "#10376b",
     padding: 14,
     borderRadius: 10,
   },

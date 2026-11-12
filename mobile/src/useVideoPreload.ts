@@ -47,7 +47,7 @@ export function useVideoPreload(
       // Only prepare the next source after the visible source is ready.
       for (
         let index = active;
-        index < Math.min(videos.length, active + 3);
+        !suspended && index < Math.min(videos.length, active + 3);
         index++
       ) {
         const video = videos[index];

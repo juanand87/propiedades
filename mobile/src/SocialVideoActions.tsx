@@ -4,6 +4,8 @@ import {
   Alert,
   Image,
   Keyboard,
+  KeyboardAvoidingView,
+  Platform,
   Modal,
   Pressable,
   ScrollView,
@@ -17,7 +19,6 @@ import { Directory, File, Paths } from "expo-file-system";
 import { useRouter } from "expo-router";
 import { api, mediaUrl, Page, Property, Session } from "./api";
 import { videoColors } from "./video-colors";
-import { KeyboardSafeView } from "./KeyboardSafeView";
 import { ProppixIcon } from "./ProppixIcon";
 import { VideoSocialData } from "./social-types";
 
@@ -45,6 +46,7 @@ export function SocialVideoActions({
   };
 }) {
   const router = useRouter();
+  const submitLock = useRef(false);
   const commentInput = useRef<ComponentRef<typeof TextInput>>(null);
   const [data, setData] = useState<VideoSocialData | null>(null);
   const [panel, setPanel] = useState<"edit" | "comments" | null>(null);
@@ -117,6 +119,29 @@ export function SocialVideoActions({
     await run(async () =>
       setComments(await api(`/videos/${videoId}/comments`, { token })),
     );
+  }
+  async function submitComment() {
+    const body = comment.trim();
+    if (!body || busy || submitLock.current || !requireSession()) return;
+    submitLock.current = true;
+    const parentId = reply?.id;
+    try {
+      await run(async () => {
+        setComments(
+          await api(`/videos/${videoId}/comments`, {
+            method: "POST",
+            token,
+            body: { body, parent_id: parentId },
+          }),
+        );
+        setComment((current) => (current.trim() === body ? "" : current));
+        setReply((current) => (current?.id === parentId ? null : current));
+        setData(await api(`/videos/${videoId}/social`, { token }));
+        onChanged?.();
+      });
+    } finally {
+      submitLock.current = false;
+    }
   }
   async function download() {
     if (!requireSession()) return;
@@ -400,9 +425,16 @@ export function SocialVideoActions({
         transparent
         animationType="slide"
         onRequestClose={() => setPanel(null)}
+        onShow={() => {
+          if (panel === "comments")
+            requestAnimationFrame(() => commentInput.current?.focus());
+        }}
       >
-        <KeyboardSafeView style={s.backdrop}>
-          <View style={s.sheet}>
+        <KeyboardAvoidingView
+          style={s.backdrop}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+        >
+          <View style={[s.sheet, panel === "comments" && s.commentSheet]}>
             <View style={s.heading}>
               <Text style={s.name}>
                 {panel === "comments" ? "Comentarios" : "Editar video"}
@@ -416,6 +448,7 @@ export function SocialVideoActions({
               </Text>
             )}
             <ScrollView
+              style={{ flexShrink: 1 }}
               keyboardShouldPersistTaps="always"
               keyboardDismissMode="none"
             >
@@ -611,30 +644,16 @@ export function SocialVideoActions({
                   <Pressable
                     accessibilityRole="button"
                     accessibilityLabel="Enviar comentario"
-                    onPressIn={() => commentInput.current?.focus()}
+                    hitSlop={8}
+                    onPressIn={() => {
+                      if (session) void submitComment();
+                    }}
                     disabled={busy || !comment.trim()}
                     style={[
                       s.send,
                       (busy || !comment.trim()) && { opacity: 0.4 },
                     ]}
-                    onPress={() => {
-                      if (requireSession())
-                        void run(async () => {
-                          setComments(
-                            await api(`/videos/${videoId}/comments`, {
-                              method: "POST",
-                              token,
-                              body: { body: comment, parent_id: reply?.id },
-                            }),
-                          );
-                          setComment("");
-                          setReply(null);
-                          setData(
-                            await api(`/videos/${videoId}/social`, { token }),
-                          );
-                          onChanged?.();
-                        });
-                    }}
+                    onPress={() => void submitComment()}
                   >
                     {busy ? (
                       <ActivityIndicator color="#fff" />
@@ -646,7 +665,7 @@ export function SocialVideoActions({
               </>
             )}
           </View>
-        </KeyboardSafeView>
+        </KeyboardAvoidingView>
       </Modal>
     </>
   );
@@ -733,6 +752,7 @@ const s = StyleSheet.create({
     paddingVertical: 17,
   },
   resumeText: { color: "#fff", fontSize: 21, fontWeight: "800" },
+  commentSheet: { height: "78%", maxHeight: "100%" },
   composer: {
     flexDirection: "row",
     alignItems: "flex-end",
