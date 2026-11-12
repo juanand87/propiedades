@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Platform } from "react-native";
+import { Image, Platform } from "react-native";
 import {
   createVideoPlayer,
   setVideoCacheSizeAsync,
@@ -25,6 +25,7 @@ export function useVideoPreload(
   active: number,
   enabled: boolean,
   suspended = false,
+  canPrepare = true,
 ) {
   const owned = useRef(new Map<string, PreparedVideo>());
   const [prepared, setPrepared] = useState(new Map<string, PreparedVideo>());
@@ -47,7 +48,7 @@ export function useVideoPreload(
       // Only prepare the next source after the visible source is ready.
       for (
         let index = active;
-        !suspended && index < Math.min(videos.length, active + 3);
+        canPrepare && index < Math.min(videos.length, active + 3);
         index++
       ) {
         const video = videos[index];
@@ -57,6 +58,8 @@ export function useVideoPreload(
         )
           break;
         if (!entries.has(video.id)) {
+          if (video.thumbnail_url)
+            void Image.prefetch(mediaUrl(video.thumbnail_url)).catch(() => {});
           const player = createVideoPlayer(null);
           const listener = player.addListener("statusChange", (event) => {
             if (event.status === "readyToPlay")
@@ -103,7 +106,7 @@ export function useVideoPreload(
       }
     }
     if (changed) setPrepared(new Map(entries));
-  }, [videos, active, enabled, suspended, generation]);
+  }, [videos, active, enabled, suspended, canPrepare, generation]);
   useEffect(() => {
     const entries = owned.current;
     return () => {

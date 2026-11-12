@@ -45,7 +45,7 @@ import {
   Video,
 } from "./api";
 import { ScreenContext } from "./screen-context";
-import { videoColors } from "./video-colors";
+import { lightColors as videoColors } from "./video-colors";
 import { VideoCard } from "./VideoCard";
 import { VideoRecorder } from "./VideoRecorder";
 import { SellerPanel } from "./SellerPanel";
@@ -167,7 +167,31 @@ function AppContent() {
   const notifications = useMessageNotifications(session);
   const setTab = (value: Tab) => {
     setDetail(null);
-    if (value === "feed") void loadFeed(true);
+    if (value === "feed" && !videos.length) void loadFeed(true);
+    if (value === "feed" && videos.length) {
+      const preparedNext = videos
+        .map((video, index) => ({ video, index }))
+        .filter(
+          ({ video, index }) =>
+            index > active &&
+            preparedVideos.get(video.id)?.player.status === "readyToPlay",
+        );
+      const preparedIndex = preparedNext.length
+        ? preparedNext[0].index
+        : videos.findIndex(
+            (video) =>
+              preparedVideos.get(video.id)?.player.status === "readyToPlay",
+          );
+      if (preparedIndex >= 0) {
+        setActive(preparedIndex);
+        requestAnimationFrame(() =>
+          feedRef.current?.scrollToOffset({
+            offset: preparedIndex * height,
+            animated: false,
+          }),
+        );
+      }
+    }
     router.replace(routes[value]);
   };
   const closeDetail = useCallback(() => {
@@ -1267,14 +1291,23 @@ function AppContent() {
       }}
     >
       <SafeAreaView
-        style={s.safe}
+        style={[
+          s.safe,
+          tab === "feed" && !propertyRoute && { backgroundColor: "#052b65" },
+        ]}
         edges={
           recordingRoute
             ? ["top", "left", "right", "bottom"]
             : ["top", "left", "right"]
         }
       >
-        <StatusBar style="light" />
+        <StatusBar
+          style={
+            recordingRoute || (tab === "feed" && !propertyRoute)
+              ? "light"
+              : "dark"
+          }
+        />
         {!recordingRoute && tab !== "catalog" && (
           <View style={s.header}>
             <ProppixBrand compact />
@@ -1523,7 +1556,7 @@ const s = StyleSheet.create({
     borderRadius: 6,
     padding: 7,
   },
-  feed: { flex: 1, backgroundColor: videoColors.background },
+  feed: { flex: 1, backgroundColor: "#000" },
   videoCreate: { color: videoColors.cyan },
   content: { flex: 1, padding: 22 },
   welcome: { flex: 1, justifyContent: "center", padding: 28, gap: 20 },
@@ -1573,7 +1606,7 @@ const s = StyleSheet.create({
     borderWidth: 1,
     borderColor: videoColors.border,
   },
-  buttonLabel: { fontWeight: "800", color: "#111111" },
+  buttonLabel: { fontWeight: "800", color: "#fff" },
   label: {
     fontSize: 13,
     color: videoColors.text,
@@ -1585,11 +1618,11 @@ const s = StyleSheet.create({
     borderColor: videoColors.border,
     borderRadius: 12,
     padding: 15,
-    color: "#fff",
+    color: videoColors.text,
     backgroundColor: videoColors.surface,
     fontSize: 15,
   },
-  error: { color: "#ffc7b9", lineHeight: 23, paddingVertical: 10 },
+  error: { color: "#a12b36", lineHeight: 23, paddingVertical: 10 },
   info: {
     padding: 20,
     backgroundColor: videoColors.surface,

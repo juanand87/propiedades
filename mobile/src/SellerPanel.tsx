@@ -1,5 +1,5 @@
 import { formatClpInput, parseClpInput } from "./clp";
-import { videoColors } from "./video-colors";
+import { lightColors as videoColors } from "./video-colors";
 import { useEffect, useState } from "react";
 import {
   View,
@@ -90,12 +90,16 @@ export function SellerPanel({
       api<Allowance>("/me/publication-allowance", { token }),
       api<Catalog>("/catalog"),
       api<typeof stats>("/manage/stats", { token }),
+      session.user.advertiser_id
+        ? api<Page<Property>>("/manage/properties?limit=24&page=1", { token })
+        : Promise.resolve(null),
     ])
-      .then(([a, c, s]) => {
+      .then(([a, c, s, properties]) => {
         if (live) {
           setAllowance(a);
           setCatalog(c);
           setStats(s);
+          setList(properties);
         }
       })
       .catch((e) => {
@@ -104,7 +108,7 @@ export function SellerPanel({
     return () => {
       live = false;
     };
-  }, [token]);
+  }, [token, session.user.advertiser_id]);
   const button = (label: string, fn: () => void) => (
     <Pressable
       accessibilityRole="button"
@@ -326,7 +330,7 @@ export function SellerPanel({
           ? propertyMode === "link"
             ? "Vincular video a una propiedad"
             : "Agregar datos de esta propiedad"
-          : "Mi espacio de vendedor"}
+          : "Mis propiedades"}
       </Text>
       {pendingVideoId && !linked && (
         <Text style={s.text}>
@@ -591,7 +595,9 @@ const s = StyleSheet.create({
   card: {
     padding: 14,
     gap: 12,
-    backgroundColor: videoColors.surface,
+    backgroundColor: videoColors.background,
+    borderWidth: 1,
+    borderColor: videoColors.border,
     borderRadius: 18,
     marginVertical: 14,
   },
@@ -601,7 +607,7 @@ const s = StyleSheet.create({
     borderWidth: 1,
     borderColor: videoColors.muted,
     borderRadius: 12,
-    color: "#fff",
+    color: videoColors.text,
     padding: 12,
     marginTop: 6,
   },
@@ -611,6 +617,6 @@ const s = StyleSheet.create({
     borderRadius: 12,
     marginVertical: 4,
   },
-  buttonText: { color: "#111111", fontWeight: "700" },
-  error: { color: "#ffb9a8" },
+  buttonText: { color: "#fff", fontWeight: "700" },
+  error: { color: "#a12b36" },
 });

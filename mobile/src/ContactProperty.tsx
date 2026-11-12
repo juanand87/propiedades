@@ -1,4 +1,4 @@
-import { videoColors } from "./video-colors";
+import { lightColors as videoColors } from "./video-colors";
 import { useState } from "react";
 import { View, Text, TextInput, Pressable } from "react-native";
 import { api, Property, Session } from "./api";
@@ -43,7 +43,9 @@ export function ContactProperty({
           Enviar mensaje en Proppix
         </Text>
       </Pressable>
-      <Text style={{ color: "#fff", fontWeight: "700", fontSize: 18 }}>
+      <Text
+        style={{ color: videoColors.text, fontWeight: "700", fontSize: 18 }}
+      >
         Enviar mensaje al vendedor
       </Text>
       <TextInput
@@ -55,7 +57,7 @@ export function ContactProperty({
         multiline
         maxLength={5000}
         style={{
-          color: "#fff",
+          color: videoColors.text,
           borderColor: videoColors.muted,
           borderWidth: 1,
           padding: 14,
@@ -106,7 +108,7 @@ export function ContactProperty({
             .finally(() => setBusy(false));
         }}
       >
-        <Text style={{ color: "#111111", fontWeight: "700" }}>
+        <Text style={{ color: "#fff", fontWeight: "700" }}>
           {busy ? "Enviando…" : "Enviar consulta"}
         </Text>
       </Pressable>

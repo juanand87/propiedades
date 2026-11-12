@@ -16,7 +16,7 @@ import { useRouter } from "expo-router";
 import { randomUUID } from "expo-crypto";
 import { api, ApiError, mediaUrl, Session } from "./api";
 import { ProppixIcon } from "./ProppixIcon";
-import { videoColors } from "./video-colors";
+import { lightColors as videoColors } from "./video-colors";
 import { KeyboardSafeView } from "./KeyboardSafeView";
 
 type Person = {
@@ -66,7 +66,11 @@ function messageError(error: unknown) {
 }
 function Avatar({ person }: { person: Person }) {
   return person.avatar_url ? (
-    <Image source={{ uri: mediaUrl(person.avatar_url) }} style={s.avatar} />
+    <Image
+      fadeDuration={0}
+      source={{ uri: mediaUrl(person.avatar_url) }}
+      style={s.avatar}
+    />
   ) : (
     <View style={s.avatar}>
       <Text style={s.initial}>
@@ -389,7 +393,7 @@ export function MessagesScreen({
           onPress={() => router.push("/cuenta")}
           style={s.primary}
         >
-          <Text style={s.white}>Iniciar sesión</Text>
+          <Text style={[s.white, { color: "#fff" }]}>Iniciar sesión</Text>
         </Pressable>
       </View>
     );
@@ -399,11 +403,11 @@ export function MessagesScreen({
         {selected && (
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Volver a las conversaciones"
+            accessibilityLabel="Cerrar conversación"
             onPress={backToInbox}
             style={s.iconButton}
           >
-            <Text style={s.back}>‹</Text>
+            <ProppixIcon name="close" color={videoColors.text} size={25} />
           </Pressable>
         )}
         {selected && person && <Avatar person={person} />}
@@ -473,8 +477,10 @@ export function MessagesScreen({
               const mine = item.sender_id === session.user.id;
               return (
                 <View style={[s.bubble, mine ? s.mine : s.theirs]}>
-                  <Text style={s.body}>{item.body}</Text>
-                  <Text style={s.time}>
+                  <Text style={[s.body, mine && { color: "#fff" }]}>
+                    {item.body}
+                  </Text>
+                  <Text style={[s.time, mine && { color: "#d8eaff" }]}>
                     {new Date(item.created_at).toLocaleTimeString("es-CL", {
                       hour: "2-digit",
                       minute: "2-digit",
@@ -628,8 +634,8 @@ const s = StyleSheet.create({
     borderBottomWidth: 1,
     borderColor: videoColors.border,
   },
-  title: { color: "#fff", fontSize: 22, fontWeight: "700" },
-  back: { color: "#fff", fontSize: 36, lineHeight: 38 },
+  title: { color: videoColors.text, fontSize: 22, fontWeight: "700" },
+  back: { color: videoColors.text, fontSize: 36, lineHeight: 38 },
   iconButton: {
     minWidth: 38,
     minHeight: 44,
@@ -640,20 +646,20 @@ const s = StyleSheet.create({
     width: 46,
     height: 46,
     borderRadius: 23,
-    backgroundColor: "#20518b",
+    backgroundColor: videoColors.surface,
     alignItems: "center",
     justifyContent: "center",
   },
-  initial: { color: "#fff", fontSize: 19, fontWeight: "700" },
+  initial: { color: videoColors.text, fontSize: 19, fontWeight: "700" },
   thread: {
     flexDirection: "row",
     gap: 13,
     alignItems: "center",
     padding: 18,
     borderBottomWidth: 1,
-    borderColor: "#ffffff0d",
+    borderColor: videoColors.border,
   },
-  name: { color: "#fff", fontSize: 16, fontWeight: "600" },
+  name: { color: videoColors.text, fontSize: 16, fontWeight: "600" },
   preview: { color: videoColors.muted, fontSize: 13 },
   date: { color: videoColors.muted, fontSize: 10 },
   unread: {
@@ -665,7 +671,7 @@ const s = StyleSheet.create({
     justifyContent: "center",
     paddingHorizontal: 5,
   },
-  unreadText: { color: "#052553", fontSize: 11, fontWeight: "800" },
+  unreadText: { color: "#fff", fontSize: 11, fontWeight: "800" },
   empty: {
     padding: 30,
     flex: 1,
@@ -674,7 +680,7 @@ const s = StyleSheet.create({
     gap: 18,
   },
   muted: { color: videoColors.muted, textAlign: "center", lineHeight: 22 },
-  white: { color: "#fff", fontWeight: "700" },
+  white: { color: videoColors.text, fontWeight: "700" },
   primary: {
     backgroundColor: "#0866f5",
     paddingHorizontal: 24,
@@ -695,11 +701,11 @@ const s = StyleSheet.create({
   },
   theirs: {
     alignSelf: "flex-start",
-    backgroundColor: "#18416f",
+    backgroundColor: "#e6f4ff",
     borderBottomLeftRadius: 4,
   },
-  body: { color: "#fff", fontSize: 15, lineHeight: 22 },
-  time: { color: "#d8eaff", fontSize: 9, alignSelf: "flex-end" },
+  body: { color: videoColors.text, fontSize: 15, lineHeight: 22 },
+  time: { color: videoColors.muted, fontSize: 9, alignSelf: "flex-end" },
   composer: {
     flexDirection: "row",
     alignItems: "flex-end",
@@ -716,7 +722,7 @@ const s = StyleSheet.create({
     borderRadius: 22,
     paddingHorizontal: 16,
     paddingVertical: 12,
-    color: "#fff",
+    color: videoColors.text,
     fontSize: 15,
   },
   send: {
@@ -728,6 +734,6 @@ const s = StyleSheet.create({
     justifyContent: "center",
   },
   loadMore: { padding: 18, alignItems: "center" },
-  errorBox: { padding: 12, backgroundColor: "#402032" },
-  error: { color: "#ffd6d6", fontSize: 13, lineHeight: 19 },
+  errorBox: { padding: 12, backgroundColor: "#fff1f0" },
+  error: { color: "#9f2834", fontSize: 13, lineHeight: 19 },
 });

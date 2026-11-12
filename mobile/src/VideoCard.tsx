@@ -18,15 +18,20 @@ function Player({
   player,
   paused,
   onPause,
+  poster,
 }: {
   url: string;
   player: VideoPlayer;
   paused: boolean;
   onPause: () => void;
+  poster?: string;
 }) {
-  const [error, setError] = useState(""),
+  const [error, setError] = useState(() =>
+      player.status === "error" ? "No se pudo reproducir este video." : "",
+    ),
     [loading, setLoading] = useState(() => player.status === "loading");
   const playingAllowed = useRef(!paused);
+  const [firstFrame, setFirstFrame] = useState(false);
   useEffect(() => {
     playingAllowed.current = !paused;
     if (!paused) player.play();
@@ -56,7 +61,17 @@ function Player({
         nativeControls={false}
         contentFit="contain"
         surfaceType="textureView"
+        onFirstFrameRender={() => setFirstFrame(true)}
       />
+      {!firstFrame && poster && (
+        <Image
+          pointerEvents="none"
+          fadeDuration={0}
+          source={{ uri: mediaUrl(poster) }}
+          style={StyleSheet.absoluteFill}
+          resizeMode="contain"
+        />
+      )}
       {loading && (
         <ActivityIndicator style={styles.center} color="#fff" size="large" />
       )}
@@ -69,6 +84,7 @@ function Player({
             onPress={() => {
               setError("");
               setLoading(true);
+              setFirstFrame(false);
               void player
                 .replaceAsync({
                   uri: mediaUrl(url),
@@ -134,7 +150,9 @@ export function VideoCard({
       )}
       {active && player && (
         <Player
+          key={item.id}
           url={item.url}
+          poster={item.thumbnail_url || p?.media[0]?.url}
           player={player}
           paused={paused}
           onPause={() => setPaused((value) => !value)}

@@ -15,6 +15,7 @@ import {
   View,
 } from "react-native";
 import { useRouter } from "expo-router";
+import { StatusBar } from "expo-status-bar";
 import { useVideoPlayer, VideoView } from "expo-video";
 import * as ImagePicker from "expo-image-picker";
 import { File } from "expo-file-system";
@@ -418,6 +419,7 @@ export function VideoProfile({
         >
           {profile?.avatar_url ? (
             <Image
+              fadeDuration={0}
               source={{ uri: mediaUrl(profile.avatar_url) }}
               style={s.avatar}
             />
@@ -615,6 +617,7 @@ export function VideoProfile({
               >
                 {person.avatar_url ? (
                   <Image
+                    fadeDuration={0}
                     source={{ uri: mediaUrl(person.avatar_url) }}
                     style={s.avatar}
                   />
@@ -752,6 +755,7 @@ export function VideoProfile({
           style={s.viewer}
           onLayout={(e) => setHeight(e.nativeEvent.layout.height)}
         >
+          <StatusBar style="light" />
           {viewer !== null && height > 1 && (
             <FlatList
               data={videos}

@@ -219,6 +219,7 @@ export function SocialVideoActions({
         >
           {data?.creator.avatar_url ? (
             <Image
+              fadeDuration={0}
               source={{ uri: mediaUrl(data.creator.avatar_url) }}
               style={s.avatar}
             />
@@ -439,7 +440,15 @@ export function SocialVideoActions({
               <Text style={s.name}>
                 {panel === "comments" ? "Comentarios" : "Editar video"}
               </Text>
-              {option("Cerrar", () => setPanel(null))}
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Cerrar"
+                hitSlop={10}
+                style={{ padding: 10 }}
+                onPress={() => setPanel(null)}
+              >
+                <ProppixIcon name="close" size={26} />
+              </Pressable>
             </View>
             {busy && <ActivityIndicator color={videoColors.cyan} />}
             {!!error && (
