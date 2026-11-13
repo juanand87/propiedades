@@ -8,6 +8,7 @@ export type VideoProfileData = {
   followed: boolean;
 };
 export type ProfileVideo = {
+  moderation_hidden?: boolean;
   hls_url?: string | null;
   thumbnail_url?: string;
   created_by: string;
@@ -21,6 +22,7 @@ export type ProfileVideo = {
   likes: number;
 };
 export type VideoSocialData = {
+  moderation_hidden?: boolean;
   hls_url?: string | null;
   id: string;
   title: string;

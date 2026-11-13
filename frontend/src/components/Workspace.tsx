@@ -29,6 +29,7 @@ import { Empty, Notice, useEstate } from "./EstateApp";
 import { DemoAdmin } from "./DemoAdmin";
 import { DesignAdmin } from "./DesignAdmin";
 import { PropertyVideosEditor } from "./PropertyVideosEditor";
+import { ModerationAdmin } from "./ModerationAdmin";
 
 function useLoad(path: string) {
   const [data, setData] = useState<any>(null),
@@ -125,6 +126,7 @@ export function Workspace({ path }: { path: string[] }) {
       ? [
           { href: "anunciantes", name: "Anunciantes", icon: Users },
           { href: "usuarios", name: "Usuarios", icon: Users },
+          { href: "moderacion", name: "Moderación", icon: Eye },
           { href: "ejemplos", name: "Propiedades de ejemplo", icon: Images },
           { href: "catalogos", name: "Tipos y ubicaciones", icon: ListFilter },
           { href: "diseno", name: "Diseño del sitio", icon: Images },
@@ -199,6 +201,8 @@ export function Workspace({ path }: { path: string[] }) {
           <AdvertiserAdmin />
         ) : section === "usuarios" && isAdmin ? (
           <UserAdmin />
+        ) : section === "moderacion" && isAdmin ? (
+          <ModerationAdmin />
         ) : section === "ejemplos" && isAdmin ? (
           <DemoAdmin />
         ) : section === "catalogos" && isAdmin ? (

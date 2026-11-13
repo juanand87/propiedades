@@ -5,6 +5,7 @@ import { PropertyVideosService } from './property-videos.service';
 import { EstateService } from './estate.service';
 import { PushService } from './push.service';
 import { ActivityService } from './activity.service';
+import { ModerationService } from './moderation.service';
 import { Actor } from './rules';
 
 describe('notification comment destinations', () => {
@@ -23,8 +24,9 @@ describe('notification comment destinations', () => {
         return Promise.resolve(
           recent ? [row, { id: parentId }] : [{ id: 'recent' }],
         );
-      if (params[1] === targetId) return Promise.resolve(target ? [row] : []);
-      if (params[1] === parentId)
+      if (params.at(-1) === targetId)
+        return Promise.resolve(target ? [row] : []);
+      if (params.at(-1) === parentId)
         return Promise.resolve([{ id: parentId, body: 'Parent' }]);
       throw new Error('Unexpected query');
     });
@@ -37,6 +39,9 @@ describe('notification comment destinations', () => {
         {} as EstateService,
         {} as PushService,
         {} as ActivityService,
+        {
+          assertContact: jest.fn().mockResolvedValue(undefined),
+        } as unknown as ModerationService,
       ),
     };
   }

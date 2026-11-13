@@ -1,3 +1,4 @@
+import { ModerationActions } from "./ModerationActions";
 import { playbackSource, preferredVideoUrl } from "./video-source";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -258,6 +259,7 @@ export function VideoProfile({
     await run(async () => {
       const result = await api<{ items: typeof followers; has_more: boolean }>(
         `/video-profiles/${target}/${direction}?page=${next}&q=${encodeURIComponent(query)}`,
+        { token },
       );
       setFollowers((previous) =>
         next === 1 ? result.items : [...previous, ...result.items],
@@ -542,6 +544,15 @@ export function VideoProfile({
             }),
           true,
         )}
+      {!own && target && (
+        <ModerationActions
+          kind="user"
+          targetId={target}
+          authorId={target}
+          session={session}
+          label="Reportar o bloquear usuario"
+        />
+      )}
       {error && (
         <Text accessibilityRole="alert" style={s.error}>
           {error}
@@ -747,7 +758,12 @@ export function VideoProfile({
                 {item.title}
               </Text>
               <Text style={s.tileMeta}>
-                ♥ {item.likes} {item.status === "draft" ? " · Borrador" : ""}
+                ♥ {item.likes}{" "}
+                {item.moderation_hidden
+                  ? " · Oculto por moderación"
+                  : item.status === "draft"
+                    ? " · Borrador"
+                    : ""}
               </Text>
             </Pressable>
           )}

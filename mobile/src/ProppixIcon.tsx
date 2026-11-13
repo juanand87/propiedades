@@ -1,6 +1,7 @@
 import Svg, { Path, Circle, Rect } from "react-native-svg";
 
 export type ProppixIconName =
+  | "flag"
   | "home"
   | "search"
   | "bell"
@@ -29,6 +30,7 @@ export type ProppixIconName =
   | "send";
 
 const paths: Partial<Record<ProppixIconName, string>> = {
+  flag: "M5 22V3m0 0c4-4 9 4 14 0v11c-5 4-10-4-14 0",
   play: "M8 4 21 12 8 20Z",
   send: "M22 2 9 15M22 2l-8 20-5-7-7-5Z",
   home: "M3 10 12 3l9 7v11h-6v-7H9v7H3Z",

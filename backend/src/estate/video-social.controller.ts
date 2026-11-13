@@ -1,28 +1,16 @@
 import {
   Body,
-  CanActivate,
   Controller,
-  ExecutionContext,
   Get,
-  Injectable,
   Param,
   Post,
   Query,
   Req,
   UseGuards,
 } from '@nestjs/common';
-import { EstateGuard } from './estate.guard';
+import { EstateGuard, OptionalEstateGuard } from './estate.guard';
 import { VideoSocialService } from './video-social.service';
 
-@Injectable()
-export class OptionalEstateGuard implements CanActivate {
-  constructor(private guard: EstateGuard) {}
-  canActivate(context: ExecutionContext) {
-    return context.switchToHttp().getRequest().headers.authorization
-      ? this.guard.canActivate(context)
-      : true;
-  }
-}
 @Controller()
 export class VideoSocialController {
   constructor(private social: VideoSocialService) {}
@@ -42,20 +30,24 @@ export class VideoSocialController {
     return this.social.saveProfile(req.user, body);
   }
   @Get('video-profiles/:id/followers')
+  @UseGuards(OptionalEstateGuard)
   followers(
     @Param('id') id: string,
     @Query('page') page: string,
     @Query('q') q: string,
+    @Req() req: any,
   ) {
-    return this.social.followers(id, page, 'followers', q);
+    return this.social.followers(id, page, 'followers', q, req.user);
   }
   @Get('video-profiles/:id/following')
+  @UseGuards(OptionalEstateGuard)
   following(
     @Param('id') id: string,
     @Query('page') page: string,
     @Query('q') q: string,
+    @Req() req: any,
   ) {
-    return this.social.followers(id, page, 'following', q);
+    return this.social.followers(id, page, 'following', q, req.user);
   }
   @Post('video-profiles/:id/follow')
   @UseGuards(EstateGuard)

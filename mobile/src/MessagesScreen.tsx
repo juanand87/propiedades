@@ -1,3 +1,4 @@
+import { ModerationActions } from "./ModerationActions";
 import { ComponentRef, useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -414,6 +415,15 @@ export function MessagesScreen({
         <Text style={[s.title, { flex: 1 }]} numberOfLines={1}>
           {selected ? person?.display_name || "Conversación" : "Mensajes"}
         </Text>
+        {selected && person && (
+          <ModerationActions
+            kind="user"
+            targetId={person.id}
+            authorId={person.id}
+            session={session}
+            label="Reportar"
+          />
+        )}
         {!selected && (
           <Pressable
             accessibilityRole="button"

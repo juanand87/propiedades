@@ -13,7 +13,7 @@ import {
   UploadedFile,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { EstateGuard } from './estate.guard';
+import { EstateGuard, OptionalEstateGuard } from './estate.guard';
 import { PropertyVideosService } from './property-videos.service';
 @Controller()
 export class PropertyVideosController {
@@ -35,8 +35,11 @@ export class PropertyVideosController {
   @Get('mobile/environment') environment() {
     return this.videos.environment();
   }
-  @Get('videos') feed(@Query() q: any) {
-    return this.videos.feed(q);
+  @Get('videos') @UseGuards(OptionalEstateGuard) feed(
+    @Query() q: any,
+    @Req() req: any,
+  ) {
+    return this.videos.feed(q, req.user);
   }
   @Get('videos/capabilities') capabilities() {
     return this.videos.capabilities();

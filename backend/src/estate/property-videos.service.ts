@@ -1,3 +1,4 @@
+import { notBlocked, notHidden } from './moderation-rules';
 import { compressVideo } from './video-compression';
 import { videoPoster } from './video-poster';
 import {
@@ -90,7 +91,7 @@ export class PropertyVideosService {
       return { enabled: false, storage: 'disabled', version: 1 };
     }
   }
-  async feed(q: any) {
+  async feed(q: any, actor?: Actor) {
     this.guard();
     const page = Math.max(1, Math.min(10000, Number.parseInt(q.page, 10) || 1));
     const limit = Math.max(1, Math.min(20, Number.parseInt(q.limit, 10) || 5));
@@ -101,8 +102,13 @@ export class PropertyVideosService {
     const filter =
         (type ? ' AND p.type_id=?' : '') +
         (q.linked_only === 'true' ? ' AND v.property_id IS NOT NULL' : '') +
-        (videoId ? ' AND v.id=?' : ''),
-      params = [...(type ? [type] : []), ...(videoId ? [videoId] : [])];
+        (videoId ? ' AND v.id=?' : '') +
+        (actor ? ' AND ' + notBlocked('?', 'v.created_by') : ''),
+      params = [
+        ...(type ? [type] : []),
+        ...(videoId ? [videoId] : []),
+        ...(actor ? [actor.id, actor.id] : []),
+      ];
     const [count] = await this.db.query(
       `SELECT COUNT(*) total ${joined} WHERE ${visible}${filter}`,
       params,
@@ -418,6 +424,16 @@ export class PropertyVideosService {
         body.status === undefined
           ? v.status
           : choice(body.status, ['draft', 'published', 'archived']);
+      if (status === 'published') {
+        const [allowed] = await tx.query(
+          'SELECT ' + notHidden('video', '?') + ' ok',
+          [id],
+        );
+        if (!Number(allowed.ok))
+          throw new ForbiddenException(
+            'Este video está oculto por moderación.',
+          );
+      }
       if (status === 'published' && v.property_id) {
         const [p] = await tx.query(
           'SELECT p.publication_status,a.status,u.isActive FROM properties p JOIN advertisers a ON a.id=p.advertiser_id JOIN users u ON CONVERT(u.id USING utf8mb4) COLLATE utf8mb4_unicode_ci=a.user_id WHERE p.id=? FOR UPDATE',

@@ -1,3 +1,4 @@
+import { notHidden, notBlocked } from './moderation-rules';
 import {
   BadRequestException,
   Injectable,
@@ -420,7 +421,7 @@ export class PushService implements OnModuleInit, OnModuleDestroy {
         `SELECT c.video_id FROM estate_video_comments c JOIN users author ON CONVERT(author.id USING utf8mb4) COLLATE utf8mb4_unicode_ci=c.user_id AND author.isActive=1 JOIN users recipient ON recipient.id=? AND recipient.isActive=1
         JOIN estate_push_devices d ON d.user_id=CONVERT(recipient.id USING utf8mb4) COLLATE utf8mb4_unicode_ci AND d.token=?
         JOIN property_videos ownvideo ON ownvideo.id=c.video_id AND ownvideo.status<>'archived'
-        WHERE c.id=? AND (ownvideo.created_by=? OR EXISTS(SELECT 1 ${videoJoined} WHERE v.id=c.video_id AND ${videoVisible}))`,
+        WHERE ${notHidden('comment', 'c.id')} AND ${notHidden('video', 'ownvideo.id')} AND ${notBlocked('recipient.id', 'c.user_id')} AND ${notBlocked('recipient.id', 'ownvideo.created_by')} AND c.id=? AND (ownvideo.created_by=? OR EXISTS(SELECT 1 ${videoJoined} WHERE v.id=c.video_id AND ${videoVisible}))`,
         [row.user_id, row.token, row.comment_id, row.user_id],
       );
       if (!event || !validFcmToken(row.token)) {
@@ -534,8 +535,8 @@ export class PushService implements OnModuleInit, OnModuleDestroy {
         WHERE d.status IN ('pending','receipt') AND d.due_at<=UTC_TIMESTAMP(3) ORDER BY d.due_at LIMIT 25`);
       for (const row of rows) {
         const [device] = await this.db.query<{ user_id: string }[]>(
-          'SELECT user_id FROM estate_push_devices WHERE token=? AND user_id=?',
-          [row.token, row.user_id],
+          `SELECT user_id FROM estate_push_devices WHERE token=? AND user_id=? AND EXISTS(SELECT 1 FROM users WHERE id=estate_push_devices.user_id AND isActive=1) AND NOT EXISTS(SELECT 1 FROM estate_direct_messages message JOIN estate_user_blocks blocked ON (blocked.blocker_id=message.sender_id AND blocked.blocked_id=estate_push_devices.user_id) OR (blocked.blocked_id=message.sender_id AND blocked.blocker_id=estate_push_devices.user_id) WHERE message.id=?)`,
+          [row.token, row.user_id, row.message_id],
         );
         const read =
           row.user_low_id === row.user_id ? row.low_read_id : row.high_read_id;

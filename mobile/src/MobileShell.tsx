@@ -1,3 +1,5 @@
+import { BlockedUsersScreen } from "./BlockedUsersScreen";
+import { listenModerationChange } from "./moderation-events";
 import {
   useCallback,
   useEffect,
@@ -118,6 +120,7 @@ function AppContent() {
   const notificationVideoRoute = pathname.startsWith("/video/");
   const activityRoute = pathname === "/actividad";
   const savedSearchRoute = pathname === "/busquedas";
+  const blockedUsersRoute = pathname === "/bloqueados";
   const {
     propertyId,
     from,
@@ -175,6 +178,10 @@ function AppContent() {
     [favorites, setFavorites] = useState<string[]>([]),
     [detail, setDetail] = useState<Property | null>(null),
     [detailBusy, setDetailBusy] = useState(false);
+  const feedViewer = useRef(session?.access_token);
+  useEffect(() => {
+    feedViewer.current = session?.access_token;
+  }, [session?.access_token]);
   const notifications = useMessageNotifications(session, ready);
   const [activityCount, setActivityCount] = useState({ userId: "", count: 0 });
   const activityUnread =
@@ -263,7 +270,8 @@ function AppContent() {
     !detail &&
     !notificationVideoRoute &&
     !activityRoute &&
-    !savedSearchRoute;
+    !savedSearchRoute &&
+    !blockedUsersRoute;
   const preparedVideos = useVideoPreload(videos, active, ready, !feedVisible);
   const feedRef = useRef<FlatList<Video>>(null),
     feedDragIndex = useRef(0),
@@ -364,6 +372,7 @@ function AppContent() {
     try {
       const data = await api<Page<Video>>(
         `/videos?limit=12&page=${next}&seed=${feedSeed.current}`,
+        { token: feedViewer.current },
       );
       if (generation !== feedGeneration.current || !mounted.current) return;
       setVideos((previous) => {
@@ -399,7 +408,7 @@ function AppContent() {
     const controller = new AbortController();
     void api<Page<Video>>(
       `/videos?video_id=${encodeURIComponent(resumeVideoId)}`,
-      { signal: controller.signal },
+      { signal: controller.signal, token: session?.access_token },
     )
       .then((result) => {
         if (controller.signal.aborted) return;
@@ -422,7 +431,7 @@ function AppContent() {
         }
       });
     return () => controller.abort();
-  }, [ready, propertyRoute, tab, resumeVideoId, router]);
+  }, [ready, propertyRoute, tab, resumeVideoId, router, session?.access_token]);
   useEffect(() => {
     if (
       !feedVisible ||
@@ -443,7 +452,22 @@ function AppContent() {
       const timer = setTimeout(() => onReady(), 0);
       return () => clearTimeout(timer);
     }
-  }, [ready]);
+  }, [ready, session?.access_token]);
+  const moderationChange = useEffectEvent(
+    (change: { userId: string; blocked: boolean }) => {
+      if (change.blocked) {
+        setVideos((previous) =>
+          previous.filter((video) => video.creator?.id !== change.userId),
+        );
+        setActive(0);
+      }
+      void loadFeed(true);
+    },
+  );
+  useEffect(
+    () => listenModerationChange((change) => moderationChange(change)),
+    [],
+  );
   useEffect(() => {
     if (!session) {
       return;
@@ -1352,6 +1376,12 @@ function AppContent() {
             session={session}
           />
         ),
+        blockedUsers: (
+          <BlockedUsersScreen
+            key={session?.user.id || "guest"}
+            session={session}
+          />
+        ),
         active: tab,
         recorder: recordingRoute ? (
           <VideoRecorder
@@ -1452,6 +1482,14 @@ function AppContent() {
                 onPress={() => {
                   setAccountMenu(false);
                   setTab("account");
+                }}
+              />
+              <Button
+                label="Usuarios bloqueados"
+                secondary
+                onPress={() => {
+                  setAccountMenu(false);
+                  router.push("/bloqueados");
                 }}
               />
               <Button

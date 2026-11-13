@@ -1,3 +1,5 @@
+import { ModerationService } from './moderation.service';
+import { notBlocked } from './moderation-rules';
 import {
   BadRequestException,
   ConflictException,
@@ -66,6 +68,7 @@ export class MessagingService {
     private db: DataSource,
     private estate: EstateService,
     private push: PushService,
+    private moderation: ModerationService,
   ) {}
 
   async capabilities() {
@@ -102,16 +105,22 @@ export class MessagingService {
     return row;
   }
 
-  private async person(id: string) {
+  private async person(id: string, viewer?: string) {
     const [row] = await this.db.query<PersonRow[]>(
       "SELECT u.id,u.isActive,COALESCE(p.display_name,u.firstName,'Usuario Proppix') display_name,p.avatar_media_id FROM users u LEFT JOIN estate_video_profiles p ON p.user_id=CONVERT(u.id USING utf8mb4) COLLATE utf8mb4_unicode_ci WHERE u.id=?",
       [id],
     );
     if (!row) throw new NotFoundException('Usuario no encontrado.');
+    const [permission] = viewer
+      ? await this.db.query<{ ok: number }[]>(
+          'SELECT ' + notBlocked('?', '?') + ' ok',
+          [viewer, id, id, viewer],
+        )
+      : [{ ok: 1 }];
     return {
       id: row.id,
       display_name: row.isActive ? row.display_name : 'Cuenta no disponible',
-      available: Boolean(row.isActive),
+      available: Boolean(row.isActive) && !!Number(permission.ok),
       avatar_url:
         row.isActive && row.avatar_media_id
           ? this.estate.mediaUrl(row.avatar_media_id, { id: row.id } as Actor)
@@ -133,7 +142,8 @@ export class MessagingService {
     } else recipient = uuid(body?.recipient_id);
     if (recipient.toLowerCase() === actor.id.toLowerCase())
       throw new BadRequestException('Elige otro usuario para conversar.');
-    const person = await this.person(recipient);
+    await this.moderation.assertContact(actor.id, recipient);
+    const person = await this.person(recipient, actor.id);
     if (!person.available)
       throw new BadRequestException('Esta cuenta no puede recibir mensajes.');
     const [low, high] = [
@@ -159,7 +169,7 @@ export class MessagingService {
       IF(c.user_low_id=?,c.user_high_id,c.user_low_id) participant_id,
       (SELECT COUNT(*) FROM estate_direct_messages unread WHERE unread.conversation_id=c.id AND unread.sender_id<>? AND unread.id>IF(c.user_low_id=?,c.low_read_id,c.high_read_id)) unread
       FROM estate_conversations c JOIN estate_direct_messages m ON m.id=c.last_message_id
-      WHERE c.user_low_id=? OR c.user_high_id=? ORDER BY c.updated_at DESC,c.id LIMIT 25 OFFSET ?`,
+      WHERE (c.user_low_id=? OR c.user_high_id=?) AND ${notBlocked('c.user_low_id', 'c.user_high_id')} ORDER BY c.updated_at DESC,c.id LIMIT 25 OFFSET ?`,
       [actor.id, actor.id, actor.id, actor.id, actor.id, (page - 1) * 24],
     );
     return {
@@ -171,7 +181,7 @@ export class MessagingService {
           from_me: row.sender_id.toLowerCase() === actor.id.toLowerCase(),
           updated_at: row.updated_at,
           unread: Number(row.unread),
-          participant: await this.person(row.participant_id),
+          participant: await this.person(row.participant_id, actor.id),
         })),
       ),
       has_more: rows.length > 24,
@@ -208,6 +218,7 @@ export class MessagingService {
         conversation.user_low_id === actor.id.toLowerCase()
           ? conversation.user_high_id
           : conversation.user_low_id,
+        actor.id,
       ),
       items,
       has_more: rows.length > 50,
@@ -227,6 +238,11 @@ export class MessagingService {
       // Serialize sends from an account so retries and the rate limit stay consistent.
       await tx.query('SELECT id FROM users WHERE id=? FOR UPDATE', [actor.id]);
       const conversation = await this.conversation(actor, id, tx, true);
+      await this.moderation.assertContact(
+        conversation.user_low_id,
+        conversation.user_high_id,
+        tx,
+      );
       const [existing] = await tx.query<MessageRow[]>(
         'SELECT CAST(id AS CHAR) id,conversation_id,sender_id,client_id,body,created_at FROM estate_direct_messages WHERE sender_id=? AND client_id=?',
         [actor.id, clientId],

@@ -1,3 +1,4 @@
+import { ModerationActions } from "./ModerationActions";
 import {
   ComponentRef,
   useEffect,
@@ -76,6 +77,7 @@ export function SocialVideoActions({
   const [comments, setComments] = useState<
     {
       id: string;
+      user_id: string;
       display_name: string;
       body: string;
       parent_id?: string;
@@ -374,7 +376,39 @@ export function SocialVideoActions({
               () => void Share.share({ message: data.share_url }),
             )}
       </View>
+      <View
+        style={{
+          position: "absolute",
+          top: 12,
+          right: 12,
+          paddingHorizontal: 10,
+          borderRadius: 22,
+          backgroundColor: "#00142b88",
+        }}
+      >
+        {data && (
+          <ModerationActions
+            kind="video"
+            targetId={videoId}
+            authorId={data.creator.id}
+            session={session}
+            color="#fff"
+          />
+        )}
+      </View>
       <View style={s.caption} pointerEvents="box-none">
+        {data?.can_edit && data.moderation_hidden && (
+          <Text
+            style={{
+              color: "#fff",
+              backgroundColor: "#782f2f",
+              padding: 8,
+              borderRadius: 8,
+            }}
+          >
+            Oculto por moderación
+          </Text>
+        )}
         <Text style={s.name}>
           @{data?.creator.display_name || "Propiedades"}
         </Text>
@@ -675,6 +709,13 @@ export function SocialVideoActions({
                         </Text>
                       )}
                       <Text style={s.white}>{c.body}</Text>
+                      <ModerationActions
+                        kind="comment"
+                        targetId={c.id}
+                        authorId={c.user_id}
+                        session={session}
+                        color="#8be3ff"
+                      />
                       <Pressable
                         accessibilityRole="button"
                         disabled={busy}

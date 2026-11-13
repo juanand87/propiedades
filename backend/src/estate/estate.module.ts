@@ -3,7 +3,7 @@ import { JwtModule } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { EstateController } from './estate.controller';
 import { EstateService } from './estate.service';
-import { EstateGuard } from './estate.guard';
+import { EstateGuard, OptionalEstateGuard } from './estate.guard';
 import { MessagingController } from './messaging.controller';
 import { MessagingService } from './messaging.service';
 import { PushService } from './push.service';
@@ -21,11 +21,13 @@ import { ImageStorageService } from './image-storage.service';
 import { VideoStorageService } from './video-storage.service';
 import { VideoHlsService } from './video-hls.service';
 import { VideoHlsController } from './video-hls.controller';
-import { VideoSocialService } from './video-social.service';
+import { ModerationService } from './moderation.service';
 import {
-  VideoSocialController,
-  OptionalEstateGuard,
-} from './video-social.controller';
+  ModerationController,
+  ModerationCapabilitiesController,
+} from './moderation.controller';
+import { VideoSocialService } from './video-social.service';
+import { VideoSocialController } from './video-social.controller';
 import {
   GoogleAuthController,
   GoogleAuthService,
@@ -42,6 +44,8 @@ import {
     }),
   ],
   controllers: [
+    ModerationController,
+    ModerationCapabilitiesController,
     VideoHlsController,
     SavedSearchController,
     SavedSearchCapabilitiesController,
@@ -53,6 +57,7 @@ import {
     MessagingController,
   ],
   providers: [
+    ModerationService,
     VideoHlsService,
     SavedSearchService,
     ActivityService,

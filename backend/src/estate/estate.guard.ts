@@ -32,3 +32,13 @@ export class EstateGuard implements CanActivate {
     return true;
   }
 }
+
+@Injectable()
+export class OptionalEstateGuard implements CanActivate {
+  constructor(private guard: EstateGuard) {}
+  canActivate(context: ExecutionContext) {
+    return context.switchToHttp().getRequest().headers.authorization
+      ? this.guard.canActivate(context)
+      : true;
+  }
+}

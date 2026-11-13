@@ -1,3 +1,5 @@
+import { ModerationService } from './moderation.service';
+import { notBlocked, notHidden } from './moderation-rules';
 import {
   BadRequestException,
   ForbiddenException,
@@ -27,6 +29,7 @@ export class VideoSocialService {
     private estate: EstateService,
     private push: PushService,
     private activity: ActivityService,
+    private moderation: ModerationService,
   ) {}
   guard() {
     if (this.config.get('SOCIAL_VIDEOS_ENABLED') !== 'true')
@@ -37,7 +40,7 @@ export class VideoSocialService {
   private async access(id: string, actor?: Actor) {
     this.guard();
     const [v] = await this.db.query(
-      `SELECT v.*,(${videoVisible}) can_view,p.title property_title ${videoJoined} WHERE v.id=? AND v.status<>'archived'`,
+      `SELECT v.*,(${videoVisible}) can_view,(NOT ${notHidden('video', 'v.id')}) moderation_hidden,p.title property_title ${videoJoined} WHERE v.id=? AND v.status<>'archived'`,
       [uuid(id)],
     );
     if (
@@ -47,6 +50,8 @@ export class VideoSocialService {
         actor?.role !== 'admin')
     )
       throw new NotFoundException('Video no disponible.');
+    if (actor && actor.id !== v.created_by)
+      await this.moderation.assertContact(actor.id, v.created_by);
     return v;
   }
   async profile(userId: string, actor?: Actor) {
@@ -56,6 +61,8 @@ export class VideoSocialService {
       [uuid(userId)],
     );
     if (!u) throw new NotFoundException('Perfil no disponible.');
+    if (actor && actor.id !== userId)
+      await this.moderation.assertContact(actor.id, userId);
     const [[following], [followers], [likes], [relation]] = await Promise.all([
       this.db.query(
         'SELECT COUNT(*) n FROM estate_video_follows WHERE follower_id=?',
@@ -120,14 +127,17 @@ export class VideoSocialService {
     const where = saved
       ? 'v.id IN (SELECT video_id FROM estate_video_saves WHERE user_id=?)'
       : 'v.created_by=?';
-    const visibility = own && !saved ? "v.status<>'archived'" : videoVisible;
+    const visibility =
+      (own && !saved ? "v.status<>'archived'" : videoVisible) +
+      (actor ? ' AND ' + notBlocked('?', 'v.created_by') : '');
+    const viewerParams = actor ? [actor.id, actor.id] : [];
     const [count] = await this.db.query(
       `SELECT COUNT(*) n ${videoJoined} WHERE ${where} AND ${visibility}`,
-      [userId],
+      [userId, ...viewerParams],
     );
     const rows = await this.db.query(
-      `SELECT v.id,v.title,v.status,v.property_id,v.created_by,p.title property_title,r.duration_ms,(SELECT COUNT(*) FROM estate_video_likes l WHERE l.video_id=v.id) likes ${videoJoined} LEFT JOIN property_video_recordings r ON r.video_id=v.id WHERE ${where} AND ${visibility} ORDER BY v.created_at DESC,v.id LIMIT 24 OFFSET ?`,
-      [userId, (page - 1) * 24],
+      `SELECT v.id,v.title,v.status,v.property_id,v.created_by,p.title property_title,r.duration_ms,(NOT ${notHidden('video', 'v.id')}) moderation_hidden,(SELECT COUNT(*) FROM estate_video_likes l WHERE l.video_id=v.id) likes ${videoJoined} LEFT JOIN property_video_recordings r ON r.video_id=v.id WHERE ${where} AND ${visibility} ORDER BY v.created_at DESC,v.id LIMIT 24 OFFSET ?`,
+      [userId, ...viewerParams, (page - 1) * 24],
     );
     const publicHls = await this.videos.hlsUrls(
       rows.map((v: { id: string }) => v.id),
@@ -160,7 +170,8 @@ export class VideoSocialService {
         [id],
       ),
       this.db.query(
-        'SELECT COUNT(*) n FROM estate_video_comments WHERE video_id=?',
+        'SELECT COUNT(*) n FROM estate_video_comments WHERE video_id=? AND ' +
+          notHidden('comment', 'id'),
         [id],
       ),
       this.db.query(
@@ -176,6 +187,7 @@ export class VideoSocialService {
       id,
       title: v.title,
       status: v.status,
+      moderation_hidden: !!Number(v.moderation_hidden),
       property_id: v.property_id,
       property_title: v.property_title,
       creator: await this.profile(v.created_by, actor),
@@ -229,8 +241,9 @@ export class VideoSocialService {
     rawPage: string,
     direction: 'followers' | 'following' = 'followers',
     query = '',
+    actor?: Actor,
   ) {
-    await this.profile(id);
+    await this.profile(id, actor);
     const page = Math.max(1, Math.min(10000, parseInt(rawPage, 10) || 1));
     const following = direction === 'following';
     const other = following ? 'followed_id' : 'follower_id';
@@ -241,9 +254,9 @@ export class VideoSocialService {
        FROM estate_video_follows f
        JOIN users u ON CONVERT(u.id USING utf8mb4) COLLATE utf8mb4_unicode_ci=f.${other}
        LEFT JOIN estate_video_profiles p ON p.user_id=f.${other}
-       WHERE f.${owner}=? AND u.isActive=1 AND LOCATE(?,COALESCE(p.display_name,u.firstName))>0
+       WHERE f.${owner}=? AND u.isActive=1 AND LOCATE(?,COALESCE(p.display_name,u.firstName))>0 ${actor ? 'AND ' + notBlocked('?', 'u.id') : ''}
        ORDER BY f.created_at DESC,f.${other} LIMIT 25 OFFSET ?`,
-      [id, search, (page - 1) * 24],
+      [id, search, ...(actor ? [actor.id, actor.id] : []), (page - 1) * 24],
     );
     return {
       items: rows.slice(0, 24).map(({ id, display_name, avatar_media_id }) => ({
@@ -259,7 +272,11 @@ export class VideoSocialService {
   async comments(id: string, actor?: Actor, commentId?: string) {
     await this.access(id, actor);
     const select =
-      'SELECT c.id,c.body,c.created_at,c.user_id,r.parent_id,COALESCE(pp.display_name,pu.firstName) parent_name,COALESCE(p.display_name,u.firstName) display_name FROM estate_video_comments c LEFT JOIN estate_video_comment_replies r ON r.comment_id=c.id LEFT JOIN estate_video_comments parent ON parent.id=r.parent_id LEFT JOIN users pu ON CONVERT(pu.id USING utf8mb4) COLLATE utf8mb4_unicode_ci=parent.user_id AND pu.isActive=1 LEFT JOIN estate_video_profiles pp ON pp.user_id=parent.user_id AND pu.id IS NOT NULL JOIN users u ON CONVERT(u.id USING utf8mb4) COLLATE utf8mb4_unicode_ci=c.user_id LEFT JOIN estate_video_profiles p ON p.user_id=c.user_id WHERE c.video_id=? AND u.isActive=1';
+      'SELECT c.id,c.body,c.created_at,c.user_id,r.parent_id,COALESCE(pp.display_name,pu.firstName) parent_name,COALESCE(p.display_name,u.firstName) display_name FROM estate_video_comments c LEFT JOIN estate_video_comment_replies r ON r.comment_id=c.id LEFT JOIN estate_video_comments parent ON parent.id=r.parent_id LEFT JOIN users pu ON CONVERT(pu.id USING utf8mb4) COLLATE utf8mb4_unicode_ci=parent.user_id AND pu.isActive=1 LEFT JOIN estate_video_profiles pp ON pp.user_id=parent.user_id AND pu.id IS NOT NULL JOIN users u ON CONVERT(u.id USING utf8mb4) COLLATE utf8mb4_unicode_ci=c.user_id LEFT JOIN estate_video_profiles p ON p.user_id=c.user_id WHERE c.video_id=? AND u.isActive=1' +
+      ' AND ' +
+      notHidden('comment', 'c.id') +
+      (actor ? ' AND ' + notBlocked('?', 'c.user_id') : '');
+    const params = [id, ...(actor ? [actor.id, actor.id] : [])];
     type CommentRow = {
       id: string;
       parent_id?: string;
@@ -267,13 +284,13 @@ export class VideoSocialService {
     };
     const rows = await this.db.query<CommentRow[]>(
       select + ' ORDER BY c.created_at DESC,c.id LIMIT 100',
-      [id],
+      params,
     );
     if (!commentId) return rows;
     const targetId = uuid(commentId);
     const [target] = await this.db.query<CommentRow[]>(
       select + ' AND c.id=? LIMIT 1',
-      [id, targetId],
+      [...params, targetId],
     );
     if (!target)
       throw new NotFoundException('Este comentario ya no está disponible.');
@@ -281,7 +298,7 @@ export class VideoSocialService {
     if (target.parent_id && !rows.some((row) => row.id === target.parent_id)) {
       const [parent] = await this.db.query<CommentRow[]>(
         select + ' AND c.id=? LIMIT 1',
-        [id, target.parent_id],
+        [...params, target.parent_id],
       );
       if (parent) context.push(parent);
     }
@@ -298,13 +315,15 @@ export class VideoSocialService {
       let parentUserId: string | undefined;
       if (parentId) {
         const [parent] = await tx.query(
-          'SELECT id,user_id FROM estate_video_comments WHERE id=? AND video_id=?',
+          'SELECT id,user_id FROM estate_video_comments WHERE id=? AND video_id=? AND ' +
+            notHidden('comment', 'id'),
           [parentId, id],
         );
         if (!parent)
           throw new NotFoundException(
             'Comentario no disponible en este video.',
           );
+        await this.moderation.assertContact(actor.id, parent.user_id, tx);
         parentUserId = parent.user_id;
       }
       const commentId = randomUUID();

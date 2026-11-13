@@ -46,6 +46,7 @@ async function main() {
     for (const file of [
       'SPACES_VIDEOS_PROPIEDADES.sql',
       'PERFILES_Y_VIDEOS_SOCIALES.sql',
+      'MODERACION_Y_BLOQUEOS.sql',
       'NOTIFICACIONES_Y_PORTADAS.sql',
       'NOTIFICACIONES_COMENTARIOS.sql',
       'MENSAJES_PROPPIX.sql',

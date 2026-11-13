@@ -1,3 +1,4 @@
+import { notHidden, notBlocked } from './moderation-rules';
 import {
   BadRequestException,
   Injectable,
@@ -71,7 +72,7 @@ export class ActivityService {
     JOIN users author ON CONVERT(author.id USING utf8mb4) COLLATE utf8mb4_unicode_ci=c.user_id AND author.isActive=1
     JOIN property_videos ownvideo ON ownvideo.id=c.video_id AND ownvideo.status<>'archived'
     LEFT JOIN estate_video_profiles profile ON profile.user_id=c.user_id
-    WHERE a.user_id=? AND (ownvideo.created_by=? OR EXISTS(SELECT 1 ${videoJoined} WHERE v.id=c.video_id AND ${videoVisible}))`;
+    WHERE ${notHidden('comment', 'c.id')} AND ${notHidden('video', 'ownvideo.id')} AND ${notBlocked('a.user_id', 'c.user_id')} AND ${notBlocked('a.user_id', 'ownvideo.created_by')} AND a.user_id=? AND (ownvideo.created_by=? OR EXISTS(SELECT 1 ${videoJoined} WHERE v.id=c.video_id AND ${videoVisible}))`;
   async list(
     actor: Actor,
     query: { before?: string; unread?: string; limit?: string },

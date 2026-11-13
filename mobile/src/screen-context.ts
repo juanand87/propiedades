@@ -5,6 +5,7 @@ type Screen =
   | "messages"
   | "activity"
   | "savedSearches"
+  | "blockedUsers"
   | "manage"
   | "account"
   | "recorder"
