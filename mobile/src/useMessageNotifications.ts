@@ -139,6 +139,15 @@ export function useMessageNotifications(
             commentId: destination.commentId,
           },
         });
+      } else if (destination.kind === "property") {
+        void api(`/me/saved-searches/matches/${destination.matchId}/read`, {
+          method: "POST",
+          token: session.access_token,
+        }).catch(() => {});
+        router.push({
+          pathname: "/property/[propertyId]",
+          params: { propertyId: destination.propertyId, from: "catalog" },
+        });
       } else if (destination.kind === "conversation")
         router.push({
           pathname: "/mensajes",

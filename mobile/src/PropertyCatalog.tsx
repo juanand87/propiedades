@@ -1,9 +1,17 @@
+import { useRouter } from "expo-router";
+import {
+  emptySearchFilters,
+  SavedSearch,
+  searchDescription,
+} from "./saved-search-types";
 import { ComponentRef, useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
   Image,
   Modal,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -14,30 +22,13 @@ import {
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { api, mediaUrl, Page, Property } from "./api";
+import { api, mediaUrl, Page, Property, Session } from "./api";
 import { ProppixBrand } from "./ProppixBrand";
 import { ProppixIcon, ProppixIconName } from "./ProppixIcon";
 import { ActivityBell } from "./ActivityBell";
 import { formatClpInput, parseClpInput } from "./clp";
 
-type Filters = {
-  search: string;
-  type_id: string;
-  operation_type: string;
-  bedrooms: string;
-  price_unit: string;
-  min_price: string;
-  max_price: string;
-};
-const emptyFilters: Filters = {
-  search: "",
-  type_id: "",
-  operation_type: "",
-  bedrooms: "",
-  price_unit: "CLP",
-  min_price: "",
-  max_price: "",
-};
+const emptyFilters = emptySearchFilters;
 const categories: {
   label: string;
   icon: ProppixIconName;
@@ -55,12 +46,21 @@ export function PropertyCatalog({
   onFavorite,
   onOpen,
   activityUnread = 0,
+  session,
+  savedSearchId,
 }: {
   favorites: string[];
+  session: Session | null;
+  savedSearchId?: string;
   activityUnread?: number;
   onFavorite: (id: string) => void;
   onOpen: (property: Property) => void;
 }) {
+  const router = useRouter();
+  const [saveOpen, setSaveOpen] = useState(false);
+  const [saveName, setSaveName] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
   const [filters, setFilters] = useState(emptyFilters),
     [draft, setDraft] = useState(emptyFilters),
     [search, setSearch] = useState(""),
@@ -136,6 +136,85 @@ export function PropertyCatalog({
       request.current?.abort();
     };
   }, [load]);
+  useEffect(() => {
+    if (!savedSearchId || !session) return;
+    const controller = new AbortController();
+    void api<SavedSearch>(
+      "/me/saved-searches/" + encodeURIComponent(savedSearchId),
+      { token: session.access_token, signal: controller.signal },
+    )
+      .then((item) => {
+        if (!controller.signal.aborted) {
+          setFilters({ ...emptyFilters, ...item.filters });
+          setSearch(item.filters.search || "");
+        }
+      })
+      .catch((e) => {
+        if (!controller.signal.aborted) setError(e.message);
+      });
+    return () => controller.abort();
+  }, [savedSearchId, session]);
+  function beginSave() {
+    if (!session) {
+      Alert.alert(
+        "Inicia sesión",
+        "Entra a tu cuenta para guardar búsquedas.",
+        [
+          { text: "Cancelar" },
+          { text: "Iniciar sesión", onPress: () => router.push("/cuenta") },
+        ],
+      );
+      return;
+    }
+    if (
+      ![
+        search.trim(),
+        filters.type_id,
+        filters.operation_type,
+        filters.bedrooms,
+        filters.min_price,
+        filters.max_price,
+      ].some(Boolean)
+    ) {
+      Alert.alert(
+        "Elige filtros",
+        "Busca una ubicación o selecciona al menos un filtro.",
+      );
+      return;
+    }
+    const current = { ...filters, search: search.trim() };
+    setFilters(current);
+    setSaveName(searchDescription(current).slice(0, 80));
+    setSaveError("");
+    setSaveOpen(true);
+  }
+  async function saveSearch() {
+    if (saving || !session || !saveName.trim()) return;
+    setSaving(true);
+    setSaveError("");
+    try {
+      const saved = await api<SavedSearch>("/me/saved-searches", {
+        method: "POST",
+        token: session.access_token,
+        body: { name: saveName.trim(), filters, enabled: true },
+      });
+      setSaveOpen(false);
+      Alert.alert(
+        "Búsqueda guardada",
+        saved.enabled
+          ? "Te avisaremos cuando se publique una nueva coincidencia."
+          : "Esta búsqueda ya existe y sus alertas están pausadas. Puedes activarlas en Mis búsquedas.",
+        [
+          { text: "Aceptar" },
+          { text: "Mis búsquedas", onPress: () => router.push("/busquedas") },
+        ],
+      );
+    } catch (e) {
+      setSaveError(e instanceof Error ? e.message : "No se pudo guardar.");
+    } finally {
+      setSaving(false);
+    }
+  }
   const submitSearch = () =>
     setFilters((previous) => ({ ...previous, search: search.trim() }));
   const activeFilterCount = [
@@ -272,6 +351,31 @@ export function PropertyCatalog({
                 <Text style={s.badgeText}>{activeFilterCount}</Text>
               </View>
             )}
+          </Pressable>
+        </View>
+        <View
+          style={{
+            flexDirection: "row",
+            justifyContent: "space-between",
+            paddingHorizontal: 12,
+            paddingTop: 14,
+            gap: 10,
+          }}
+        >
+          <Pressable
+            accessibilityRole="button"
+            onPress={beginSave}
+            style={s.more}
+          >
+            <ProppixIcon name="bell" color="#0866f5" size={18} />
+            <Text style={s.moreText}>Guardar búsqueda</Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => router.push("/busquedas")}
+            style={s.more}
+          >
+            <Text style={s.moreText}>Mis búsquedas</Text>
           </Pressable>
         </View>
         <View style={s.categories}>
@@ -453,6 +557,75 @@ export function PropertyCatalog({
           </Pressable>
         )}
       </ScrollView>
+      <Modal
+        visible={saveOpen}
+        transparent
+        animationType="slide"
+        onRequestClose={() => {
+          if (!saving) setSaveOpen(false);
+        }}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={{
+            flex: 1,
+            justifyContent: "center",
+            backgroundColor: "#0008",
+            padding: 24,
+          }}
+        >
+          <View
+            style={{
+              backgroundColor: "#fff",
+              padding: 24,
+              borderRadius: 22,
+              gap: 18,
+            }}
+          >
+            <View style={s.filterHeading}>
+              <Text style={s.filterTitle}>Guardar búsqueda</Text>
+              <Pressable
+                accessibilityLabel="Cerrar"
+                disabled={saving}
+                onPress={() => setSaveOpen(false)}
+              >
+                <ProppixIcon name="close" color="#08275f" />
+              </Pressable>
+            </View>
+            <Text style={s.chipText}>{searchDescription(filters)}</Text>
+            <TextInput
+              autoFocus
+              accessibilityLabel="Nombre de la búsqueda"
+              style={s.field}
+              value={saveName}
+              onChangeText={setSaveName}
+              maxLength={80}
+              placeholder="Ej. Casa en Los Lagos"
+              placeholderTextColor="#677b96"
+            />
+            <Text style={s.chipText}>
+              Recibirás avisos de nuevas propiedades que coincidan. Puedes
+              pausarlos en Mis búsquedas.
+            </Text>
+            {!!saveError && (
+              <Text accessibilityRole="alert" style={{ color: "#a42c3a" }}>
+                {saveError}
+              </Text>
+            )}
+            <Pressable
+              disabled={saving || !saveName.trim()}
+              onPress={() => void saveSearch()}
+              style={s.apply}
+            >
+              {saving ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={s.applyText}>Guardar y activar alertas</Text>
+              )}
+            </Pressable>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
       <Modal
         visible={filterOpen}
         animationType="slide"

@@ -1,3 +1,4 @@
+import { propertyFilters } from './property-filters';
 import { membershipPlans, MembershipPlan } from './membership';
 import {
   Injectable,
@@ -731,52 +732,9 @@ export class EstateService {
         ]),
       );
     }
-    if (q.search) {
-      where.push(
-        '(p.title LIKE ? OR p.description LIKE ? OR c.name LIKE ? OR p.code=?)',
-      );
-      const term = `%${text(q.search, 100)}%`;
-      params.push(term, term, term, text(q.search, 100));
-    }
-    for (const key of [
-      'type_id',
-      'region_id',
-      'commune_id',
-      'advertiser_id',
-      'price_unit',
-      'availability',
-      'operation_type',
-    ])
-      if (q[key]) {
-        where.push(`p.${key}=?`);
-        params.push(text(q[key], 100));
-      }
-    for (const [key, operator, col] of [
-      ['min_price', '>=', 'price_amount'],
-      ['max_price', '<=', 'price_amount'],
-      ['min_area', '>=', 'built_area'],
-      ['max_area', '<=', 'built_area'],
-      ['bedrooms', '>=', 'bedrooms'],
-      ['bathrooms', '>=', 'bathrooms'],
-    ] as const)
-      if (q[key] !== undefined && q[key] !== '') {
-        if (col === 'price_amount' && !['CLP', 'UF'].includes(q.price_unit))
-          throw new BadRequestException(
-            'Selecciona CLP o UF para comparar precios.',
-          );
-        where.push(`p.${col}${operator}?`);
-        params.push(decimal(q[key], key));
-      }
-    if (q.featured === 'true') where.push('p.featured=1');
-    for (const a of text(q.amenities, 500)
-      .split(',')
-      .filter(Boolean)
-      .slice(0, 20)) {
-      where.push(
-        'EXISTS(SELECT 1 FROM property_amenities pa WHERE pa.property_id=p.id AND pa.amenity_id=?)',
-      );
-      params.push(a);
-    }
+    const filters = propertyFilters(q);
+    where.push(...filters.where);
+    params.push(...filters.params);
     const sorts: Record<string, string> = {
       recent: 'p.featured DESC,p.created_at DESC,p.id',
       oldest: 'p.created_at ASC,p.id',

@@ -9,6 +9,11 @@ import { MessagingService } from './messaging.service';
 import { PushService } from './push.service';
 import { ActivityService } from './activity.service';
 import { ActivityController } from './activity.controller';
+import { SavedSearchService } from './saved-search.service';
+import {
+  SavedSearchController,
+  SavedSearchCapabilitiesController,
+} from './saved-search.controller';
 import { DemoService } from './demo.service';
 import { PropertyVideosService } from './property-videos.service';
 import { PropertyVideosController } from './property-videos.controller';
@@ -35,6 +40,8 @@ import {
     }),
   ],
   controllers: [
+    SavedSearchController,
+    SavedSearchCapabilitiesController,
     ActivityController,
     EstateController,
     PropertyVideosController,
@@ -43,6 +50,7 @@ import {
     MessagingController,
   ],
   providers: [
+    SavedSearchService,
     ActivityService,
     EstateService,
     GoogleAuthService,

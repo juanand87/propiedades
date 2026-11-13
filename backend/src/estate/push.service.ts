@@ -11,6 +11,10 @@ import { JWT } from 'google-auth-library';
 import { readFileSync } from 'node:fs';
 import { Actor } from './rules';
 import { videoJoined, videoVisible } from './property-videos.service';
+import {
+  publicPropertyConditions,
+  publicPropertyJoins,
+} from './property-filters';
 
 type VideoDelivery = {
   comment_id: string;
@@ -301,6 +305,7 @@ export class PushService implements OnModuleInit, OnModuleDestroy {
       commentId: string;
       kind: 'comment' | 'reply';
     },
+    property?: { propertyId: string; matchId: string },
   ) {
     const { auth, projectId } = this.credentials();
     const { token: accessToken } = await auth.getAccessToken();
@@ -317,22 +322,33 @@ export class PushService implements OnModuleInit, OnModuleDestroy {
           message: {
             token: row.token,
             notification: {
-              title: activity
-                ? activity.kind === 'reply'
-                  ? 'Respondieron tu comentario'
-                  : 'Nuevo comentario en tu video'
-                : test
-                  ? 'Prueba de Proppix'
-                  : 'Nuevo mensaje en Proppix',
-              body: activity
-                ? activity.kind === 'reply'
-                  ? 'Recibiste una respuesta en un video de Proppix.'
-                  : 'Tu video recibió un comentario nuevo en Proppix.'
-                : test
-                  ? 'Las notificaciones de tu cuenta están funcionando.'
-                  : 'Tienes un mensaje nuevo. Toca para abrir la conversación.',
+              title: property
+                ? 'Nueva propiedad para tu búsqueda'
+                : activity
+                  ? activity.kind === 'reply'
+                    ? 'Respondieron tu comentario'
+                    : 'Nuevo comentario en tu video'
+                  : test
+                    ? 'Prueba de Proppix'
+                    : 'Nuevo mensaje en Proppix',
+              body: property
+                ? 'Encontramos una propiedad que coincide con tus filtros. Toca para verla.'
+                : activity
+                  ? activity.kind === 'reply'
+                    ? 'Recibiste una respuesta en un video de Proppix.'
+                    : 'Tu video recibió un comentario nuevo en Proppix.'
+                  : test
+                    ? 'Las notificaciones de tu cuenta están funcionando.'
+                    : 'Tienes un mensaje nuevo. Toca para abrir la conversación.',
             },
             data: {
+              ...(property
+                ? {
+                    type: 'property_match',
+                    propertyId: property.propertyId,
+                    searchMatchId: property.matchId,
+                  }
+                : {}),
               conversationId: row.conversation_id,
               messageId: row.message_id,
               ...(test ? { test: 'true' } : {}),
@@ -352,9 +368,11 @@ export class PushService implements OnModuleInit, OnModuleDestroy {
                 channel_id: 'messages',
                 sound: 'default',
                 icon: 'notification_icon',
-                tag: activity
-                  ? 'video-comment-' + activity.commentId
-                  : 'message-' + row.message_id,
+                tag: property
+                  ? 'property-match-' + property.matchId
+                  : activity
+                    ? 'video-comment-' + activity.commentId
+                    : 'message-' + row.message_id,
               },
             },
           },
@@ -441,6 +459,59 @@ export class PushService implements OnModuleInit, OnModuleDestroy {
       "DELETE FROM estate_video_push_deliveries WHERE status IN ('done','failed') AND due_at<UTC_TIMESTAMP()-INTERVAL 7 DAY LIMIT 1000",
     );
   }
+  private async flushSearchMatches() {
+    const [schema] = await this.db.query<{ n: number }[]>(
+      "SELECT COUNT(*) n FROM information_schema.tables WHERE table_schema=DATABASE() AND table_name='estate_search_push_deliveries'",
+    );
+    if (!Number(schema.n)) return;
+    const rows = await this.db.query<
+      { match_id: string; token: string; user_id: string; attempts: number }[]
+    >(
+      "SELECT CAST(match_id AS CHAR) match_id,token,user_id,attempts FROM estate_search_push_deliveries WHERE status='pending' AND due_at<=UTC_TIMESTAMP(3) ORDER BY due_at,match_id LIMIT 25",
+    );
+    for (const row of rows) {
+      const update = (status: string) =>
+        this.db.query(
+          'UPDATE estate_search_push_deliveries SET status=? WHERE match_id=? AND token=?',
+          [status, row.match_id, row.token],
+        );
+      const [event] = await this.db.query<{ property_id: string }[]>(
+        `SELECT p.id property_id ${publicPropertyJoins} JOIN estate_search_matches m ON m.property_id=p.id JOIN estate_saved_searches s ON s.id=m.search_id JOIN users recipient ON recipient.id=s.user_id AND recipient.isActive=1 JOIN estate_push_devices d ON d.user_id=s.user_id AND d.token=? WHERE m.id=? AND s.user_id=? AND s.enabled=1 AND m.read_at IS NULL AND ${publicPropertyConditions} AND p.availability='available'`,
+        [row.token, row.match_id, row.user_id],
+      );
+      if (!event || !validFcmToken(row.token)) {
+        await update('done');
+        continue;
+      }
+      if (row.attempts >= 12) {
+        await update('failed');
+        continue;
+      }
+      await this.db.query(
+        'UPDATE estate_search_push_deliveries SET attempts=attempts+1,due_at=TIMESTAMPADD(SECOND,?,UTC_TIMESTAMP(3)) WHERE match_id=? AND token=?',
+        [Math.min(3600, 30 * 2 ** row.attempts), row.match_id, row.token],
+      );
+      try {
+        const result = await this.sendFcm(
+          { token: row.token, message_id: row.match_id, conversation_id: '' },
+          false,
+          undefined,
+          { propertyId: event.property_id, matchId: row.match_id },
+        );
+        if (result === 'unregistered')
+          await this.db.query(
+            'DELETE FROM estate_push_devices WHERE token=? AND user_id=?',
+            [row.token, row.user_id],
+          );
+        await update(result === 'invalid' ? 'failed' : 'done');
+      } catch {
+        /* Keep persisted retry after transient FCM failure. */
+      }
+    }
+    await this.db.query(
+      "DELETE FROM estate_search_push_deliveries WHERE status IN ('done','failed') AND due_at<UTC_TIMESTAMP()-INTERVAL 7 DAY LIMIT 1000",
+    );
+  }
   async flush() {
     if (this.busy) return;
     // Do not consume queued attempts while the server credential is absent.
@@ -506,6 +577,7 @@ export class PushService implements OnModuleInit, OnModuleDestroy {
         "DELETE FROM estate_push_deliveries WHERE status IN ('done','failed') AND due_at<UTC_TIMESTAMP()-INTERVAL 7 DAY LIMIT 1000",
       );
       await this.flushVideoComments();
+      await this.flushSearchMatches();
     } finally {
       if (locked)
         await runner

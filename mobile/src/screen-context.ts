@@ -4,6 +4,7 @@ type Screen =
   | "catalog"
   | "messages"
   | "activity"
+  | "savedSearches"
   | "manage"
   | "account"
   | "recorder"

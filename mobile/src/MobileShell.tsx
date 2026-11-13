@@ -63,6 +63,7 @@ import { useMessageNotifications } from "./useMessageNotifications";
 import { NotificationVideoScreen } from "./NotificationVideoScreen";
 import { ActivityScreen } from "./ActivityScreen";
 import { ActivityBell } from "./ActivityBell";
+import { SavedSearchesScreen } from "./SavedSearchesScreen";
 
 type Tab = "feed" | "catalog" | "manage" | "messages" | "account";
 const sessionKey = IS_PRODUCTION
@@ -116,6 +117,7 @@ function AppContent() {
   const profileRoute = pathname.startsWith("/perfil/");
   const notificationVideoRoute = pathname.startsWith("/video/");
   const activityRoute = pathname === "/actividad";
+  const savedSearchRoute = pathname === "/busquedas";
   const {
     propertyId,
     from,
@@ -128,6 +130,7 @@ function AppContent() {
     recipientId,
     resumeVideoId,
     commentId,
+    savedSearchId,
   } = useGlobalSearchParams<{
     propertyId?: string;
     from?: Tab;
@@ -140,6 +143,7 @@ function AppContent() {
     recipientId?: string;
     resumeVideoId?: string;
     commentId?: string;
+    savedSearchId?: string;
   }>();
   const tab: Tab = propertyRoute
     ? from && from in routes
@@ -258,7 +262,8 @@ function AppContent() {
     !propertyRoute &&
     !detail &&
     !notificationVideoRoute &&
-    !activityRoute;
+    !activityRoute &&
+    !savedSearchRoute;
   const preparedVideos = useVideoPreload(videos, active, ready, !feedVisible);
   const feedRef = useRef<FlatList<Video>>(null),
     feedDragIndex = useRef(0),
@@ -940,6 +945,9 @@ function AppContent() {
   );
   const catalogScreen = (
     <PropertyCatalog
+      key={savedSearchId || "catalog"}
+      savedSearchId={savedSearchId}
+      session={session}
       activityUnread={activityUnread}
       favorites={favorites}
       onFavorite={(id) => void favorite(id)}
@@ -1338,6 +1346,12 @@ function AppContent() {
             onChanged={() => setActivityRevision((value) => value + 1)}
           />
         ),
+        savedSearches: (
+          <SavedSearchesScreen
+            key={session?.user.id || "guest"}
+            session={session}
+          />
+        ),
         active: tab,
         recorder: recordingRoute ? (
           <VideoRecorder
@@ -1438,6 +1452,14 @@ function AppContent() {
                 onPress={() => {
                   setAccountMenu(false);
                   setTab("account");
+                }}
+              />
+              <Button
+                label="Mis búsquedas"
+                secondary
+                onPress={() => {
+                  setAccountMenu(false);
+                  router.push("/busquedas");
                 }}
               />
               <Button

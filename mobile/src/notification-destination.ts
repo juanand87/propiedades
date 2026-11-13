@@ -1,6 +1,7 @@
 export type NotificationDestination =
   | { kind: "test" }
   | { kind: "conversation"; conversationId: string }
+  | { kind: "property"; propertyId: string; matchId: string }
   | { kind: "video"; videoId: string; commentId: string };
 
 const validId = (value: unknown): value is string =>
@@ -14,6 +15,17 @@ export function notificationDestination(
   if (!data || typeof data !== "object" || Array.isArray(data)) return null;
   const fields = data as Record<string, unknown>;
   if (fields.test === "true") return { kind: "test" };
+  if (
+    fields.type === "property_match" &&
+    validId(fields.propertyId) &&
+    typeof fields.searchMatchId === "string" &&
+    /^[1-9][0-9]{0,18}$/.test(fields.searchMatchId)
+  )
+    return {
+      kind: "property",
+      propertyId: fields.propertyId,
+      matchId: fields.searchMatchId,
+    };
   if (validId(fields.videoId) && validId(fields.commentId))
     return {
       kind: "video",

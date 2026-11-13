@@ -66,6 +66,57 @@ describe('message push delivery', () => {
       .mockResolvedValue({ token: 'test-access-token' });
   });
   afterEach(() => jest.restoreAllMocks());
+  it.each(['sent', 'offline', 'withdrawn'] as const)(
+    'handles saved-search push %s',
+    async (state) => {
+      const { service, query } = setup();
+      query.mockImplementation((sql: string) =>
+        Promise.resolve(
+          sql.includes('information_schema')
+            ? [{ n: 2 }]
+            : sql.startsWith('SELECT CAST(match_id')
+              ? [{ match_id: '17', token, user_id: 'recipient', attempts: 0 }]
+              : sql.startsWith('SELECT p.id property_id') &&
+                  state !== 'withdrawn'
+                ? [{ property_id: '00000000-0000-4000-8000-000000000001' }]
+                : [],
+        ),
+      );
+      const network = jest.spyOn(global, 'fetch');
+      if (state === 'offline') network.mockRejectedValue(new Error('offline'));
+      else
+        network.mockResolvedValue({
+          ok: true,
+          json: () => Promise.resolve({ name: 'accepted' }),
+        } as Response);
+      await service.flush();
+      if (state === 'withdrawn') expect(network).not.toHaveBeenCalled();
+      else if (state === 'sent') {
+        const payload = JSON.parse(
+          network.mock.calls[0][1]!.body as string,
+        ) as {
+          message: {
+            data: { type: string; propertyId: string; searchMatchId: string };
+          };
+        };
+        expect(payload.message.data).toMatchObject({
+          type: 'property_match',
+          searchMatchId: '17',
+          propertyId: '00000000-0000-4000-8000-000000000001',
+        });
+      }
+      if (state === 'offline')
+        expect(query).not.toHaveBeenCalledWith(
+          expect.stringContaining('estate_search_push_deliveries SET status=?'),
+          expect.anything(),
+        );
+      else
+        expect(query).toHaveBeenCalledWith(
+          expect.stringContaining('estate_search_push_deliveries SET status=?'),
+          ['done', '17', token],
+        );
+    },
+  );
   it('tests only the authenticated account devices and throttles retries', async () => {
     const { service, query } = setup();
     jest.spyOn(service, 'health').mockResolvedValue({
