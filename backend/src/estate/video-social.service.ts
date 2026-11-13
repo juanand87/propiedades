@@ -250,12 +250,37 @@ export class VideoSocialService {
       has_more: rows.length > 24,
     };
   }
-  async comments(id: string, actor?: Actor) {
+  async comments(id: string, actor?: Actor, commentId?: string) {
     await this.access(id, actor);
-    return this.db.query(
-      'SELECT c.id,c.body,c.created_at,c.user_id,r.parent_id,COALESCE(pp.display_name,pu.firstName) parent_name,COALESCE(p.display_name,u.firstName) display_name FROM estate_video_comments c LEFT JOIN estate_video_comment_replies r ON r.comment_id=c.id LEFT JOIN estate_video_comments parent ON parent.id=r.parent_id LEFT JOIN users pu ON CONVERT(pu.id USING utf8mb4) COLLATE utf8mb4_unicode_ci=parent.user_id AND pu.isActive=1 LEFT JOIN estate_video_profiles pp ON pp.user_id=parent.user_id AND pu.id IS NOT NULL JOIN users u ON CONVERT(u.id USING utf8mb4) COLLATE utf8mb4_unicode_ci=c.user_id LEFT JOIN estate_video_profiles p ON p.user_id=c.user_id WHERE c.video_id=? AND u.isActive=1 ORDER BY c.created_at DESC,c.id LIMIT 100',
+    const select =
+      'SELECT c.id,c.body,c.created_at,c.user_id,r.parent_id,COALESCE(pp.display_name,pu.firstName) parent_name,COALESCE(p.display_name,u.firstName) display_name FROM estate_video_comments c LEFT JOIN estate_video_comment_replies r ON r.comment_id=c.id LEFT JOIN estate_video_comments parent ON parent.id=r.parent_id LEFT JOIN users pu ON CONVERT(pu.id USING utf8mb4) COLLATE utf8mb4_unicode_ci=parent.user_id AND pu.isActive=1 LEFT JOIN estate_video_profiles pp ON pp.user_id=parent.user_id AND pu.id IS NOT NULL JOIN users u ON CONVERT(u.id USING utf8mb4) COLLATE utf8mb4_unicode_ci=c.user_id LEFT JOIN estate_video_profiles p ON p.user_id=c.user_id WHERE c.video_id=? AND u.isActive=1';
+    type CommentRow = {
+      id: string;
+      parent_id?: string;
+      [key: string]: unknown;
+    };
+    const rows = await this.db.query<CommentRow[]>(
+      select + ' ORDER BY c.created_at DESC,c.id LIMIT 100',
       [id],
     );
+    if (!commentId) return rows;
+    const targetId = uuid(commentId);
+    const [target] = await this.db.query<CommentRow[]>(
+      select + ' AND c.id=? LIMIT 1',
+      [id, targetId],
+    );
+    if (!target)
+      throw new NotFoundException('Este comentario ya no está disponible.');
+    const context: CommentRow[] = [];
+    if (target.parent_id && !rows.some((row) => row.id === target.parent_id)) {
+      const [parent] = await this.db.query<CommentRow[]>(
+        select + ' AND c.id=? LIMIT 1',
+        [id, target.parent_id],
+      );
+      if (parent) context.push(parent);
+    }
+    if (!rows.some((row) => row.id === target.id)) context.push(target);
+    return [...context, ...rows];
   }
   async comment(actor: Actor, id: string, body: any, ip: string) {
     const video = await this.access(id, actor);

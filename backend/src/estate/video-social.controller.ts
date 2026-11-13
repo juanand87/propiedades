@@ -79,8 +79,12 @@ export class VideoSocialController {
   }
   @Get('videos/:id/comments')
   @UseGuards(OptionalEstateGuard)
-  comments(@Param('id') id: string, @Req() req: any) {
-    return this.social.comments(id, req.user);
+  comments(
+    @Param('id') id: string,
+    @Req() req: any,
+    @Query('comment_id') commentId?: string,
+  ) {
+    return this.social.comments(id, req.user, commentId);
   }
   @Post('videos/:id/comments')
   @UseGuards(EstateGuard)

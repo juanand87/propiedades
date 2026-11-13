@@ -4,6 +4,7 @@ import * as Notifications from "expo-notifications";
 import { AndroidImportance } from "expo-notifications";
 import { useGlobalSearchParams, usePathname, useRouter } from "expo-router";
 import { api, Session } from "./api";
+import { notificationDestination } from "./notification-destination";
 
 let visibleConversation: string | undefined;
 Notifications.setNotificationHandler({
@@ -20,7 +21,10 @@ Notifications.setNotificationHandler({
   },
 });
 
-export function useMessageNotifications(session: Session | null) {
+export function useMessageNotifications(
+  session: Session | null,
+  navigationReady = true,
+) {
   const router = useRouter();
   const pathname = usePathname();
   const params = useGlobalSearchParams<{ conversationId?: string }>();
@@ -38,7 +42,7 @@ export function useMessageNotifications(session: Session | null) {
     };
   }, [pathname, params.conversationId]);
   useEffect(() => {
-    if (!session || Platform.OS === "web") return;
+    if (!session || !navigationReady || Platform.OS === "web") return;
     stopping.current = false;
     let live = true;
     let registering = false;
@@ -109,29 +113,35 @@ export function useMessageNotifications(session: Session | null) {
       foreground.remove();
       tokenChange.remove();
     };
-  }, [session, retry]);
+  }, [session, retry, navigationReady]);
   useEffect(() => {
-    if (!session || Platform.OS === "web") return;
+    if (!session || !navigationReady || Platform.OS === "web") return;
     const open = (response: Notifications.NotificationResponse | null) => {
       if (
         !response ||
         handled.current === response.notification.request.identifier
       )
         return;
-      if (response.notification.request.content.data?.test === "true") {
-        router.push("/mensajes");
-        return;
-      }
-      const conversationId =
-        response.notification.request.content.data?.conversationId;
-      if (
-        typeof conversationId !== "string" ||
-        !/^[a-f0-9-]{36}$/i.test(conversationId)
-      )
-        return;
+      const destination = notificationDestination(
+        response.notification.request.content.data,
+      );
+      if (!destination) return;
       handled.current = response.notification.request.identifier;
-      router.push({ pathname: "/mensajes", params: { conversationId } });
-      void Notifications.clearLastNotificationResponseAsync();
+      if (destination.kind === "video")
+        router.push({
+          pathname: "/video/[videoId]",
+          params: {
+            videoId: destination.videoId,
+            commentId: destination.commentId,
+          },
+        });
+      else if (destination.kind === "conversation")
+        router.push({
+          pathname: "/mensajes",
+          params: { conversationId: destination.conversationId },
+        });
+      else router.push("/mensajes");
+      void Notifications.clearLastNotificationResponseAsync().catch(() => {});
     };
     let live = true;
     void Notifications.getLastNotificationResponseAsync().then((response) => {
@@ -143,7 +153,7 @@ export function useMessageNotifications(session: Session | null) {
       live = false;
       listener.remove();
     };
-  }, [session, router]);
+  }, [session, router, navigationReady]);
   async function unregister() {
     stopping.current = true;
     await pendingRegistration.current;

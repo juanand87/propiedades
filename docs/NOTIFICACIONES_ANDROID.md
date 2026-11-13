@@ -30,4 +30,10 @@ En la app, Mensajes → Probar aviso en mi teléfono envía a los dispositivos d
 
 Ejecutar database/NOTIFICACIONES_COMENTARIOS.sql. Se guarda una entrega por comentario y dispositivo en la misma transacción del comentario. Un comentario avisa al dueño del video; una respuesta avisa además al autor del comentario padre. Si ambos destinatarios son el mismo usuario, se envía un único aviso de respuesta. Los comentarios propios generan avisos por ahora; se pueden desactivar con PUSH_SELF_ACTIVITY_ENABLED=false sin cambiar el APK. El trabajador procesa la cola cada 10 segundos, aplica reintentos a errores temporales y elimina dispositivos UNREGISTERED. Comprueba que el video siga accesible al destinatario y que comentario, autor y cuenta receptora existan y estén activos. No se incluye el texto privado del comentario en la pantalla bloqueada.
 
-La versión 1.0.10 ya puede recibir estos avisos: no es necesaria otra instalación para esta activación del backend. El enlace de video se incluye en los datos de FCM para la navegación de las siguientes versiones.
+La versión 1.0.10 ya puede recibir estos avisos. Desde la versión 1.0.14, tocar un aviso de comentario o respuesta abre su video y desplaza la lista hasta el comentario resaltado. Los mensajes siguen abriendo su conversación. La navegación espera a que termine la restauración de sesión y evita procesar dos veces el mismo aviso.
+
+GET /api/videos/:id/comments?comment_id=UUID incluye el comentario solicitado y su padre, aunque no estén entre los últimos 100. Mantiene los permisos del video y responde 404 si el comentario fue eliminado o pertenece a otro video. No requiere una migración adicional.
+
+Prueba en teléfono con 1.0.14: generar un comentario propio, tocar el aviso y comprobar video y comentario resaltado; repetir con una respuesta y con la app cerrada. Comprobar también un aviso de mensaje. La recepción física y la apertura con la app cerrada requieren esta prueba manual.
+
+Validación local: scripts/mobile/verify-notification-destination.cjs valida los datos de navegación sin red; scripts/mobile/verify-notification-comments.cjs verifica SQL y permisos en la base aislada local y revierte todos sus cambios.

@@ -60,6 +60,7 @@ import { randomUUID } from "expo-crypto";
 import { PropertySlideshow } from "./PropertySlideshow";
 import { MessagesScreen } from "./MessagesScreen";
 import { useMessageNotifications } from "./useMessageNotifications";
+import { NotificationVideoScreen } from "./NotificationVideoScreen";
 
 type Tab = "feed" | "catalog" | "manage" | "messages" | "account";
 const sessionKey = IS_PRODUCTION
@@ -111,6 +112,7 @@ function AppContent() {
   const propertyRoute = pathname.startsWith("/property/");
   const recordingRoute = pathname === "/grabar";
   const profileRoute = pathname.startsWith("/perfil/");
+  const notificationVideoRoute = pathname.startsWith("/video/");
   const {
     propertyId,
     from,
@@ -122,6 +124,7 @@ function AppContent() {
     conversationId,
     recipientId,
     resumeVideoId,
+    commentId,
   } = useGlobalSearchParams<{
     propertyId?: string;
     from?: Tab;
@@ -133,6 +136,7 @@ function AppContent() {
     conversationId?: string;
     recipientId?: string;
     resumeVideoId?: string;
+    commentId?: string;
   }>();
   const tab: Tab = propertyRoute
     ? from && from in routes
@@ -164,7 +168,7 @@ function AppContent() {
     [favorites, setFavorites] = useState<string[]>([]),
     [detail, setDetail] = useState<Property | null>(null),
     [detailBusy, setDetailBusy] = useState(false);
-  const notifications = useMessageNotifications(session);
+  const notifications = useMessageNotifications(session, ready);
   const setTab = (value: Tab) => {
     setDetail(null);
     if (value === "feed" && !videos.length) void loadFeed(true);
@@ -210,7 +214,12 @@ function AppContent() {
     [height, setHeight] = useState(1),
     [foreground, setForeground] = useState(AppState.currentState === "active");
   const feedVisible =
-    ready && foreground && tab === "feed" && !propertyRoute && !detail;
+    ready &&
+    foreground &&
+    tab === "feed" &&
+    !propertyRoute &&
+    !detail &&
+    !notificationVideoRoute;
   const preparedVideos = useVideoPreload(videos, active, ready, !feedVisible);
   const feedRef = useRef<FlatList<Video>>(null),
     feedDragIndex = useRef(0),
@@ -1272,6 +1281,14 @@ function AppContent() {
             session={session}
             userId={userId}
             propertyFavorite={{ ids: favorites, toggle: favorite }}
+          />
+        ),
+        notificationVideo: (
+          <NotificationVideoScreen
+            key={videoId + ":" + commentId}
+            videoId={videoId}
+            commentId={commentId}
+            session={session}
           />
         ),
         active: tab,

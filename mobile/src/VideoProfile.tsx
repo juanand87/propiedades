@@ -61,12 +61,14 @@ function FullVideoPlayer({
   session,
   onChanged,
   propertyFavorite,
+  initialCommentId,
 }: {
   video: ProfileVideo;
   active: boolean;
   session: Session | null;
   onChanged: () => void;
   propertyFavorite?: PropertyFavorite;
+  initialCommentId?: string;
 }) {
   const [paused, setPaused] = useState(false),
     [foreground, setForeground] = useState(AppState.currentState === "active"),
@@ -128,16 +130,18 @@ function FullVideoPlayer({
         propertyFavorite={propertyFavorite}
         paused={paused}
         onResume={() => setPaused(false)}
+        initialCommentId={initialCommentId}
       />
     </View>
   );
 }
-function FullVideo(props: {
+export function FullVideo(props: {
   video: ProfileVideo;
   active: boolean;
   session: Session | null;
   onChanged: () => void;
   propertyFavorite?: PropertyFavorite;
+  initialCommentId?: string;
 }) {
   const own = props.video.created_by === props.session?.user.id;
   const [url, setUrl] = useState<string | null>(own ? null : props.video.url);

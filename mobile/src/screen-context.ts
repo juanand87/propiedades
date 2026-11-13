@@ -6,7 +6,8 @@ type Screen =
   | "manage"
   | "account"
   | "recorder"
-  | "videoProfile";
+  | "videoProfile"
+  | "notificationVideo";
 // State stays in the persistent layout; route components mount only their own UI.
 export const ScreenContext = createContext<
   (Record<Screen, ReactNode> & { active: Screen }) | null

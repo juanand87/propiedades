@@ -1,4 +1,10 @@
-import { ComponentRef, useEffect, useRef, useState } from "react";
+import {
+  ComponentRef,
+  useEffect,
+  useEffectEvent,
+  useRef,
+  useState,
+} from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -30,12 +36,14 @@ export function SocialVideoActions({
   propertyFavorite,
   paused = false,
   onResume,
+  initialCommentId,
 }: {
   videoId: string;
   session: Session | null;
   onChanged?: () => void;
   paused?: boolean;
   onResume?: () => void;
+  initialCommentId?: string;
   propertyFavorite?: { ids: string[]; toggle: (id: string) => void };
   propertyActions?: {
     favorite: boolean;
@@ -48,6 +56,13 @@ export function SocialVideoActions({
   const router = useRouter();
   const submitLock = useRef(false);
   const commentInput = useRef<ComponentRef<typeof TextInput>>(null);
+  const commentList = useRef<ComponentRef<typeof ScrollView>>(null);
+  const focusWhenShown = useRef(true);
+  const commentPositions = useRef(new Map<string, number>());
+  const targetComment = useRef<string | undefined>(undefined);
+  const [highlightedComment, setHighlightedComment] = useState<
+    string | undefined
+  >(undefined);
   const [data, setData] = useState<VideoSocialData | null>(null);
   const [panel, setPanel] = useState<"edit" | "comments" | null>(null);
   const [error, setError] = useState("");
@@ -113,13 +128,40 @@ export function SocialVideoActions({
     setPropertyPage(r.page);
     setPropertyPages(r.pages);
   }
-  async function openComments() {
+  function scrollToTarget() {
+    const offset = targetComment.current
+      ? commentPositions.current.get(targetComment.current)
+      : undefined;
+    if (offset !== undefined)
+      commentList.current?.scrollTo({
+        y: Math.max(0, offset - 12),
+        animated: false,
+      });
+  }
+  async function openComments(commentId?: string, focus = true) {
+    focusWhenShown.current = focus;
+    targetComment.current = commentId;
+    commentPositions.current.clear();
+    setHighlightedComment(commentId);
     setReply(null);
     setPanel("comments");
     await run(async () =>
-      setComments(await api(`/videos/${videoId}/comments`, { token })),
+      setComments(
+        await api(
+          `/videos/${videoId}/comments${commentId ? `?comment_id=${encodeURIComponent(commentId)}` : ""}`,
+          { token },
+        ),
+      ),
     );
   }
+  const openNotificationComment = useEffectEvent(() => {
+    void openComments(initialCommentId, false);
+  });
+  useEffect(() => {
+    if (!initialCommentId) return;
+    const timer = setTimeout(() => openNotificationComment(), 0);
+    return () => clearTimeout(timer);
+  }, [initialCommentId, videoId, token]);
   async function submitComment() {
     const body = comment.trim();
     if (!body || busy || submitLock.current || !requireSession()) return;
@@ -291,13 +333,18 @@ export function SocialVideoActions({
           data?.liked,
           data?.liked ? "Quitar me gusta al video" : "Dar me gusta al video",
         )}
-        {action(
-          "comment",
-          String(data?.comments ?? 0),
-          () => void openComments(),
-          false,
-          `Comentarios: ${data?.comments ?? 0}`,
-        )}
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`Comentarios: ${data?.comments ?? 0}`}
+          disabled={busy}
+          onPress={() => void openComments()}
+          style={({ pressed }) => [s.action, pressed && { opacity: 0.7 }]}
+        >
+          <View style={s.actionIcon}>
+            <ProppixIcon name="comment" size={37} color="#fff" filled />
+          </View>
+          <Text style={s.count}>{data?.comments ?? 0}</Text>
+        </Pressable>
         {propertyActions &&
           action(
             "bookmark",
@@ -427,7 +474,7 @@ export function SocialVideoActions({
         animationType="slide"
         onRequestClose={() => setPanel(null)}
         onShow={() => {
-          if (panel === "comments")
+          if (panel === "comments" && focusWhenShown.current)
             requestAnimationFrame(() => commentInput.current?.focus());
         }}
       >
@@ -457,6 +504,8 @@ export function SocialVideoActions({
               </Text>
             )}
             <ScrollView
+              ref={commentList}
+              onContentSizeChange={() => scrollToTarget()}
               style={{ flexShrink: 1 }}
               keyboardShouldPersistTaps="always"
               keyboardDismissMode="none"
@@ -599,7 +648,26 @@ export function SocialVideoActions({
                     <Text style={s.muted}>Sé el primero en comentar.</Text>
                   )}
                   {comments.map((c) => (
-                    <View key={c.id} style={s.comment}>
+                    <View
+                      key={c.id}
+                      style={[
+                        s.comment,
+                        c.id === highlightedComment && s.highlightedComment,
+                      ]}
+                      onLayout={(event) => {
+                        commentPositions.current.set(
+                          c.id,
+                          event.nativeEvent.layout.y,
+                        );
+                        if (c.id === targetComment.current)
+                          requestAnimationFrame(scrollToTarget);
+                      }}
+                    >
+                      {c.id === highlightedComment && (
+                        <Text style={s.highlightLabel}>
+                          Comentario de la notificación
+                        </Text>
+                      )}
                       <Text style={s.name}>{c.display_name}</Text>
                       {c.parent_id && (
                         <Text style={s.muted}>
@@ -847,5 +915,18 @@ const s = StyleSheet.create({
     paddingVertical: 14,
     borderBottomColor: videoColors.border,
     borderBottomWidth: 1,
+  },
+  highlightedComment: {
+    backgroundColor: "#164474",
+    borderColor: "#31c8ee",
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+  },
+  highlightLabel: {
+    color: "#8be3ff",
+    fontSize: 12,
+    fontWeight: "700",
+    marginBottom: 8,
   },
 });
