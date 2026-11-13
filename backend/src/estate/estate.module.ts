@@ -19,6 +19,8 @@ import { PropertyVideosService } from './property-videos.service';
 import { PropertyVideosController } from './property-videos.controller';
 import { ImageStorageService } from './image-storage.service';
 import { VideoStorageService } from './video-storage.service';
+import { VideoHlsService } from './video-hls.service';
+import { VideoHlsController } from './video-hls.controller';
 import { VideoSocialService } from './video-social.service';
 import {
   VideoSocialController,
@@ -40,6 +42,7 @@ import {
     }),
   ],
   controllers: [
+    VideoHlsController,
     SavedSearchController,
     SavedSearchCapabilitiesController,
     ActivityController,
@@ -50,6 +53,7 @@ import {
     MessagingController,
   ],
   providers: [
+    VideoHlsService,
     SavedSearchService,
     ActivityService,
     EstateService,

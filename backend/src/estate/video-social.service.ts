@@ -129,18 +129,21 @@ export class VideoSocialService {
       `SELECT v.id,v.title,v.status,v.property_id,v.created_by,p.title property_title,r.duration_ms,(SELECT COUNT(*) FROM estate_video_likes l WHERE l.video_id=v.id) likes ${videoJoined} LEFT JOIN property_video_recordings r ON r.video_id=v.id WHERE ${where} AND ${visibility} ORDER BY v.created_at DESC,v.id LIMIT 24 OFFSET ?`,
       [userId, (page - 1) * 24],
     );
+    const publicHls = await this.videos.hlsUrls(
+      rows.map((v: { id: string }) => v.id),
+    );
     const items = await Promise.all(
-      rows.map(async (v: any) => ({
-        ...v,
-        thumbnail_url:
-          own && !saved
-            ? (await this.videos.preview(actor!, v.id)).thumbnail_url
-            : `/api/videos/${v.id}/thumbnail`,
-        url:
-          own && !saved
-            ? (await this.videos.preview(actor!, v.id)).url
-            : `/api/videos/${v.id}/content`,
-      })),
+      rows.map(async (v: { id: string; [key: string]: unknown }) => {
+        const preview =
+          own && !saved ? await this.videos.preview(actor!, v.id) : null;
+        return {
+          ...v,
+          thumbnail_url:
+            preview?.thumbnail_url || `/api/videos/${v.id}/thumbnail`,
+          url: preview?.url || `/api/videos/${v.id}/content`,
+          hls_url: preview?.hls_url || publicHls.get(v.id) || null,
+        };
+      }),
     );
     return {
       items,
@@ -182,6 +185,7 @@ export class VideoSocialService {
       liked: !!Number(mine.liked),
       saved: !!Number(mine.saved),
       can_edit: actor?.id === v.created_by || actor?.role === 'admin',
+      hls_url: (await this.videos.hlsUrls([id])).get(id) || null,
       share_url: `https://propiedades-eta.vercel.app/descubrir?video=${id}`,
     };
   }

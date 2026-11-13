@@ -11,6 +11,25 @@ const env = {
 };
 const id = '00000000-0000-4000-8000-000000000001';
 describe('private video storage', () => {
+  it('keeps HLS segments private and signs them with their video transport type', async () => {
+    const storage = new VideoStorageService(new ConfigService(env));
+    const send = jest.fn().mockResolvedValue({});
+    (storage as any).client.send = send;
+    const key = `propiedades/pruebas/videos/hls/${id}/${id}/q360/seg00000.ts`;
+    await storage.put(key, Buffer.from('ts'));
+    expect(send.mock.calls[0][0].input).toMatchObject({
+      ACL: 'private',
+      ContentType: 'video/mp2t',
+      CacheControl: 'private,max-age=120',
+    });
+    const url = new URL(await storage.signedRead(key));
+    expect(url.searchParams.get('response-content-type')).toBe('video/mp2t');
+    expect(url.searchParams.get('response-cache-control')).toBe(
+      'private,max-age=120',
+    );
+    expect(url.searchParams.get('X-Amz-Expires')).toBe('120');
+    storage.onModuleDestroy();
+  });
   it('stores MP4 files as private and signs short-lived playback URLs', async () => {
     const storage = new VideoStorageService(new ConfigService(env)),
       send = jest.fn().mockResolvedValue({});

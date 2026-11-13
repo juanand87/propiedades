@@ -27,6 +27,7 @@ export type Property = {
   };
 };
 export type Video = {
+  hls_url?: string | null;
   id: string;
   thumbnail_url?: string;
   property_id: string | null;
@@ -88,7 +89,12 @@ if (!allowed.includes(API_URL))
     "La API configurada no corresponde al entorno de Propiedades seleccionado.",
   );
 export function mediaUrl(url: string) {
+  const hls =
+    /^\/api\/videos\/[a-f0-9-]{36}\/hls\/master\.m3u8\?v=[a-f0-9-]{36}(?:&signature=[A-Za-z0-9_.%\-]+)?$/i.test(
+      url,
+    );
   if (
+    !hls &&
     !/^\/api\/(media|videos)\/[a-f0-9-]{36}(\/(content|preview|thumbnail))?(\?signature=[^\s]*)?$/i.test(
       url,
     )

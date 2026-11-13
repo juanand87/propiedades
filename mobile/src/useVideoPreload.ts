@@ -6,6 +6,7 @@ import {
   VideoPlayer,
 } from "expo-video";
 import { mediaUrl, Video } from "./api";
+import { preferredVideoUrl, playbackSource } from "./video-source";
 
 type PreparedVideo = {
   url: string;
@@ -37,7 +38,11 @@ export function useVideoPreload(
       : [];
     let changed = false;
     for (const [id, entry] of entries) {
-      if (!wanted.some((video) => video.id === id && video.url === entry.url)) {
+      if (
+        !wanted.some(
+          (video) => video.id === id && preferredVideoUrl(video) === entry.url,
+        )
+      ) {
         entry.unsubscribe();
         entry.player.release();
         entries.delete(id);
@@ -61,13 +66,20 @@ export function useVideoPreload(
           if (video.thumbnail_url)
             void Image.prefetch(mediaUrl(video.thumbnail_url)).catch(() => {});
           const player = createVideoPlayer(null);
+          let fallback = false;
           const listener = player.addListener("statusChange", (event) => {
+            if (event.status === "error" && video.hls_url && !fallback) {
+              fallback = true;
+              void player
+                .replaceAsync(playbackSource(video.url))
+                .catch(() => {});
+            }
             if (event.status === "readyToPlay")
               setGeneration((value) => value + 1);
           });
           const entry = {
             player,
-            url: video.url,
+            url: preferredVideoUrl(video),
             unsubscribe: () => listener.remove(),
             role: "",
           };
@@ -83,11 +95,7 @@ export function useVideoPreload(
             prioritizeTimeOverSizeThreshold: false,
           };
           void player
-            .replaceAsync({
-              uri: mediaUrl(video.url),
-              contentType: "progressive",
-              useCaching: true,
-            })
+            .replaceAsync(playbackSource(preferredVideoUrl(video)))
             .catch(() => {});
         }
       }

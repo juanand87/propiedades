@@ -43,6 +43,10 @@ function Player({
   useEffect(() => {
     const sub = player.addListener("statusChange", (event) => {
       setLoading(event.status === "loading");
+      if (event.status === "readyToPlay") {
+        if (playingAllowed.current) player.play();
+        else player.pause();
+      }
       setError(
         event.status === "error" ? "No se pudo reproducir este video." : "",
       );

@@ -32,6 +32,12 @@ export function videoSpacesConfig(env: Record<string, any>) {
 }
 export function assertVideoObjectKey(key: string) {
   if (
+    /^propiedades\/(pruebas\/)?videos\/hls\/[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}\/[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}\/q(360|540|720)\/seg[0-9]{5}\.ts$/.test(
+      key,
+    )
+  )
+    return;
+  if (
     !/^propiedades\/(pruebas\/)?videos\/[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}\.mp4$/.test(
       key,
     )

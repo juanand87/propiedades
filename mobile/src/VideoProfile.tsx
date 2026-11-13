@@ -1,3 +1,4 @@
+import { playbackSource, preferredVideoUrl } from "./video-source";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -73,8 +74,10 @@ function FullVideoPlayer({
   const [paused, setPaused] = useState(false),
     [foreground, setForeground] = useState(AppState.currentState === "active"),
     [error, setError] = useState("");
+  const fallbackUsed = useRef(false);
+  const allowedToPlay = useRef(false);
   const player = useVideoPlayer(
-    { uri: mediaUrl(video.url), useCaching: true, contentType: "progressive" },
+    playbackSource(preferredVideoUrl(video)),
     (p) => {
       p.loop = true;
       p.muted = false;
@@ -93,11 +96,21 @@ function FullVideoPlayer({
     return () => sub.remove();
   }, []);
   useEffect(() => {
-    if (active && foreground && !paused) player.play();
+    allowedToPlay.current = active && foreground && !paused;
+    if (allowedToPlay.current) player.play();
     else player.pause();
   }, [active, foreground, paused, player]);
   useEffect(() => {
     const sub = player.addListener("statusChange", (e) => {
+      if (e.status === "error" && video.hls_url && !fallbackUsed.current) {
+        fallbackUsed.current = true;
+        void player.replaceAsync(playbackSource(video.url)).catch(() => {});
+        return;
+      }
+      if (e.status === "readyToPlay") {
+        if (allowedToPlay.current) player.play();
+        else player.pause();
+      }
       if (e.status === "error")
         setError(
           "No se pudo reproducir. Cierra y vuelve a abrir el video para renovar el acceso.",
@@ -105,7 +118,7 @@ function FullVideoPlayer({
       else setError("");
     });
     return () => sub.remove();
-  }, [player]);
+  }, [player, video.hls_url, video.url]);
   return (
     <View style={StyleSheet.absoluteFill}>
       <Pressable
@@ -145,15 +158,22 @@ export function FullVideo(props: {
 }) {
   const own = props.video.created_by === props.session?.user.id;
   const [url, setUrl] = useState<string | null>(own ? null : props.video.url);
+  const [hlsUrl, setHlsUrl] = useState(props.video.hls_url);
   const [error, setError] = useState("");
   useEffect(() => {
     if (!own) return;
     let live = true;
-    void api<{ url: string }>(`/manage/videos/${props.video.id}/preview`, {
-      token: props.session?.access_token,
-    })
+    void api<{ url: string; hls_url?: string | null }>(
+      `/manage/videos/${props.video.id}/preview`,
+      {
+        token: props.session?.access_token,
+      },
+    )
       .then((r) => {
-        if (live) setUrl(r.url);
+        if (live) {
+          setUrl(r.url);
+          setHlsUrl(r.hls_url);
+        }
       })
       .catch((e) => {
         if (live) setError(e.message);
@@ -163,7 +183,10 @@ export function FullVideo(props: {
     };
   }, [own, props.video.id, props.session?.access_token]);
   return url ? (
-    <FullVideoPlayer {...props} video={{ ...props.video, url }} />
+    <FullVideoPlayer
+      {...props}
+      video={{ ...props.video, url, hls_url: hlsUrl }}
+    />
   ) : error ? (
     <Text style={s.playerError}>{error}</Text>
   ) : (

@@ -38,14 +38,15 @@ export function NotificationVideoScreen({
           `/videos/${encodeURIComponent(videoId)}/social`,
           { token, signal: controller.signal },
         );
+        let hlsUrl = data.hls_url;
         let url = `/api/videos/${data.id}/content`;
         if (data.can_edit && data.creator.id !== session?.user.id) {
-          url = (
-            await api<{ url: string }>(`/manage/videos/${data.id}/preview`, {
-              token,
-              signal: controller.signal,
-            })
-          ).url;
+          const preview = await api<{ url: string; hls_url?: string | null }>(
+            `/manage/videos/${data.id}/preview`,
+            { token, signal: controller.signal },
+          );
+          url = preview.url;
+          hlsUrl = preview.hls_url;
         }
         if (!controller.signal.aborted)
           setVideo({
@@ -58,6 +59,7 @@ export function NotificationVideoScreen({
             duration_ms: null,
             likes: data.likes,
             url,
+            hls_url: hlsUrl,
           });
       } catch (error) {
         if (!controller.signal.aborted)

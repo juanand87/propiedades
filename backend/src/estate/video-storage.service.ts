@@ -74,9 +74,11 @@ export class VideoStorageService implements OnModuleDestroy {
           Key: key,
           Body: bytes,
           ContentLength: bytes.length,
-          ContentType: 'video/mp4',
+          ContentType: key.endsWith('.ts') ? 'video/mp2t' : 'video/mp4',
           ACL: 'private',
-          CacheControl: 'private,no-store',
+          CacheControl: key.endsWith('.ts')
+            ? 'private,max-age=120'
+            : 'private,no-store',
         }),
       );
     } catch {
@@ -94,8 +96,12 @@ export class VideoStorageService implements OnModuleDestroy {
         ? new HeadObjectCommand(input)
         : new GetObjectCommand({
             ...input,
-            ResponseContentType: 'video/mp4',
-            ResponseCacheControl: 'private,no-store',
+            ResponseContentType: key.endsWith('.ts')
+              ? 'video/mp2t'
+              : 'video/mp4',
+            ResponseCacheControl: key.endsWith('.ts')
+              ? 'private,max-age=120'
+              : 'private,no-store',
           }),
       { expiresIn: 120 },
     );
@@ -111,6 +117,23 @@ export class VideoStorageService implements OnModuleDestroy {
         'La retirada del video de Spaces quedó pendiente.',
       );
     }
+  }
+  async readOriginal(key: string) {
+    const { client, config } = this.ready(key);
+    const object = await client.send(
+      new GetObjectCommand({ Bucket: config.bucket, Key: key }),
+    );
+    if (!object.Body)
+      throw new ServiceUnavailableException('Video no disponible.');
+    const chunks: Buffer[] = [];
+    let size = 0;
+    for await (const part of object.Body as AsyncIterable<Uint8Array>) {
+      size += part.length;
+      if (size > 50 * 1024 * 1024)
+        throw new ServiceUnavailableException('Video demasiado grande.');
+      chunks.push(Buffer.from(part));
+    }
+    return Buffer.concat(chunks);
   }
   onModuleDestroy() {
     this.client?.destroy();

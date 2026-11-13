@@ -39,6 +39,7 @@ describe('private property video previews', () => {
       estate as any,
       { enabled: false } as any,
       jwt,
+      { urls: async () => new Map(), available: async () => false } as any,
     );
   });
   it('issues a two-minute capability bound to a single video and user', async () => {
@@ -113,8 +114,22 @@ describe('private property video previews', () => {
     );
   });
   it('does not treat two missing advertiser IDs as ownership of a standalone video', async () => {
-    db.query.mockResolvedValue([{ id: videoId, size_bytes: 1024, created_by: actor.id, advertiser_id: null }]);
-    await expect(service.preview({ ...actor, id: 'another-user', advertiser_id: null as any }, videoId)).rejects.toThrow('no te pertenece');
-    await expect(service.preview({ ...actor, advertiser_id: undefined }, videoId)).resolves.toHaveProperty('url');
+    db.query.mockResolvedValue([
+      {
+        id: videoId,
+        size_bytes: 1024,
+        created_by: actor.id,
+        advertiser_id: null,
+      },
+    ]);
+    await expect(
+      service.preview(
+        { ...actor, id: 'another-user', advertiser_id: null as any },
+        videoId,
+      ),
+    ).rejects.toThrow('no te pertenece');
+    await expect(
+      service.preview({ ...actor, advertiser_id: undefined }, videoId),
+    ).resolves.toHaveProperty('url');
   });
 });

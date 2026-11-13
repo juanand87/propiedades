@@ -30,8 +30,9 @@ import {
 import { EstateService } from './estate.service';
 import { VideoStorageService } from './video-storage.service';
 
-export const videoVisible = `v.status='published' AND creator.isActive=1 AND (v.property_id IS NULL OR (p.publication_status='published' AND a.status='approved' AND u.isActive=1))`;
-export const videoJoined = `FROM property_videos v JOIN users creator ON CONVERT(creator.id USING utf8mb4) COLLATE utf8mb4_unicode_ci=v.created_by LEFT JOIN properties p ON p.id=v.property_id LEFT JOIN advertisers a ON a.id=p.advertiser_id LEFT JOIN users u ON CONVERT(u.id USING utf8mb4) COLLATE utf8mb4_unicode_ci=a.user_id`;
+import { videoVisible, videoJoined } from './video-visibility';
+export { videoVisible, videoJoined } from './video-visibility';
+import { VideoHlsService } from './video-hls.service';
 const visible = videoVisible,
   joined = videoJoined;
 @Injectable()
@@ -44,6 +45,7 @@ export class PropertyVideosService {
     private estate: EstateService,
     private storage: VideoStorageService,
     private jwt: JwtService,
+    private hls: VideoHlsService,
   ) {}
   private guard() {
     assertPropertyVideos(
@@ -74,11 +76,12 @@ export class PropertyVideosService {
       videoStorage: this.storage.enabled ? 'spaces' : 'local',
     };
   }
-  capabilities() {
+  async capabilities() {
     try {
       this.guard();
       return {
         enabled: true,
+        hls: await this.hls.available(),
         storage: this.storage.enabled ? 'spaces' : 'local',
         version: 1,
         social: this.config.get('SOCIAL_VIDEOS_ENABLED') === 'true',
@@ -108,11 +111,13 @@ export class PropertyVideosService {
       `SELECT v.id,v.property_id,v.title,v.size_bytes,creator.id creator_id,creator.firstName creator_name,r.duration_ms,r.capture_seconds ${joined} LEFT JOIN property_video_recordings r ON r.video_id=v.id WHERE ${visible}${filter} ORDER BY ${seed ? 'MD5(CONCAT(?,v.id)),v.id' : 'v.created_at DESC,v.id'} LIMIT ? OFFSET ?`,
       [...params, ...(seed ? [seed] : []), limit, (page - 1) * limit],
     );
+    const hlsUrls = await this.hls.urls(rows.map((v: { id: string }) => v.id));
     return {
       items: await Promise.all(
         rows.map(async (v: any) => ({
           ...v,
           url: `/api/videos/${v.id}/content`,
+          hls_url: hlsUrls.get(v.id) || null,
           thumbnail_url: `/api/videos/${v.id}/thumbnail`,
           creator: { id: v.creator_id, display_name: v.creator_name },
           property: v.property_id ? await this.estate.get(v.property_id) : null,
@@ -122,6 +127,9 @@ export class PropertyVideosService {
       page,
       pages: Math.ceil(Number(count.total) / limit),
     };
+  }
+  async hlsUrls(ids: string[]) {
+    return this.hls.urls(ids);
   }
   async list(actor: Actor, id: string) {
     this.guard();
@@ -153,7 +161,9 @@ export class PropertyVideosService {
       { sub: actor.id, videoId: id, aud: 'estate-video-preview' },
       { expiresIn: '2m' },
     );
+    const hlsUrls = await this.hls.urls([id], signature);
     return {
+      hls_url: hlsUrls.get(id) || null,
       url: `/api/videos/${id}/preview?signature=${encodeURIComponent(signature)}`,
       thumbnail_url: `/api/videos/${id}/thumbnail?signature=${encodeURIComponent(signature)}`,
     };
@@ -328,6 +338,7 @@ export class PropertyVideosService {
           'INSERT INTO property_video_recordings(video_id,duration_ms,capture_seconds,request_id,content_digest) VALUES (?,?,?,?,?)',
           [videoId, duration, limit, requestId, digest],
         );
+        await this.hls.enqueue(tx, videoId);
         // A missing optional migration must not prevent saving the video.
         const [posterTable] = await tx.query(
           "SELECT COUNT(*) n FROM information_schema.tables WHERE table_schema=DATABASE() AND table_name='property_video_posters'",
