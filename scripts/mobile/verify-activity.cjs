@@ -25,6 +25,7 @@ async function main(){
     await call('/me/activity',{status:401});
     await call('/me/activity?before=bad',{token,status:400});
     const route='/videos/'+qa.videoId+'/comments';
+    await db.query('DELETE FROM estate_push_devices WHERE user_id=?',[qa.userId]);
     const suffix=randomUUID();
     const comments=await call(route,{method:'POST',status:201,token,body:{body:'Activity own '+suffix}});
     const parent=comments.find(c=>c.body==='Activity own '+suffix);
@@ -56,6 +57,16 @@ async function main(){
     await call('/me/activity/comments/'+latest.comment_id+'/read',{method:'POST',status:201,token});
     check(!(await call('/me/activity?unread=true',{token})).items.some(x=>x.id===latest.id),'Tapping push can mark its matching activity read');
     check(!(await call('/me/activity',{token:other.access_token})).items.some(x=>x.comment_id===parent.id),'Inbox does not leak another account activity');
+    await call('/me/activity/read-all',{method:'POST',status:400,token,body:{through_id:'bad'}});
+    const foreignComments=await call(route,{method:'POST',status:201,token:other.access_token,body:{body:'Activity foreign parent '+suffix}});
+    const foreignParent=foreignComments.find(c=>c.body==='Activity foreign parent '+suffix);
+    await call(route,{method:'POST',status:201,token,body:{body:'Activity foreign reply '+suffix,parent_id:foreignParent.id}});
+    check((await call('/me/activity',{token:other.access_token})).items.some(x=>x.body==='Activity foreign reply '+suffix),'Original commenter receives a reply without a registered device');
+    try {
+      await db.query("UPDATE property_videos SET status='draft' WHERE id=?",[qa.videoId]);
+      check(!(await call('/me/activity',{token:other.access_token})).items.some(x=>x.video_id===qa.videoId),'Inbox hides a video that became private');
+      check((await call('/me/activity',{token})).items.some(x=>x.video_id===qa.videoId),'Owner retains activity on their own draft');
+    } finally {await db.query("UPDATE property_videos SET status='published' WHERE id=?",[qa.videoId]);}
     console.log(`PASS: ${checks} activity checks. Local DB only; production connections: 0.`);
   } finally {await db.end();}
 }
