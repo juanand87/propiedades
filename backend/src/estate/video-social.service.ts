@@ -11,6 +11,7 @@ import { randomUUID } from 'node:crypto';
 import { Actor, text, uuid } from './rules';
 import { EstateService } from './estate.service';
 import { PushService } from './push.service';
+import { ActivityService } from './activity.service';
 import {
   PropertyVideosService,
   videoJoined,
@@ -25,6 +26,7 @@ export class VideoSocialService {
     private videos: PropertyVideosService,
     private estate: EstateService,
     private push: PushService,
+    private activity: ActivityService,
   ) {}
   guard() {
     if (this.config.get('SOCIAL_VIDEOS_ENABLED') !== 'true')
@@ -311,12 +313,14 @@ export class VideoSocialService {
           'INSERT INTO estate_video_comment_replies(comment_id,parent_id) VALUES (?,?)',
           [commentId, parentId],
         );
-      await this.push.enqueueVideoComment(tx, {
+      const event = {
         commentId,
         ownerId: video.created_by,
         parentUserId,
         actorId: actor.id,
-      });
+      };
+      await this.activity.recordComment(tx, event);
+      await this.push.enqueueVideoComment(tx, event);
     });
     return this.comments(id, actor);
   }

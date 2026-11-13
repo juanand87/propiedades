@@ -4,6 +4,7 @@ import { VideoSocialService } from './video-social.service';
 import { PropertyVideosService } from './property-videos.service';
 import { EstateService } from './estate.service';
 import { PushService } from './push.service';
+import { ActivityService } from './activity.service';
 import { Actor } from './rules';
 
 describe('notification comment destinations', () => {
@@ -35,6 +36,7 @@ describe('notification comment destinations', () => {
         {} as PropertyVideosService,
         {} as EstateService,
         {} as PushService,
+        {} as ActivityService,
       ),
     };
   }

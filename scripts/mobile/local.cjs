@@ -149,6 +149,7 @@ async function main() {
   await db.query(await fs.readFile(path.join(root, 'database/MENSAJES_PROPPIX.sql'), 'utf8'));
   await db.query(await fs.readFile(path.join(root, 'database/NOTIFICACIONES_Y_PORTADAS.sql'), 'utf8'));
   await db.query(await fs.readFile(path.join(root, 'database/NOTIFICACIONES_COMENTARIOS.sql'), 'utf8'));
+  await db.query(await fs.readFile(path.join(root, 'database/ACTIVIDAD_PROPPIX.sql'), 'utf8'));
   const spaces = {
     SPACES_IMAGES_ENABLED: "false",
     SPACES_VIDEOS_ENABLED: "false",

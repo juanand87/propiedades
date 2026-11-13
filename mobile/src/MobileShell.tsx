@@ -61,6 +61,8 @@ import { PropertySlideshow } from "./PropertySlideshow";
 import { MessagesScreen } from "./MessagesScreen";
 import { useMessageNotifications } from "./useMessageNotifications";
 import { NotificationVideoScreen } from "./NotificationVideoScreen";
+import { ActivityScreen } from "./ActivityScreen";
+import { ActivityBell } from "./ActivityBell";
 
 type Tab = "feed" | "catalog" | "manage" | "messages" | "account";
 const sessionKey = IS_PRODUCTION
@@ -113,6 +115,7 @@ function AppContent() {
   const recordingRoute = pathname === "/grabar";
   const profileRoute = pathname.startsWith("/perfil/");
   const notificationVideoRoute = pathname.startsWith("/video/");
+  const activityRoute = pathname === "/actividad";
   const {
     propertyId,
     from,
@@ -169,6 +172,41 @@ function AppContent() {
     [detail, setDetail] = useState<Property | null>(null),
     [detailBusy, setDetailBusy] = useState(false);
   const notifications = useMessageNotifications(session, ready);
+  const [activityCount, setActivityCount] = useState({ userId: "", count: 0 });
+  const activityUnread =
+    activityCount.userId === session?.user.id ? activityCount.count : 0;
+  const [activityRevision, setActivityRevision] = useState(0);
+  useEffect(() => {
+    if (!session || !ready) {
+      return;
+    }
+    const controller = new AbortController();
+    const refresh = () => {
+      if (AppState.currentState !== "active") return;
+      void api<{ unread_count: number }>("/me/activity?limit=1", {
+        token: session.access_token,
+        signal: controller.signal,
+      })
+        .then((page) => {
+          if (!controller.signal.aborted)
+            setActivityCount({
+              userId: session.user.id,
+              count: page.unread_count,
+            });
+        })
+        .catch(() => {});
+    };
+    refresh();
+    const timer = setInterval(refresh, 45000);
+    const listener = AppState.addEventListener("change", (state) => {
+      if (state === "active") refresh();
+    });
+    return () => {
+      controller.abort();
+      clearInterval(timer);
+      listener.remove();
+    };
+  }, [session, ready, pathname, activityRevision]);
   const setTab = (value: Tab) => {
     setDetail(null);
     if (value === "feed" && !videos.length) void loadFeed(true);
@@ -219,7 +257,8 @@ function AppContent() {
     tab === "feed" &&
     !propertyRoute &&
     !detail &&
-    !notificationVideoRoute;
+    !notificationVideoRoute &&
+    !activityRoute;
   const preparedVideos = useVideoPreload(videos, active, ready, !feedVisible);
   const feedRef = useRef<FlatList<Video>>(null),
     feedDragIndex = useRef(0),
@@ -901,6 +940,7 @@ function AppContent() {
   );
   const catalogScreen = (
     <PropertyCatalog
+      activityUnread={activityUnread}
       favorites={favorites}
       onFavorite={(id) => void favorite(id)}
       onOpen={openDetail}
@@ -1291,6 +1331,13 @@ function AppContent() {
             session={session}
           />
         ),
+        activity: (
+          <ActivityScreen
+            key={session?.user.id || "guest"}
+            session={session}
+            onChanged={() => setActivityRevision((value) => value + 1)}
+          />
+        ),
         active: tab,
         recorder: recordingRoute ? (
           <VideoRecorder
@@ -1347,6 +1394,7 @@ function AppContent() {
               >
                 <ProppixIcon name="menu" size={25} />
               </Pressable>
+              <ActivityBell unread={activityUnread} />
             </View>
           </View>
         )}
@@ -1374,6 +1422,16 @@ function AppContent() {
                 width: 225,
               }}
             >
+              <Button
+                label={
+                  activityUnread ? `Actividad (${activityUnread})` : "Actividad"
+                }
+                secondary
+                onPress={() => {
+                  setAccountMenu(false);
+                  router.push("/actividad");
+                }}
+              />
               <Button
                 label="Cuenta"
                 secondary

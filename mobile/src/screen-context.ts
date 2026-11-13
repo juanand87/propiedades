@@ -3,6 +3,7 @@ type Screen =
   | "feed"
   | "catalog"
   | "messages"
+  | "activity"
   | "manage"
   | "account"
   | "recorder"

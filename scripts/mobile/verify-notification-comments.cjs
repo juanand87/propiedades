@@ -21,7 +21,7 @@ async function main() {
     for (let i = 0; i < entries.length; i++)
       await db.query('INSERT INTO estate_video_comments(id,video_id,user_id,body,created_at) VALUES (?,?,?,?,?)', [entries[i], qa.videoId, qa.userId, 'Notification QA ' + i, new Date(Date.UTC(2030, 0, 1, 0, 0, i))]);
     await db.query('INSERT INTO estate_video_comment_replies(comment_id,parent_id) VALUES (?,?)', [targetId, parentId]);
-    const service = new VideoSocialService({ query: async (sql, params) => (await db.query(sql, params))[0] }, new ConfigService({ SOCIAL_VIDEOS_ENABLED: 'true' }), {}, {}, {});
+    const service = new VideoSocialService({ query: async (sql, params) => (await db.query(sql, params))[0] }, new ConfigService({ SOCIAL_VIDEOS_ENABLED: 'true' }), {}, {}, {}, {});
     const normal = await service.comments(qa.videoId);
     assert.equal(normal.length, 100);
     assert.ok(!normal.some(c => c.id === targetId || c.id === parentId));

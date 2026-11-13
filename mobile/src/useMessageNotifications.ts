@@ -127,7 +127,11 @@ export function useMessageNotifications(
       );
       if (!destination) return;
       handled.current = response.notification.request.identifier;
-      if (destination.kind === "video")
+      if (destination.kind === "video") {
+        void api(`/me/activity/comments/${destination.commentId}/read`, {
+          method: "POST",
+          token: session.access_token,
+        }).catch(() => {});
         router.push({
           pathname: "/video/[videoId]",
           params: {
@@ -135,7 +139,7 @@ export function useMessageNotifications(
             commentId: destination.commentId,
           },
         });
-      else if (destination.kind === "conversation")
+      } else if (destination.kind === "conversation")
         router.push({
           pathname: "/mensajes",
           params: { conversationId: destination.conversationId },

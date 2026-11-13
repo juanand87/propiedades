@@ -17,6 +17,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { api, mediaUrl, Page, Property } from "./api";
 import { ProppixBrand } from "./ProppixBrand";
 import { ProppixIcon, ProppixIconName } from "./ProppixIcon";
+import { ActivityBell } from "./ActivityBell";
 import { formatClpInput, parseClpInput } from "./clp";
 
 type Filters = {
@@ -53,8 +54,10 @@ export function PropertyCatalog({
   favorites,
   onFavorite,
   onOpen,
+  activityUnread = 0,
 }: {
   favorites: string[];
+  activityUnread?: number;
   onFavorite: (id: string) => void;
   onOpen: (property: Property) => void;
 }) {
@@ -211,20 +214,7 @@ export function PropertyCatalog({
               >
                 <ProppixIcon name="search" size={27} />
               </Pressable>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Notificaciones"
-                hitSlop={8}
-                style={s.iconButton}
-                onPress={() =>
-                  Alert.alert(
-                    "Notificaciones",
-                    "Todavía no hay notificaciones disponibles.",
-                  )
-                }
-              >
-                <ProppixIcon name="bell" size={27} />
-              </Pressable>
+              <ActivityBell unread={activityUnread} />
             </View>
           </View>
           <Text style={s.headline}>

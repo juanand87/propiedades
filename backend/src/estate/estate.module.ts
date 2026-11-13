@@ -7,6 +7,8 @@ import { EstateGuard } from './estate.guard';
 import { MessagingController } from './messaging.controller';
 import { MessagingService } from './messaging.service';
 import { PushService } from './push.service';
+import { ActivityService } from './activity.service';
+import { ActivityController } from './activity.controller';
 import { DemoService } from './demo.service';
 import { PropertyVideosService } from './property-videos.service';
 import { PropertyVideosController } from './property-videos.controller';
@@ -33,6 +35,7 @@ import {
     }),
   ],
   controllers: [
+    ActivityController,
     EstateController,
     PropertyVideosController,
     GoogleAuthController,
@@ -40,6 +43,7 @@ import {
     MessagingController,
   ],
   providers: [
+    ActivityService,
     EstateService,
     GoogleAuthService,
     EstateGuard,
