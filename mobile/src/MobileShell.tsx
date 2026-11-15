@@ -1,14 +1,16 @@
 import {
-  captureCatalogSwipe,
-  finishCatalogSwipe,
-} from "./video-playback-policy";
+  GestureHandlerRootView,
+  GestureDetector,
+  usePanGesture,
+  useNativeGesture,
+} from "react-native-gesture-handler";
+import { finishCatalogSwipe } from "./video-playback-policy";
 import { preparedPlayerFor } from "./video-source";
 import { VisitsScreen } from "./VisitsScreen";
 import { BlockedUsersScreen } from "./BlockedUsersScreen";
 import { listenModerationChange } from "./moderation-events";
 import {
   useCallback,
-  useMemo,
   useEffect,
   useEffectEvent,
   useRef,
@@ -21,7 +23,6 @@ import {
   FlatList,
   Linking,
   Modal,
-  PanResponder,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -284,26 +285,24 @@ function AppContent() {
     !savedSearchRoute &&
     !blockedUsersRoute &&
     !visitsRoute;
-  const catalogSwipe = useMemo(
-    () =>
-      PanResponder.create({
-        onMoveShouldSetPanResponderCapture: (_event, gesture) =>
-          feedVisible &&
-          captureCatalogSwipe(
-            gesture.dx,
-            gesture.dy,
-            gesture.numberActiveTouches,
-          ),
-        onPanResponderRelease: (_event, gesture) => {
-          if (finishCatalogSwipe(gesture.dx, gesture.dy)) {
-            setDetail(null);
-            router.replace("/propiedades");
-          }
-        },
-        onPanResponderTerminationRequest: () => true,
-      }),
-    [feedVisible, router],
-  );
+  const feedScrollGesture = useNativeGesture({ enabled: feedVisible });
+  const catalogSwipe = usePanGesture({
+    enabled: feedVisible,
+    activeOffsetX: [-24, 100000],
+    failOffsetY: [-18, 18],
+    maxPointers: 1,
+    block: feedScrollGesture,
+    runOnJS: true,
+    onDeactivate: (event) => {
+      if (
+        !event.canceled &&
+        finishCatalogSwipe(event.translationX, event.translationY)
+      ) {
+        setDetail(null);
+        router.replace("/propiedades");
+      }
+    },
+  });
   const preparedVideos = useVideoPreload(videos, active, ready, !feedVisible);
   const feedRef = useRef<FlatList<Video>>(null),
     feedDragIndex = useRef(0),
@@ -851,152 +850,164 @@ function AppContent() {
       </SafeAreaView>
     );
   const feedScreen = (
-    <View
-      style={s.feed}
-      {...catalogSwipe.panHandlers}
-      onLayout={(e) => setHeight(e.nativeEvent.layout.height)}
-    >
-      {height > 1 && (
-        <FlatList
-          keyboardShouldPersistTaps="always"
-          keyboardDismissMode="none"
-          ref={feedRef}
-          data={videos}
-          keyExtractor={(v, index) => `${v.id}:${index}`}
-          initialScrollIndex={Math.min(active, Math.max(0, videos.length - 1))}
-          pagingEnabled
-          snapToInterval={height}
-          snapToAlignment="start"
-          disableIntervalMomentum
-          bounces={false}
-          overScrollMode="never"
-          decelerationRate="fast"
-          showsVerticalScrollIndicator={false}
-          getItemLayout={(_, i) => ({
-            length: height,
-            offset: height * i,
-            index: i,
-          })}
-          initialNumToRender={2}
-          maxToRenderPerBatch={2}
-          windowSize={3}
-          extraData={[active, preparedVideos, foreground, detail, favorites]}
-          onScrollBeginDrag={() => {
-            feedDragging.current = true;
-            feedDragIndex.current = active;
-          }}
-          onMomentumScrollEnd={(e) => {
-            if (!feedDragging.current) return;
-            feedDragging.current = false;
-            const bounded = clampVideoOffset(
-              e.nativeEvent.contentOffset.y,
-              height,
-              feedDragIndex.current,
-              videos.length,
-            );
-            const next = Math.round(bounded / height);
-            setActive(next);
-            if (Math.abs(e.nativeEvent.contentOffset.y - next * height) > 1)
-              feedRef.current?.scrollToOffset({
-                offset: next * height,
-                animated: false,
-              });
-          }}
-          onScroll={(e) => {
-            if (!feedDragging.current) return;
-            const offset = e.nativeEvent.contentOffset.y;
-            const bounded = clampVideoOffset(
-              offset,
-              height,
-              feedDragIndex.current,
-              videos.length,
-            );
-            if (Math.abs(bounded - offset) > 1)
-              feedRef.current?.scrollToOffset({
-                offset: bounded,
-                animated: false,
-              });
-            setActive(Math.round(bounded / height));
-          }}
-          scrollEventThrottle={16}
-          onEndReached={() => void loadFeed()}
-          onEndReachedThreshold={1.5}
-          refreshControl={
-            <RefreshControl
-              refreshing={loading && page > 0}
-              onRefresh={() => void loadFeed(true)}
-              tintColor={videoColors.cyan}
-            />
-          }
-          renderItem={({ item, index }) => (
-            <VideoCard
-              item={item}
-              height={height}
-              active={index === active && feedVisible}
-              player={
-                feedVisible && index === active
-                  ? preparedPlayerFor(item, preparedVideos.get(item.id))
-                  : undefined
-              }
-              social={socialEnabled}
-              session={session}
-              favorite={favorites.includes(item.property_id || "")}
-              onFavorite={() => {
-                if (item.property_id) void favorite(item.property_id);
-              }}
-              onDetails={() => {
-                if (item.property) void openDetail(item.property);
-              }}
-              onContact={
-                item.property && !item.property.is_demo
-                  ? () => {
-                      if (item.property) openDetail(item.property, true);
-                    }
-                  : undefined
-              }
-              onShare={() => {
-                if (item.property) void share(item.property);
-              }}
-            />
-          )}
-          ListEmptyComponent={
-            <View style={[s.empty, { height }]}>
-              {loading ? (
-                <ActivityIndicator color={videoColors.cyan} />
-              ) : (
-                <>
-                  <Text style={s.h2}>Videos de propiedades</Text>
-                  <Text style={s.muted}>
-                    {feedError || "Todavía no hay videos publicados."}
-                  </Text>
-                  <Button
-                    label={feedError ? "Reintentar" : "Ver propiedades"}
-                    onPress={() =>
-                      feedError ? void loadFeed(true) : setTab("catalog")
-                    }
-                  />
-                </>
+    <GestureDetector gesture={catalogSwipe}>
+      <View
+        style={s.feed}
+        onLayout={(e) => setHeight(e.nativeEvent.layout.height)}
+      >
+        {height > 1 && (
+          <GestureDetector gesture={feedScrollGesture}>
+            <FlatList
+              keyboardShouldPersistTaps="always"
+              keyboardDismissMode="none"
+              ref={feedRef}
+              data={videos}
+              keyExtractor={(v, index) => `${v.id}:${index}`}
+              initialScrollIndex={Math.min(
+                active,
+                Math.max(0, videos.length - 1),
               )}
-            </View>
-          }
-          ListFooterComponent={
-            videos.length > 0 ? (
-              feedError ? (
-                <View style={s.pad}>
-                  <Text style={s.error}>{feedError}</Text>
-                  <Button
-                    label="Reintentar carga"
-                    onPress={() => void loadFeed()}
-                  />
+              pagingEnabled
+              snapToInterval={height}
+              snapToAlignment="start"
+              disableIntervalMomentum
+              bounces={false}
+              overScrollMode="never"
+              decelerationRate="fast"
+              showsVerticalScrollIndicator={false}
+              getItemLayout={(_, i) => ({
+                length: height,
+                offset: height * i,
+                index: i,
+              })}
+              initialNumToRender={2}
+              maxToRenderPerBatch={2}
+              windowSize={3}
+              extraData={[
+                active,
+                preparedVideos,
+                foreground,
+                detail,
+                favorites,
+              ]}
+              onScrollBeginDrag={() => {
+                feedDragging.current = true;
+                feedDragIndex.current = active;
+              }}
+              onMomentumScrollEnd={(e) => {
+                if (!feedDragging.current) return;
+                feedDragging.current = false;
+                const bounded = clampVideoOffset(
+                  e.nativeEvent.contentOffset.y,
+                  height,
+                  feedDragIndex.current,
+                  videos.length,
+                );
+                const next = Math.round(bounded / height);
+                setActive(next);
+                if (Math.abs(e.nativeEvent.contentOffset.y - next * height) > 1)
+                  feedRef.current?.scrollToOffset({
+                    offset: next * height,
+                    animated: false,
+                  });
+              }}
+              onScroll={(e) => {
+                if (!feedDragging.current) return;
+                const offset = e.nativeEvent.contentOffset.y;
+                const bounded = clampVideoOffset(
+                  offset,
+                  height,
+                  feedDragIndex.current,
+                  videos.length,
+                );
+                if (Math.abs(bounded - offset) > 1)
+                  feedRef.current?.scrollToOffset({
+                    offset: bounded,
+                    animated: false,
+                  });
+                setActive(Math.round(bounded / height));
+              }}
+              scrollEventThrottle={16}
+              onEndReached={() => void loadFeed()}
+              onEndReachedThreshold={1.5}
+              refreshControl={
+                <RefreshControl
+                  refreshing={loading && page > 0}
+                  onRefresh={() => void loadFeed(true)}
+                  tintColor={videoColors.cyan}
+                />
+              }
+              renderItem={({ item, index }) => (
+                <VideoCard
+                  item={item}
+                  height={height}
+                  active={index === active && feedVisible}
+                  player={
+                    feedVisible && index === active
+                      ? preparedPlayerFor(item, preparedVideos.get(item.id))
+                      : undefined
+                  }
+                  social={socialEnabled}
+                  session={session}
+                  favorite={favorites.includes(item.property_id || "")}
+                  onFavorite={() => {
+                    if (item.property_id) void favorite(item.property_id);
+                  }}
+                  onDetails={() => {
+                    if (item.property) void openDetail(item.property);
+                  }}
+                  onContact={
+                    item.property && !item.property.is_demo
+                      ? () => {
+                          if (item.property) openDetail(item.property, true);
+                        }
+                      : undefined
+                  }
+                  onShare={() => {
+                    if (item.property) void share(item.property);
+                  }}
+                />
+              )}
+              ListEmptyComponent={
+                <View style={[s.empty, { height }]}>
+                  {loading ? (
+                    <ActivityIndicator color={videoColors.cyan} />
+                  ) : (
+                    <>
+                      <Text style={s.h2}>Videos de propiedades</Text>
+                      <Text style={s.muted}>
+                        {feedError || "Todavía no hay videos publicados."}
+                      </Text>
+                      <Button
+                        label={feedError ? "Reintentar" : "Ver propiedades"}
+                        onPress={() =>
+                          feedError ? void loadFeed(true) : setTab("catalog")
+                        }
+                      />
+                    </>
+                  )}
                 </View>
-              ) : loading ? (
-                <ActivityIndicator color={videoColors.cyan} style={s.pad} />
-              ) : undefined
-            ) : undefined
-          }
-        />
-      )}
-    </View>
+              }
+              ListFooterComponent={
+                videos.length > 0 ? (
+                  feedError ? (
+                    <View style={s.pad}>
+                      <Text style={s.error}>{feedError}</Text>
+                      <Button
+                        label="Reintentar carga"
+                        onPress={() => void loadFeed()}
+                      />
+                    </View>
+                  ) : loading ? (
+                    <ActivityIndicator color={videoColors.cyan} style={s.pad} />
+                  ) : undefined
+                ) : undefined
+              }
+            />
+          </GestureDetector>
+        )}
+      </View>
+    </GestureDetector>
   );
   const catalogScreen = (
     <PropertyCatalog
@@ -1715,9 +1726,11 @@ function AppContent() {
 }
 export default function App() {
   return (
-    <SafeAreaProvider>
-      <AppContent />
-    </SafeAreaProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaProvider>
+        <AppContent />
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }
 const s = StyleSheet.create({
