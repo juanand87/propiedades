@@ -148,7 +148,12 @@ export function useMessageNotifications(
           pathname: "/property/[propertyId]",
           params: { propertyId: destination.propertyId, from: "catalog" },
         });
-      } else if (destination.kind === "conversation")
+      } else if (destination.kind === "visit")
+        router.push({
+          pathname: "/visitas",
+          params: { visitId: destination.visitId },
+        });
+      else if (destination.kind === "conversation")
         router.push({
           pathname: "/mensajes",
           params: { conversationId: destination.conversationId },

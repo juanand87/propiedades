@@ -1495,9 +1495,16 @@ export class EstateService {
         : 'Consulta enviada al anunciante.',
     };
   }
+  private async visitBookingsAvailable() {
+    const [schema] = await this.db.query<{ n: number }[]>(
+      "SELECT COUNT(*) n FROM information_schema.tables WHERE table_schema=DATABASE() AND table_name='estate_visit_bookings'",
+    );
+    return !!Number(schema?.n);
+  }
   async inquiries(u: Actor) {
+    const bookings = await this.visitBookingsAvailable();
     return this.db.query(
-      `SELECT i.*,p.title,p.code,p.advertiser_id,v.id visit_id,v.requested_at,v.status visit_status FROM property_inquiries i JOIN properties p ON p.id=i.property_id LEFT JOIN property_visit_requests v ON v.inquiry_id=i.id ${isAdmin(u) ? '' : 'WHERE p.advertiser_id=?'} ORDER BY i.created_at DESC LIMIT 200`,
+      `SELECT i.*,p.title,p.code,p.advertiser_id,v.id visit_id,v.requested_at,v.status visit_status,${bookings ? 'b.id' : 'NULL'} booking_id FROM property_inquiries i JOIN properties p ON p.id=i.property_id LEFT JOIN property_visit_requests v ON v.inquiry_id=i.id ${bookings ? 'LEFT JOIN estate_visit_bookings b ON b.legacy_visit_id=v.id' : ''} ${isAdmin(u) ? '' : 'WHERE p.advertiser_id=?'} ORDER BY i.created_at DESC LIMIT 200`,
       isAdmin(u) ? [] : [u.advertiser_id || ''],
     );
   }
@@ -1519,6 +1526,14 @@ export class EstateService {
   }
   async updateInquiry(u: Actor, id: string, b: any) {
     await this.ownInquiry(u, id);
+    if (b.visit_status && (await this.visitBookingsAvailable())) {
+      const [booking] = await this.db.query(
+        'SELECT b.id FROM estate_visit_bookings b JOIN property_visit_requests v ON v.id=b.legacy_visit_id WHERE v.inquiry_id=?',
+        [id],
+      );
+      if (booking)
+        throw new BadRequestException('Gestiona esta visita desde la Agenda.');
+    }
     if (b.status)
       await this.db.query('UPDATE property_inquiries SET status=? WHERE id=?', [
         choice(b.status, ['new', 'contacted', 'closed']),

@@ -29,6 +29,7 @@ import { Empty, Notice, useEstate } from "./EstateApp";
 import { DemoAdmin } from "./DemoAdmin";
 import { DesignAdmin } from "./DesignAdmin";
 import { PropertyVideosEditor } from "./PropertyVideosEditor";
+import { VisitsAgenda } from "./VisitsAgenda";
 import { ModerationAdmin } from "./ModerationAdmin";
 
 function useLoad(path: string) {
@@ -1302,11 +1303,14 @@ function Contacts({ visits = false }: { visits?: boolean }) {
       setFailure((e as Error).message);
     }
   };
-  const rows = (data || []).filter((i: any) => !visits || i.visit_id);
+  const rows = (data || []).filter(
+    (i: any) => !visits || (i.visit_id && !i.booking_id),
+  );
   return (
     <>
       <span className="eyebrow">CONVERSACIONES QUE ABREN PUERTAS</span>
-      <h1>{visits ? "Solicitudes de visita" : "Personas interesadas"}</h1>
+      {visits && <VisitsAgenda />}
+      <h1>{visits ? "Solicitudes anteriores" : "Personas interesadas"}</h1>
       <Notice error={error || failure} />
       {rows.length ? (
         <div className="contact-list">
@@ -1326,7 +1330,13 @@ function Contacts({ visits = false }: { visits?: boolean }) {
               </p>
               <p className="preserve-lines">{i.message}</p>
               <small>{date(i.created_at)}</small>
-              {i.requested_at && (
+              {i.booking_id && (
+                <p>
+                  Visita con confirmación y avisos: gestiónala en Agenda de
+                  visitas.
+                </p>
+              )}
+              {i.requested_at && !i.booking_id && (
                 <div className="visit-detail">
                   <CalendarDays size={19} />
                   <span>Visita solicitada: {date(i.requested_at)} · Chile</span>

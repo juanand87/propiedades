@@ -7,3 +7,7 @@
 5. Bloqueo y reporte de usuarios, videos y comentarios, con revisión en el panel web. Implementación 1.0.18; MODERACION_Y_BLOQUEOS.sql ejecutado según confirmación del usuario. Pendiente prueba física y de la sesión administradora en producción.
 
 Completar y validar cada punto antes de pasar al siguiente.
+
+## Siguiente mejora
+
+6. Agenda de visitas: solicitudes, propuestas de horario, confirmaciones, cancelaciones, historial en chat y recordatorios FCM. Implementación 1.0.19. Requiere `AGENDA_VISITAS.sql` antes del despliegue. Véase `docs/AGENDA_VISITAS.md`. Pendientes confirmación de SQL en producción y prueba física con dos cuentas.

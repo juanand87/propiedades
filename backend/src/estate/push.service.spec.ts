@@ -66,6 +66,86 @@ describe('message push delivery', () => {
       .mockResolvedValue({ token: 'test-access-token' });
   });
   afterEach(() => jest.restoreAllMocks());
+  it.each(['sent', 'offline', 'obsolete', 'unregistered'] as const)(
+    'handles durable visit notification %s',
+    async (state) => {
+      const { service, query } = setup();
+      query.mockImplementation((sql: string) =>
+        Promise.resolve(
+          sql.includes('information_schema')
+            ? [{ n: 2 }]
+            : sql.startsWith('SELECT notice_id,token')
+              ? [
+                  {
+                    notice_id: 'notice',
+                    token,
+                    user_id: 'recipient',
+                    attempts: 0,
+                  },
+                ]
+              : sql.startsWith('SELECT n.booking_id') && state !== 'obsolete'
+                ? [
+                    {
+                      booking_id: '00000000-0000-4000-8000-000000000001',
+                      title: 'Visita confirmada',
+                    },
+                  ]
+                : [],
+        ),
+      );
+      const network = jest.spyOn(global, 'fetch');
+      if (state === 'offline') network.mockRejectedValue(new Error('offline'));
+      else
+        network.mockResolvedValue({
+          ok: state !== 'unregistered',
+          status: state === 'unregistered' ? 404 : 200,
+          json: () =>
+            Promise.resolve(
+              state === 'unregistered'
+                ? { error: { details: [{ errorCode: 'UNREGISTERED' }] } }
+                : { name: 'accepted' },
+            ),
+        } as Response);
+      await service.flush();
+      if (state === 'obsolete') expect(network).not.toHaveBeenCalled();
+      if (state === 'sent') {
+        const payload = JSON.parse(
+          network.mock.calls[0][1]!.body as string,
+        ) as {
+          message: {
+            data: { type: string; visitId: string };
+            notification: { body: string };
+          };
+        };
+        expect(payload.message.data).toMatchObject({
+          type: 'visit',
+          visitId: '00000000-0000-4000-8000-000000000001',
+        });
+        expect(payload.message.notification.body).not.toMatch(
+          /@|dirección|teléfono/,
+        );
+        expect(query).toHaveBeenCalledWith(
+          expect.stringContaining('UPDATE estate_visit_push SET status=?'),
+          ['done', 'notice', token],
+        );
+      }
+      if (state === 'offline') {
+        expect(query).toHaveBeenCalledWith(
+          expect.stringContaining('attempts=attempts+1'),
+          [30, 'notice', token],
+        );
+        expect(query).not.toHaveBeenCalledWith(
+          expect.stringContaining('UPDATE estate_visit_push SET status=?'),
+          expect.anything(),
+        );
+      }
+      if (state === 'unregistered')
+        expect(query).toHaveBeenCalledWith(
+          'DELETE FROM estate_push_devices WHERE token=? AND user_id=?',
+          [token, 'recipient'],
+        );
+    },
+  );
   it.each(['sent', 'offline', 'withdrawn'] as const)(
     'handles saved-search push %s',
     async (state) => {

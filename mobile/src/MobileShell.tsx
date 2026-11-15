@@ -1,3 +1,4 @@
+import { VisitsScreen } from "./VisitsScreen";
 import { BlockedUsersScreen } from "./BlockedUsersScreen";
 import { listenModerationChange } from "./moderation-events";
 import {
@@ -120,6 +121,7 @@ function AppContent() {
   const notificationVideoRoute = pathname.startsWith("/video/");
   const activityRoute = pathname === "/actividad";
   const savedSearchRoute = pathname === "/busquedas";
+  const visitsRoute = pathname === "/visitas";
   const blockedUsersRoute = pathname === "/bloqueados";
   const {
     propertyId,
@@ -134,6 +136,7 @@ function AppContent() {
     resumeVideoId,
     commentId,
     savedSearchId,
+    visitId,
   } = useGlobalSearchParams<{
     propertyId?: string;
     from?: Tab;
@@ -147,6 +150,7 @@ function AppContent() {
     resumeVideoId?: string;
     commentId?: string;
     savedSearchId?: string;
+    visitId?: string;
   }>();
   const tab: Tab = propertyRoute
     ? from && from in routes
@@ -271,7 +275,8 @@ function AppContent() {
     !notificationVideoRoute &&
     !activityRoute &&
     !savedSearchRoute &&
-    !blockedUsersRoute;
+    !blockedUsersRoute &&
+    !visitsRoute;
   const preparedVideos = useVideoPreload(videos, active, ready, !feedVisible);
   const feedRef = useRef<FlatList<Video>>(null),
     feedDragIndex = useRef(0),
@@ -1376,6 +1381,17 @@ function AppContent() {
             session={session}
           />
         ),
+        visits: (
+          <VisitsScreen
+            key={[session?.user.id, visitId, propertyId, conversationId].join(
+              ":",
+            )}
+            session={session}
+            visitId={visitId}
+            propertyId={propertyId}
+            conversationId={conversationId}
+          />
+        ),
         blockedUsers: (
           <BlockedUsersScreen
             key={session?.user.id || "guest"}
@@ -1474,6 +1490,14 @@ function AppContent() {
                 onPress={() => {
                   setAccountMenu(false);
                   router.push("/actividad");
+                }}
+              />
+              <Button
+                label="Mis visitas"
+                secondary
+                onPress={() => {
+                  setAccountMenu(false);
+                  router.push("/visitas");
                 }}
               />
               <Button

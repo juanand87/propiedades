@@ -43,6 +43,25 @@ export function ContactProperty({
           Enviar mensaje en Proppix
         </Text>
       </Pressable>
+      <Pressable
+        accessibilityRole="button"
+        onPress={() =>
+          router.push({
+            pathname: "/visitas",
+            params: { propertyId: property.id },
+          })
+        }
+        style={{
+          padding: 15,
+          borderRadius: 24,
+          backgroundColor: "#edf6ff",
+          alignItems: "center",
+        }}
+      >
+        <Text style={{ color: "#0866f5", fontWeight: "700" }}>
+          Agendar visita
+        </Text>
+      </Pressable>
       <Text
         style={{ color: videoColors.text, fontWeight: "700", fontSize: 18 }}
       >

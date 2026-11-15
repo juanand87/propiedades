@@ -6,6 +6,7 @@ type Screen =
   | "activity"
   | "savedSearches"
   | "blockedUsers"
+  | "visits"
   | "manage"
   | "account"
   | "recorder"

@@ -210,7 +210,25 @@ export class MessagingService {
       `SELECT CAST(id AS CHAR) id,conversation_id,sender_id,client_id,body,created_at FROM estate_direct_messages WHERE conversation_id=?${condition} ORDER BY estate_direct_messages.id ${after !== null ? 'ASC' : 'DESC'} LIMIT 51`,
       params,
     );
-    const items = rows.slice(0, 50);
+    const items = rows.slice(0, 50) as (MessageRow & { visit_id?: string })[];
+    const [schema] = await this.db.query<{ n: number }[]>(
+      "SELECT COUNT(*) n FROM information_schema.tables WHERE table_schema=DATABASE() AND table_name='estate_visit_message_links'",
+    );
+    if (Number(schema?.n) && items.length) {
+      const links = await this.db.query<
+        { message_id: string; booking_id: string }[]
+      >(
+        `SELECT CAST(message_id AS CHAR) message_id,booking_id FROM estate_visit_message_links WHERE message_id IN (${items.map(() => '?').join(',')})`,
+        items.map((m) => m.id),
+      );
+      const visits = new Map(
+        links.map((l) => [String(l.message_id), l.booking_id]),
+      );
+      items.forEach((m) => {
+        const visit = visits.get(String(m.id));
+        if (visit) m.visit_id = visit;
+      });
+    }
     if (after === null) items.reverse();
     return {
       id: conversation.id,

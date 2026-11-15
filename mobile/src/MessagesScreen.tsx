@@ -27,6 +27,7 @@ type Person = {
   available: boolean;
 };
 type Message = {
+  visit_id?: string;
   id: string;
   sender_id: string;
   client_id: string;
@@ -435,6 +436,25 @@ export function MessagesScreen({
           </Pressable>
         )}
       </View>
+      <Pressable
+        accessibilityRole="button"
+        style={{ padding: 12, backgroundColor: "#edf6ff" }}
+        onPress={() =>
+          router.push({
+            pathname: "/visitas",
+            params: {
+              ...(selected ? { conversationId: selected } : {}),
+              ...(propertyId ? { propertyId } : {}),
+            },
+          })
+        }
+      >
+        <Text
+          style={{ color: "#0866f5", fontWeight: "700", textAlign: "center" }}
+        >
+          {propertyId ? "Agendar visita" : "Ver agenda de visitas"}
+        </Text>
+      </Pressable>
       {!!error && (
         <View style={s.errorBox}>
           <Text accessibilityRole="alert" style={s.error}>
@@ -484,6 +504,29 @@ export function MessagesScreen({
             keyboardDismissMode="none"
             contentContainerStyle={{ padding: 15, gap: 9 }}
             renderItem={({ item }) => {
+              if (item.visit_id)
+                return (
+                  <Pressable
+                    accessibilityRole="button"
+                    style={{
+                      padding: 16,
+                      borderRadius: 14,
+                      backgroundColor: "#edf6ff",
+                      gap: 8,
+                    }}
+                    onPress={() =>
+                      router.push({
+                        pathname: "/visitas",
+                        params: { visitId: item.visit_id },
+                      })
+                    }
+                  >
+                    <Text style={{ color: "#123d70" }}>{item.body}</Text>
+                    <Text style={{ color: "#0866f5", fontWeight: "700" }}>
+                      Ver visita →
+                    </Text>
+                  </Pressable>
+                );
               const mine = item.sender_id === session.user.id;
               return (
                 <View style={[s.bubble, mine ? s.mine : s.theirs]}>

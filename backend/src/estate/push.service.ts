@@ -1,3 +1,4 @@
+import { visitNoticeJoins, visitNoticeValid } from './visit-notifications';
 import { notHidden, notBlocked } from './moderation-rules';
 import {
   BadRequestException,
@@ -307,6 +308,7 @@ export class PushService implements OnModuleInit, OnModuleDestroy {
       kind: 'comment' | 'reply';
     },
     property?: { propertyId: string; matchId: string },
+    visit?: { id: string; noticeId: string; title: string },
   ) {
     const { auth, projectId } = this.credentials();
     const { token: accessToken } = await auth.getAccessToken();
@@ -323,26 +325,33 @@ export class PushService implements OnModuleInit, OnModuleDestroy {
           message: {
             token: row.token,
             notification: {
-              title: property
-                ? 'Nueva propiedad para tu búsqueda'
-                : activity
-                  ? activity.kind === 'reply'
-                    ? 'Respondieron tu comentario'
-                    : 'Nuevo comentario en tu video'
-                  : test
-                    ? 'Prueba de Proppix'
-                    : 'Nuevo mensaje en Proppix',
-              body: property
-                ? 'Encontramos una propiedad que coincide con tus filtros. Toca para verla.'
-                : activity
-                  ? activity.kind === 'reply'
-                    ? 'Recibiste una respuesta en un video de Proppix.'
-                    : 'Tu video recibió un comentario nuevo en Proppix.'
-                  : test
-                    ? 'Las notificaciones de tu cuenta están funcionando.'
-                    : 'Tienes un mensaje nuevo. Toca para abrir la conversación.',
+              title: visit
+                ? visit.title
+                : property
+                  ? 'Nueva propiedad para tu búsqueda'
+                  : activity
+                    ? activity.kind === 'reply'
+                      ? 'Respondieron tu comentario'
+                      : 'Nuevo comentario en tu video'
+                    : test
+                      ? 'Prueba de Proppix'
+                      : 'Nuevo mensaje en Proppix',
+              body: visit
+                ? 'Revisa la agenda de visitas en Proppix para ver los detalles.'
+                : property
+                  ? 'Encontramos una propiedad que coincide con tus filtros. Toca para verla.'
+                  : activity
+                    ? activity.kind === 'reply'
+                      ? 'Recibiste una respuesta en un video de Proppix.'
+                      : 'Tu video recibió un comentario nuevo en Proppix.'
+                    : test
+                      ? 'Las notificaciones de tu cuenta están funcionando.'
+                      : 'Tienes un mensaje nuevo. Toca para abrir la conversación.',
             },
             data: {
+              ...(visit
+                ? { type: 'visit', visitId: visit.id, noticeId: visit.noticeId }
+                : {}),
               ...(property
                 ? {
                     type: 'property_match',
@@ -369,11 +378,13 @@ export class PushService implements OnModuleInit, OnModuleDestroy {
                 channel_id: 'messages',
                 sound: 'default',
                 icon: 'notification_icon',
-                tag: property
-                  ? 'property-match-' + property.matchId
-                  : activity
-                    ? 'video-comment-' + activity.commentId
-                    : 'message-' + row.message_id,
+                tag: visit
+                  ? 'visit-' + visit.noticeId
+                  : property
+                    ? 'property-match-' + property.matchId
+                    : activity
+                      ? 'video-comment-' + activity.commentId
+                      : 'message-' + row.message_id,
               },
             },
           },
@@ -513,6 +524,84 @@ export class PushService implements OnModuleInit, OnModuleDestroy {
       "DELETE FROM estate_search_push_deliveries WHERE status IN ('done','failed') AND due_at<UTC_TIMESTAMP()-INTERVAL 7 DAY LIMIT 1000",
     );
   }
+  private async flushVisits() {
+    const [schema] = await this.db.query<{ n: number }[]>(
+      "SELECT COUNT(*) n FROM information_schema.tables WHERE table_schema=DATABASE() AND table_name='estate_visit_notices'",
+    );
+    if (!Number(schema.n)) return;
+    const notices = await this.db.query<{ id: string }[]>(
+      'SELECT id FROM estate_visit_notices WHERE expanded=0 AND due_at<=UTC_TIMESTAMP(3) ORDER BY due_at,id LIMIT 25',
+    );
+    for (const notice of notices)
+      await this.db.transaction(async (tx) => {
+        const [row] = await tx.query<{ id: string }[]>(
+          'SELECT id FROM estate_visit_notices WHERE id=? AND expanded=0 FOR UPDATE',
+          [notice.id],
+        );
+        if (!row) return;
+        await tx.query(
+          `INSERT IGNORE INTO estate_visit_push(notice_id,token,user_id) SELECT n.id,d.token,n.user_id ${visitNoticeJoins} JOIN estate_push_devices d ON d.user_id=n.user_id AND d.updated_at>UTC_TIMESTAMP()-INTERVAL 90 DAY WHERE n.id=? AND ${visitNoticeValid}`,
+          [notice.id],
+        );
+        await tx.query(
+          'UPDATE estate_visit_notices SET expanded=1 WHERE id=?',
+          [notice.id],
+        );
+      });
+    const rows = await this.db.query<
+      { notice_id: string; token: string; user_id: string; attempts: number }[]
+    >(
+      "SELECT notice_id,token,user_id,attempts FROM estate_visit_push WHERE status='pending' AND due_at<=UTC_TIMESTAMP(3) ORDER BY due_at,notice_id LIMIT 25",
+    );
+    for (const row of rows) {
+      const update = (status: string) =>
+        this.db.query(
+          'UPDATE estate_visit_push SET status=? WHERE notice_id=? AND token=?',
+          [status, row.notice_id, row.token],
+        );
+      const [event] = await this.db.query<
+        { booking_id: string; title: string }[]
+      >(
+        `SELECT n.booking_id,n.title ${visitNoticeJoins} JOIN estate_push_devices d ON d.user_id=n.user_id AND d.token=? WHERE n.id=? AND n.user_id=? AND ${visitNoticeValid}`,
+        [row.token, row.notice_id, row.user_id],
+      );
+      if (!event || !validFcmToken(row.token)) {
+        await update('done');
+        continue;
+      }
+      if (row.attempts >= 12) {
+        await update('failed');
+        continue;
+      }
+      await this.db.query(
+        'UPDATE estate_visit_push SET attempts=attempts+1,due_at=TIMESTAMPADD(SECOND,?,UTC_TIMESTAMP(3)) WHERE notice_id=? AND token=?',
+        [Math.min(3600, 30 * 2 ** row.attempts), row.notice_id, row.token],
+      );
+      try {
+        const result = await this.sendFcm(
+          { token: row.token, message_id: row.notice_id, conversation_id: '' },
+          false,
+          undefined,
+          undefined,
+          { id: event.booking_id, noticeId: row.notice_id, title: event.title },
+        );
+        if (result === 'unregistered')
+          await this.db.query(
+            'DELETE FROM estate_push_devices WHERE token=? AND user_id=?',
+            [row.token, row.user_id],
+          );
+        await update(result === 'invalid' ? 'failed' : 'done');
+      } catch {
+        /* Retry with persisted backoff. */
+      }
+    }
+    await this.db.query(
+      "DELETE FROM estate_visit_push WHERE status IN ('done','failed') AND due_at<UTC_TIMESTAMP()-INTERVAL 7 DAY LIMIT 1000",
+    );
+    await this.db.query(
+      'DELETE FROM estate_visit_notices WHERE expanded=1 AND due_at<UTC_TIMESTAMP()-INTERVAL 30 DAY LIMIT 1000',
+    );
+  }
   async flush() {
     if (this.busy) return;
     // Do not consume queued attempts while the server credential is absent.
@@ -579,6 +668,7 @@ export class PushService implements OnModuleInit, OnModuleDestroy {
       );
       await this.flushVideoComments();
       await this.flushSearchMatches();
+      await this.flushVisits();
     } finally {
       if (locked)
         await runner

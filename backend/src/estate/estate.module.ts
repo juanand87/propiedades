@@ -6,6 +6,8 @@ import { EstateService } from './estate.service';
 import { EstateGuard, OptionalEstateGuard } from './estate.guard';
 import { MessagingController } from './messaging.controller';
 import { MessagingService } from './messaging.service';
+import { VisitsService } from './visits.service';
+import { VisitsController } from './visits.controller';
 import { PushService } from './push.service';
 import { ActivityService } from './activity.service';
 import { ActivityController } from './activity.controller';
@@ -44,6 +46,7 @@ import {
     }),
   ],
   controllers: [
+    VisitsController,
     ModerationController,
     ModerationCapabilitiesController,
     VideoHlsController,
@@ -57,6 +60,7 @@ import {
     MessagingController,
   ],
   providers: [
+    VisitsService,
     ModerationService,
     VideoHlsService,
     SavedSearchService,
