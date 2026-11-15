@@ -21,4 +21,7 @@ for (const data of [null, [], {}, 'url', { url: 'https://other.invalid' }, { vid
 assert.deepEqual(destination({type:'property_match',propertyId:videoId,searchMatchId:'17'}),{kind:'property',propertyId:videoId,matchId:'17'});
 assert.equal(destination({type:'property_match',propertyId:videoId,searchMatchId:'../private'}),null);
 assert.equal(destination({type:'property_match',propertyId:'bad',searchMatchId:'17'}),null);
-console.log('PASS: 16 notification destination checks. No network or credentials.');
+assert.deepEqual(destination({type:'visit',visitId:videoId}),{kind:'visit',visitId:videoId});
+assert.equal(destination({type:'visit',visitId:'../../private'}),null);
+assert.equal(destination({type:'visit',visitId:'https://other.invalid'}),null);
+console.log('PASS: 19 notification destination checks. No network or credentials.');
