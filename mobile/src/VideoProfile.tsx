@@ -1,3 +1,4 @@
+import { hlsUnavailable } from "./video-playback-policy";
 import { ModerationActions } from "./ModerationActions";
 import { playbackSource, preferredVideoUrl } from "./video-source";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -84,8 +85,8 @@ function FullVideoPlayer({
       p.muted = false;
       p.volume = 1;
       p.bufferOptions = {
-        minBufferForPlayback: 0.75,
-        preferredForwardBufferDuration: 8,
+        minBufferForPlayback: 1.5,
+        preferredForwardBufferDuration: 20,
         maxBufferBytes: 8 * 1024 * 1024,
       };
     },
@@ -103,7 +104,12 @@ function FullVideoPlayer({
   }, [active, foreground, paused, player]);
   useEffect(() => {
     const sub = player.addListener("statusChange", (e) => {
-      if (e.status === "error" && video.hls_url && !fallbackUsed.current) {
+      if (
+        e.status === "error" &&
+        video.hls_url &&
+        !fallbackUsed.current &&
+        hlsUnavailable(e.error?.message)
+      ) {
         fallbackUsed.current = true;
         void player.replaceAsync(playbackSource(video.url)).catch(() => {});
         return;

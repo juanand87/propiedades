@@ -7,6 +7,12 @@ export function preferredVideoUrl(video: {
 }) {
   return Platform.OS === "web" ? video.url : video.hls_url || video.url;
 }
+export function preparedPlayerFor<T>(
+  video: { url: string; hls_url?: string | null },
+  entry?: { url: string; player: T },
+): T | undefined {
+  return entry?.url === preferredVideoUrl(video) ? entry.player : undefined;
+}
 export function playbackSource(url: string): VideoSource {
   const hls = url.includes("/hls/master.m3u8?");
   return {

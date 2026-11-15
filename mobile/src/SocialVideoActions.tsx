@@ -11,8 +11,6 @@ import {
   Alert,
   Image,
   Keyboard,
-  KeyboardAvoidingView,
-  Platform,
   Modal,
   Pressable,
   ScrollView,
@@ -25,7 +23,9 @@ import {
 import { Directory, File, Paths } from "expo-file-system";
 import { useRouter } from "expo-router";
 import { api, mediaUrl, Page, Property, Session } from "./api";
-import { videoColors } from "./video-colors";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { KeyboardSafeView } from "./KeyboardSafeView";
+import { videoColors, lightColors } from "./video-colors";
 import { ProppixIcon } from "./ProppixIcon";
 import { VideoSocialData } from "./social-types";
 
@@ -55,6 +55,7 @@ export function SocialVideoActions({
   };
 }) {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const submitLock = useRef(false);
   const commentInput = useRef<ComponentRef<typeof TextInput>>(null);
   const commentList = useRef<ComponentRef<typeof ScrollView>>(null);
@@ -88,6 +89,7 @@ export function SocialVideoActions({
   const [propertyPage, setPropertyPage] = useState(0);
   const [propertyPages, setPropertyPages] = useState(0);
   const token = session?.access_token;
+  const sheetColors = panel === "comments" ? lightColors : videoColors;
   useEffect(() => {
     let live = true;
     void api<VideoSocialData>(`/videos/${videoId}/social`, { token })
@@ -242,7 +244,11 @@ export function SocialVideoActions({
       onPress={fn}
       style={s.option}
     >
-      <Text style={s.white}>{label}</Text>
+      <Text
+        style={[s.white, panel === "comments" && { color: lightColors.text }]}
+      >
+        {label}
+      </Text>
     </Pressable>
   );
   const propertyId = data?.property_id;
@@ -512,13 +518,16 @@ export function SocialVideoActions({
             requestAnimationFrame(() => commentInput.current?.focus());
         }}
       >
-        <KeyboardAvoidingView
-          style={s.backdrop}
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
-        >
-          <View style={[s.sheet, panel === "comments" && s.commentSheet]}>
+        <KeyboardSafeView style={s.backdrop}>
+          <View
+            style={[
+              s.sheet,
+              panel === "comments" && s.commentSheet,
+              { paddingBottom: Math.max(20, insets.bottom + 12) },
+            ]}
+          >
             <View style={s.heading}>
-              <Text style={s.name}>
+              <Text style={[s.name, { color: sheetColors.text }]}>
                 {panel === "comments" ? "Comentarios" : "Editar video"}
               </Text>
               <Pressable
@@ -528,19 +537,25 @@ export function SocialVideoActions({
                 style={{ padding: 10 }}
                 onPress={() => setPanel(null)}
               >
-                <ProppixIcon name="close" size={26} />
+                <ProppixIcon name="close" size={26} color={sheetColors.text} />
               </Pressable>
             </View>
             {busy && <ActivityIndicator color={videoColors.cyan} />}
             {!!error && (
-              <Text accessibilityRole="alert" style={s.error}>
+              <Text
+                accessibilityRole="alert"
+                style={[
+                  s.error,
+                  { color: panel === "comments" ? "#b02b3b" : "#ffb5ac" },
+                ]}
+              >
                 {error}
               </Text>
             )}
             <ScrollView
               ref={commentList}
               onContentSizeChange={() => scrollToTarget()}
-              style={{ flexShrink: 1 }}
+              style={panel === "comments" ? { flex: 1 } : { flexShrink: 1 }}
               keyboardShouldPersistTaps="always"
               keyboardDismissMode="none"
             >
@@ -578,7 +593,9 @@ export function SocialVideoActions({
                         params: { videoId, propertyMode: "new" },
                       });
                     })}
-                  <Text style={s.muted}>Título</Text>
+                  <Text style={[s.muted, { color: sheetColors.muted }]}>
+                    Título
+                  </Text>
                   <TextInput
                     accessibilityLabel="Editar título del video"
                     value={title}
@@ -625,8 +642,10 @@ export function SocialVideoActions({
                         setPanel(null);
                       }),
                   )}
-                  <Text style={s.name}>Propiedad vinculada · opcional</Text>
-                  <Text style={s.muted}>
+                  <Text style={[s.name, { color: sheetColors.text }]}>
+                    Propiedad vinculada · opcional
+                  </Text>
+                  <Text style={[s.muted, { color: sheetColors.muted }]}>
                     {data?.property_title || "Sin propiedad vinculada"}. Cambiar
                     el vínculo deja el video como borrador.
                   </Text>
@@ -664,7 +683,7 @@ export function SocialVideoActions({
                     </View>
                   ))}
                   {!properties.length && !busy && (
-                    <Text style={s.muted}>
+                    <Text style={[s.muted, { color: sheetColors.muted }]}>
                       No tienes propiedades para vincular. Puedes mantener el
                       video independiente.
                     </Text>
@@ -679,7 +698,9 @@ export function SocialVideoActions({
               {panel === "comments" && (
                 <>
                   {!comments.length && (
-                    <Text style={s.muted}>Sé el primero en comentar.</Text>
+                    <Text style={[s.muted, { color: sheetColors.muted }]}>
+                      Sé el primero en comentar.
+                    </Text>
                   )}
                   {comments.map((c) => (
                     <View
@@ -702,19 +723,23 @@ export function SocialVideoActions({
                           Comentario de la notificación
                         </Text>
                       )}
-                      <Text style={s.name}>{c.display_name}</Text>
+                      <Text style={[s.name, { color: sheetColors.text }]}>
+                        {c.display_name}
+                      </Text>
                       {c.parent_id && (
-                        <Text style={s.muted}>
+                        <Text style={[s.muted, { color: sheetColors.muted }]}>
                           En respuesta a {c.parent_name || "un comentario"}
                         </Text>
                       )}
-                      <Text style={s.white}>{c.body}</Text>
+                      <Text style={[s.white, { color: sheetColors.text }]}>
+                        {c.body}
+                      </Text>
                       <ModerationActions
                         kind="comment"
                         targetId={c.id}
                         authorId={c.user_id}
                         session={session}
-                        color="#8be3ff"
+                        color={lightColors.cyan}
                       />
                       <Pressable
                         accessibilityRole="button"
@@ -730,7 +755,9 @@ export function SocialVideoActions({
                           );
                         }}
                       >
-                        <Text style={s.white}>Responder</Text>
+                        <Text style={[s.white, { color: sheetColors.text }]}>
+                          Responder
+                        </Text>
                       </Pressable>
                     </View>
                   ))}
@@ -751,11 +778,20 @@ export function SocialVideoActions({
                     blurOnSubmit={false}
                     submitBehavior="newline"
                     placeholder="Escribe un comentario…"
-                    placeholderTextColor={videoColors.muted}
+                    placeholderTextColor={sheetColors.muted}
                     value={comment}
                     onChangeText={setComment}
                     maxLength={2000}
-                    style={[s.input, s.commentInput]}
+                    style={[
+                      s.input,
+                      s.commentInput,
+                      {
+                        color: sheetColors.text,
+                        backgroundColor: sheetColors.surface,
+                        borderWidth: 1,
+                        borderColor: sheetColors.border,
+                      },
+                    ]}
                     multiline
                     textAlignVertical="top"
                   />
@@ -776,14 +812,14 @@ export function SocialVideoActions({
                     {busy ? (
                       <ActivityIndicator color="#fff" />
                     ) : (
-                      <ProppixIcon name="send" size={23} />
+                      <ProppixIcon name="send" size={23} color="#fff" />
                     )}
                   </Pressable>
                 </View>
               </>
             )}
           </View>
-        </KeyboardAvoidingView>
+        </KeyboardSafeView>
       </Modal>
     </>
   );
@@ -870,7 +906,7 @@ const s = StyleSheet.create({
     paddingVertical: 17,
   },
   resumeText: { color: "#fff", fontSize: 21, fontWeight: "800" },
-  commentSheet: { height: "78%", maxHeight: "100%" },
+  commentSheet: { height: "78%", maxHeight: "100%", backgroundColor: "#fff" },
   composer: {
     flexDirection: "row",
     alignItems: "flex-end",
@@ -954,18 +990,18 @@ const s = StyleSheet.create({
   },
   comment: {
     paddingVertical: 14,
-    borderBottomColor: videoColors.border,
+    borderBottomColor: lightColors.border,
     borderBottomWidth: 1,
   },
   highlightedComment: {
-    backgroundColor: "#164474",
+    backgroundColor: "#edf6ff",
     borderColor: "#31c8ee",
     borderWidth: 1,
     borderRadius: 12,
     paddingHorizontal: 12,
   },
   highlightLabel: {
-    color: "#8be3ff",
+    color: "#0866f5",
     fontSize: 12,
     fontWeight: "700",
     marginBottom: 8,

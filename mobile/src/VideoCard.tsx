@@ -1,3 +1,4 @@
+import { playbackSource, preferredVideoUrl } from "./video-source";
 import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -90,11 +91,7 @@ function Player({
               setLoading(true);
               setFirstFrame(false);
               void player
-                .replaceAsync({
-                  uri: mediaUrl(url),
-                  contentType: "progressive",
-                  useCaching: true,
-                })
+                .replaceAsync(playbackSource(url))
                 .then(() => {
                   if (playingAllowed.current) player.play();
                 })
@@ -155,7 +152,7 @@ export function VideoCard({
       {active && player && (
         <Player
           key={item.id}
-          url={item.url}
+          url={preferredVideoUrl(item)}
           poster={item.thumbnail_url || p?.media[0]?.url}
           player={player}
           paused={paused}

@@ -1,8 +1,14 @@
+import {
+  captureCatalogSwipe,
+  finishCatalogSwipe,
+} from "./video-playback-policy";
+import { preparedPlayerFor } from "./video-source";
 import { VisitsScreen } from "./VisitsScreen";
 import { BlockedUsersScreen } from "./BlockedUsersScreen";
 import { listenModerationChange } from "./moderation-events";
 import {
   useCallback,
+  useMemo,
   useEffect,
   useEffectEvent,
   useRef,
@@ -15,6 +21,7 @@ import {
   FlatList,
   Linking,
   Modal,
+  PanResponder,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -277,6 +284,26 @@ function AppContent() {
     !savedSearchRoute &&
     !blockedUsersRoute &&
     !visitsRoute;
+  const catalogSwipe = useMemo(
+    () =>
+      PanResponder.create({
+        onMoveShouldSetPanResponderCapture: (_event, gesture) =>
+          feedVisible &&
+          captureCatalogSwipe(
+            gesture.dx,
+            gesture.dy,
+            gesture.numberActiveTouches,
+          ),
+        onPanResponderRelease: (_event, gesture) => {
+          if (finishCatalogSwipe(gesture.dx, gesture.dy)) {
+            setDetail(null);
+            router.replace("/propiedades");
+          }
+        },
+        onPanResponderTerminationRequest: () => true,
+      }),
+    [feedVisible, router],
+  );
   const preparedVideos = useVideoPreload(videos, active, ready, !feedVisible);
   const feedRef = useRef<FlatList<Video>>(null),
     feedDragIndex = useRef(0),
@@ -826,6 +853,7 @@ function AppContent() {
   const feedScreen = (
     <View
       style={s.feed}
+      {...catalogSwipe.panHandlers}
       onLayout={(e) => setHeight(e.nativeEvent.layout.height)}
     >
       {height > 1 && (
@@ -906,10 +934,8 @@ function AppContent() {
               height={height}
               active={index === active && feedVisible}
               player={
-                feedVisible &&
-                index === active &&
-                preparedVideos.get(item.id)?.url === item.url
-                  ? preparedVideos.get(item.id)?.player
+                feedVisible && index === active
+                  ? preparedPlayerFor(item, preparedVideos.get(item.id))
                   : undefined
               }
               social={socialEnabled}
