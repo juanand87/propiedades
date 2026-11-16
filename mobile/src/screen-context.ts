@@ -7,6 +7,7 @@ type Screen =
   | "savedSearches"
   | "blockedUsers"
   | "visits"
+  | "profileSearch"
   | "manage"
   | "account"
   | "recorder"

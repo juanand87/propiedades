@@ -1,4 +1,7 @@
 export type VideoProfileData = {
+  profile_kind?: "person" | "company" | null;
+  username?: string | null;
+  identity_configured?: boolean;
   id: string;
   display_name: string;
   avatar_url: string | null;

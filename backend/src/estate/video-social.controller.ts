@@ -1,3 +1,4 @@
+import type { Actor } from './rules';
 import {
   Body,
   Controller,
@@ -14,6 +15,20 @@ import { VideoSocialService } from './video-social.service';
 @Controller()
 export class VideoSocialController {
   constructor(private social: VideoSocialService) {}
+  @Get('video-profiles/capabilities')
+  async capabilities() {
+    this.social.guard();
+    const ready = await this.social.identitiesAvailable();
+    return { enabled: true, search: ready, profile_types: ready };
+  }
+  @Get('video-profiles/search')
+  @UseGuards(EstateGuard)
+  search(
+    @Query() q: { q?: unknown; kind?: unknown; page?: unknown },
+    @Req() req: { user: Actor },
+  ) {
+    return this.social.search(q, req.user);
+  }
   @Get('video-profiles/:id')
   @UseGuards(OptionalEstateGuard)
   profile(@Param('id') id: string, @Req() req: any) {
@@ -26,7 +41,16 @@ export class VideoSocialController {
   }
   @Post('me/video-profile')
   @UseGuards(EstateGuard)
-  saveProfile(@Body() body: any, @Req() req: any) {
+  saveProfile(
+    @Body()
+    body: {
+      profile_kind?: unknown;
+      username?: unknown;
+      display_name?: unknown;
+      avatar_media_id?: unknown;
+    },
+    @Req() req: { user: Actor },
+  ) {
     return this.social.saveProfile(req.user, body);
   }
   @Get('video-profiles/:id/followers')

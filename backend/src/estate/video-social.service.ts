@@ -1,7 +1,9 @@
+import { profileIdentity } from './profile-identity';
 import { ModerationService } from './moderation.service';
 import { notBlocked, notHidden } from './moderation-rules';
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -31,6 +33,83 @@ export class VideoSocialService {
     private activity: ActivityService,
     private moderation: ModerationService,
   ) {}
+  private identityReady = false;
+  async identitiesAvailable() {
+    if (this.identityReady) return true;
+    const [schema] = await this.db.query<{ n: number }[]>(
+      "SELECT COUNT(*) n FROM information_schema.tables WHERE table_schema=DATABASE() AND table_name='estate_profile_identity'",
+    );
+    return (this.identityReady = Number(schema?.n) === 1);
+  }
+  async search(
+    query: { q?: unknown; kind?: unknown; page?: unknown },
+    actor: Actor,
+  ) {
+    this.guard();
+    if (!(await this.identitiesAvailable()))
+      throw new ServiceUnavailableException(
+        'Buscar perfiles está pendiente de configurar.',
+      );
+    const kind =
+      typeof query.kind === 'string'
+        ? query.kind
+        : query.kind == null
+          ? 'all'
+          : '';
+    if (!['all', 'person', 'company'].includes(String(kind)))
+      throw new BadRequestException('Filtro de perfiles inválido.');
+    const q = text(query.q, 100).replace(/^@/, '').trim();
+    const page = Math.max(
+      1,
+      Math.min(10000, parseInt(String(query.page ?? '1'), 10) || 1),
+    );
+    if (q.length < 2) return { items: [], page, has_more: false };
+    this.estate.throttle('profile-search:' + actor.id, 90, 60000);
+    const pattern = '%' + q.replace(/[!%_]/g, (char) => '!' + char) + '%';
+    const rows = await this.db.query<
+      {
+        id: string;
+        display_name: string;
+        avatar_media_id: string | null;
+        profile_kind: string | null;
+        username: string | null;
+        followed: number;
+      }[]
+    >(
+      `SELECT candidate.id,COALESCE(vp.display_name,CONVERT(candidate.firstName USING utf8mb4) COLLATE utf8mb4_unicode_ci) display_name,vp.avatar_media_id,pi.profile_kind,pi.username,
+      EXISTS(SELECT 1 FROM estate_video_follows f WHERE f.follower_id=? AND f.followed_id=CONVERT(candidate.id USING utf8mb4) COLLATE utf8mb4_unicode_ci) followed
+      FROM users candidate LEFT JOIN estate_video_profiles vp ON vp.user_id=CONVERT(candidate.id USING utf8mb4) COLLATE utf8mb4_unicode_ci LEFT JOIN estate_profile_identity pi ON pi.user_id=CONVERT(candidate.id USING utf8mb4) COLLATE utf8mb4_unicode_ci
+      WHERE candidate.isActive=1 AND candidate.id<>? AND (vp.user_id IS NOT NULL OR pi.user_id IS NOT NULL OR EXISTS(SELECT 1 ${videoJoined} WHERE v.created_by=CONVERT(candidate.id USING utf8mb4) COLLATE utf8mb4_unicode_ci AND ${videoVisible}))
+      AND (CONVERT(COALESCE(vp.display_name,CONVERT(candidate.firstName USING utf8mb4) COLLATE utf8mb4_unicode_ci) USING utf8mb4) COLLATE utf8mb4_unicode_ci LIKE ? ESCAPE '!' OR CONVERT(pi.username USING utf8mb4) COLLATE utf8mb4_unicode_ci LIKE ? ESCAPE '!')
+      ${kind === 'all' ? '' : 'AND pi.profile_kind=?'} AND ${notBlocked('?', 'candidate.id')}
+      ORDER BY (CONVERT(pi.username USING utf8mb4) COLLATE utf8mb4_unicode_ci=?) DESC,display_name,candidate.id LIMIT 25 OFFSET ?`,
+      [
+        actor.id,
+        actor.id,
+        pattern,
+        pattern,
+        ...(kind === 'all' ? [] : [kind]),
+        actor.id,
+        actor.id,
+        q,
+        (page - 1) * 24,
+      ],
+    );
+    return {
+      items: rows.slice(0, 24).map((row) => ({
+        id: row.id,
+        display_name: row.display_name,
+        profile_kind: row.profile_kind,
+        username: row.username,
+        followed: !!Number(row.followed),
+        avatar_url: row.avatar_media_id
+          ? this.estate.mediaUrl(row.avatar_media_id, { id: row.id } as Actor)
+          : null,
+      })),
+      page,
+      has_more: rows.length > 24,
+    };
+  }
   guard() {
     if (this.config.get('SOCIAL_VIDEOS_ENABLED') !== 'true')
       throw new ServiceUnavailableException(
@@ -63,6 +142,12 @@ export class VideoSocialService {
     if (!u) throw new NotFoundException('Perfil no disponible.');
     if (actor && actor.id !== userId)
       await this.moderation.assertContact(actor.id, userId);
+    const [identity] = (await this.identitiesAvailable())
+      ? await this.db.query<{ profile_kind: string; username: string }[]>(
+          'SELECT profile_kind,username FROM estate_profile_identity WHERE user_id=?',
+          [userId],
+        )
+      : [];
     const [[following], [followers], [likes], [relation]] = await Promise.all([
       this.db.query(
         'SELECT COUNT(*) n FROM estate_video_follows WHERE follower_id=?',
@@ -84,6 +169,9 @@ export class VideoSocialService {
     return {
       id: u.id,
       display_name: u.display_name || u.firstName,
+      profile_kind: identity?.profile_kind || null,
+      username: identity?.username || null,
+      identity_configured: !!identity,
       avatar_url: u.avatar_media_id
         ? this.estate.mediaUrl(u.avatar_media_id, { id: u.id } as Actor)
         : null,
@@ -93,29 +181,77 @@ export class VideoSocialService {
       followed: Number(relation.n) > 0,
     };
   }
-  async saveProfile(actor: Actor, body: any) {
+  async saveProfile(
+    actor: Actor,
+    body: {
+      profile_kind?: unknown;
+      username?: unknown;
+      display_name?: unknown;
+      avatar_media_id?: unknown;
+    },
+  ) {
     this.guard();
-    const name = text(body.display_name, 100) || actor.firstName;
-    let avatar: string | null = null;
-    if (body.avatar_media_id) {
-      const [m] = await this.db.query(
-        'SELECT id FROM estate_media WHERE id=? AND owner_id=?',
-        [uuid(body.avatar_media_id), actor.id],
+    const identity =
+      body?.profile_kind !== undefined || body?.username !== undefined
+        ? profileIdentity(body)
+        : null;
+    if (identity && !(await this.identitiesAvailable()))
+      throw new ServiceUnavailableException(
+        'Los tipos de perfil están pendientes de configurar.',
       );
-      if (!m)
-        throw new ForbiddenException('La foto debe pertenecer a tu cuenta.');
-      avatar = m.id;
-    } else {
-      const [old] = await this.db.query(
-        'SELECT avatar_media_id FROM estate_video_profiles WHERE user_id=?',
-        [actor.id],
-      );
-      avatar = old?.avatar_media_id || null;
+    const name =
+      identity?.display_name ||
+      text(body?.display_name, 100) ||
+      actor.firstName;
+    try {
+      await this.db.transaction(async (tx) => {
+        await tx.query('SELECT id FROM users WHERE id=? FOR UPDATE', [
+          actor.id,
+        ]);
+        let avatar: string | null = null;
+        if (body?.avatar_media_id) {
+          const [media] = await tx.query<{ id: string }[]>(
+            'SELECT id FROM estate_media WHERE id=? AND owner_id=?',
+            [uuid(body.avatar_media_id), actor.id],
+          );
+          if (!media)
+            throw new ForbiddenException(
+              'La foto debe pertenecer a tu cuenta.',
+            );
+          avatar = media.id;
+        } else {
+          const [old] = await tx.query<{ avatar_media_id: string | null }[]>(
+            'SELECT avatar_media_id FROM estate_video_profiles WHERE user_id=?',
+            [actor.id],
+          );
+          avatar = old?.avatar_media_id || null;
+        }
+        await tx.query(
+          'INSERT INTO estate_video_profiles(user_id,display_name,avatar_media_id) VALUES (?,?,?) ON DUPLICATE KEY UPDATE display_name=VALUES(display_name),avatar_media_id=VALUES(avatar_media_id)',
+          [actor.id, name, avatar],
+        );
+        if (identity) {
+          const [old] = await tx.query<{ user_id: string }[]>(
+            'SELECT user_id FROM estate_profile_identity WHERE user_id=? FOR UPDATE',
+            [actor.id],
+          );
+          if (old)
+            await tx.query(
+              'UPDATE estate_profile_identity SET profile_kind=?,username=? WHERE user_id=?',
+              [identity.profile_kind, identity.username, actor.id],
+            );
+          else
+            await tx.query(
+              'INSERT INTO estate_profile_identity(user_id,profile_kind,username) VALUES (?,?,?)',
+              [actor.id, identity.profile_kind, identity.username],
+            );
+        }
+      });
+    } catch (error) {
+      if ((error as { code?: string }).code === 'ER_DUP_ENTRY')
+        throw new ConflictException('Ese @usuario ya está en uso. Elige otro.');
+      throw error;
     }
-    await this.db.query(
-      'INSERT INTO estate_video_profiles(user_id,display_name,avatar_media_id) VALUES (?,?,?) ON DUPLICATE KEY UPDATE display_name=VALUES(display_name),avatar_media_id=VALUES(avatar_media_id)',
-      [actor.id, name, avatar],
-    );
     return this.profile(actor.id, actor);
   }
   async gallery(userId: string, q: any, actor?: Actor) {

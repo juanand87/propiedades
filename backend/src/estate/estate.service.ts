@@ -1,3 +1,4 @@
+import { profileIdentity } from './profile-identity';
 import { propertyFilters } from './property-filters';
 import { membershipPlans, MembershipPlan } from './membership';
 import {
@@ -304,7 +305,18 @@ export class EstateService {
       user: actor,
     };
   }
-  async register(body: any, ip: string) {
+  async register(
+    body: {
+      email?: unknown;
+      firstName?: unknown;
+      lastName?: unknown;
+      password?: unknown;
+      profile_kind?: unknown;
+      username?: unknown;
+      display_name?: unknown;
+    },
+    ip: string,
+  ) {
     this.throttle(`register:${ip}`, 5, 3600_000);
     const address = email(body.email),
       firstName = text(body.firstName, 100),
@@ -319,15 +331,46 @@ export class EstateService {
       throw new BadRequestException(
         'Completa nombre, apellido y una contraseña de 10 a 72 bytes.',
       );
+    const identity =
+      body.profile_kind !== undefined || body.username !== undefined
+        ? profileIdentity(body)
+        : null;
+    if (identity) {
+      const [schema] = await this.db.query<{ n: number }[]>(
+        "SELECT COUNT(*) n FROM information_schema.tables WHERE table_schema=DATABASE() AND table_name='estate_profile_identity'",
+      );
+      if (!Number(schema?.n))
+        throw new ServiceUnavailableException(
+          'Los tipos de perfil están pendientes de configurar.',
+        );
+    }
     const id = randomUUID(),
       password = await bcrypt.hash(body.password, 12);
     try {
-      await this.db.query(
-        "INSERT INTO users(id,email,password,firstName,lastName,role,isActive,requirePasswordChange,createdBy,createdAt,updatedAt) VALUES (?,?,?,?,?,'customer',1,0,'self-registration',UTC_TIMESTAMP(),UTC_TIMESTAMP())",
-        [id, address, password, firstName, lastName],
-      );
-    } catch (e) {
-      if (e.code === 'ER_DUP_ENTRY')
+      await this.db.transaction(async (tx) => {
+        await tx.query(
+          "INSERT INTO users(id,email,password,firstName,lastName,role,isActive,requirePasswordChange,createdBy,createdAt,updatedAt) VALUES (?,?,?,?,?,'customer',1,0,'self-registration',UTC_TIMESTAMP(),UTC_TIMESTAMP())",
+          [id, address, password, firstName, lastName],
+        );
+        if (identity) {
+          await tx.query(
+            'INSERT INTO estate_video_profiles(user_id,display_name) VALUES (?,?)',
+            [id, identity.display_name],
+          );
+          await tx.query(
+            'INSERT INTO estate_profile_identity(user_id,profile_kind,username) VALUES (?,?,?)',
+            [id, identity.profile_kind, identity.username],
+          );
+        }
+      });
+    } catch (e: unknown) {
+      const error = e as { code?: string; sqlMessage?: string };
+      if (
+        error.code === 'ER_DUP_ENTRY' &&
+        String(error.sqlMessage).includes('profile_username')
+      )
+        throw new ConflictException('Ese @usuario ya está en uso. Elige otro.');
+      if (error.code === 'ER_DUP_ENTRY')
         throw new ConflictException('Ese correo ya tiene una cuenta.');
       throw e;
     }

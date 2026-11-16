@@ -1,3 +1,10 @@
+import {
+  ProfileIdentityFields,
+  ProfileIdentityDraft,
+  emptyProfileIdentity,
+  identityComplete,
+} from "./ProfileIdentityFields";
+import { KeyboardSafeView } from "./KeyboardSafeView";
 import { hlsUnavailable } from "./video-playback-policy";
 import { ModerationActions } from "./ModerationActions";
 import { playbackSource, preferredVideoUrl } from "./video-source";
@@ -287,8 +294,30 @@ export function VideoProfile({
     [active, setActive] = useState(0),
     [height, setHeight] = useState(1);
   const [editProfile, setEditProfile] = useState(false),
-    [name, setName] = useState(""),
+    [identity, setIdentity] =
+      useState<ProfileIdentityDraft>(emptyProfileIdentity),
     [busy, setBusy] = useState(false);
+  const identityPrompted = useRef<string | null>(null);
+  useEffect(() => {
+    if (
+      !own ||
+      !profile ||
+      profile.id !== target ||
+      profile.identity_configured !== false ||
+      identityPrompted.current === target
+    )
+      return;
+    const timer = setTimeout(() => {
+      identityPrompted.current = target;
+      setIdentity({
+        profile_kind: profile.profile_kind || null,
+        username: profile.username || "",
+        display_name: profile.display_name,
+      });
+      setEditProfile(true);
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [own, profile, target]);
   const [asset, setAsset] = useState<ImagePicker.ImagePickerAsset | null>(null),
     [title, setTitle] = useState(""),
     [uploadId, setUploadId] = useState("");
@@ -476,9 +505,13 @@ export function VideoProfile({
         </Text>
         {own && (
           <Pressable
-            accessibilityLabel="Editar nombre de perfil"
+            accessibilityLabel="Editar perfil"
             onPress={() => {
-              setName(profile?.display_name || "");
+              setIdentity({
+                profile_kind: profile?.profile_kind || null,
+                username: profile?.username || "",
+                display_name: profile?.display_name || "",
+              });
               setEditProfile(true);
             }}
           >
@@ -486,6 +519,23 @@ export function VideoProfile({
           </Pressable>
         )}
       </View>
+      <View
+        style={{
+          flexDirection: "row",
+          gap: 10,
+          alignItems: "center",
+          justifyContent: "center",
+          marginVertical: 10,
+        }}
+      >
+        {profile?.username && <Text style={s.muted}>@{profile.username}</Text>}
+        {profile?.profile_kind && (
+          <Text style={{ color: "#0866f5", fontWeight: "700" }}>
+            {profile.profile_kind === "company" ? "Empresa" : "Persona"}
+          </Text>
+        )}
+      </View>
+      {button("Buscar perfiles", () => router.push("/buscar-perfiles"), true)}
       <View style={s.counters}>
         {(
           [
@@ -857,35 +907,57 @@ export function VideoProfile({
         visible={editProfile}
         transparent
         animationType="slide"
-        onRequestClose={() => setEditProfile(false)}
+        onRequestClose={() => {
+          if (!busy) setEditProfile(false);
+        }}
       >
-        <View style={s.overlay}>
-          <View style={s.dialog}>
-            <Text style={s.title}>Editar perfil</Text>
-            <TextInput
-              accessibilityLabel="Nombre del perfil"
-              value={name}
-              onChangeText={setName}
-              maxLength={100}
-              style={s.input}
-            />
-            {button(
-              "Guardar",
-              () =>
-                void run(async () => {
-                  setProfile(
-                    await api("/me/video-profile", {
-                      method: "POST",
-                      token,
-                      body: { display_name: name },
-                    }),
-                  );
-                  setEditProfile(false);
-                }),
-            )}
-            {button("Cancelar", () => setEditProfile(false), true)}
+        <KeyboardSafeView style={s.overlay}>
+          <View style={[s.dialog, { maxHeight: "95%" }]}>
+            <ScrollView
+              keyboardShouldPersistTaps="always"
+              keyboardDismissMode="none"
+            >
+              <Text style={s.title}>
+                {profile?.identity_configured
+                  ? "Editar perfil"
+                  : "Completa tu perfil"}
+              </Text>
+              <ProfileIdentityFields
+                value={identity}
+                onChange={setIdentity}
+                disabled={busy}
+              />
+              {!!error && (
+                <Text accessibilityRole="alert" style={s.error}>
+                  {error}
+                </Text>
+              )}
+              <Pressable
+                accessibilityRole="button"
+                disabled={busy || !identityComplete(identity)}
+                style={[
+                  s.button,
+                  (busy || !identityComplete(identity)) && { opacity: 0.45 },
+                ]}
+                onPress={() =>
+                  void run(async () => {
+                    const result = await api<VideoProfileData>(
+                      "/me/video-profile",
+                      { method: "POST", token, body: identity },
+                    );
+                    setProfile(result);
+                    setEditProfile(false);
+                  })
+                }
+              >
+                <Text style={s.buttonText}>
+                  {busy ? "Guardando…" : "Guardar perfil"}
+                </Text>
+              </Pressable>
+              {button("Cerrar", () => setEditProfile(false), true)}
+            </ScrollView>
           </View>
-        </View>
+        </KeyboardSafeView>
       </Modal>
       <Modal
         visible={!!asset}

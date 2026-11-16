@@ -1,3 +1,10 @@
+import { ProfileSearchScreen } from "./ProfileSearchScreen";
+import {
+  ProfileIdentityFields,
+  ProfileIdentityDraft,
+  emptyProfileIdentity,
+  identityComplete,
+} from "./ProfileIdentityFields";
 import { HomePager } from "./HomePager";
 import {
   GestureHandlerRootView,
@@ -128,6 +135,7 @@ function AppContent() {
   const notificationVideoRoute = pathname.startsWith("/video/");
   const activityRoute = pathname === "/actividad";
   const savedSearchRoute = pathname === "/busquedas";
+  const profileSearchRoute = pathname === "/buscar-perfiles";
   const visitsRoute = pathname === "/visitas";
   const blockedUsersRoute = pathname === "/bloqueados";
   const {
@@ -163,7 +171,7 @@ function AppContent() {
     ? from && from in routes
       ? from
       : "feed"
-    : recordingRoute || profileRoute
+    : recordingRoute || profileRoute || profileSearchRoute
       ? "manage"
       : pathname === "/propiedades"
         ? "catalog"
@@ -283,7 +291,8 @@ function AppContent() {
     !activityRoute &&
     !savedSearchRoute &&
     !blockedUsersRoute &&
-    !visitsRoute;
+    !visitsRoute &&
+    !profileSearchRoute;
   const homePair = pathname === "/" || pathname === "/propiedades";
   const feedScrollGesture = useNativeGesture({ enabled: feedVisible });
   const preparedVideos = useVideoPreload(videos, active, ready, !feedVisible);
@@ -301,6 +310,8 @@ function AppContent() {
     ),
     [password, setPassword] = useState(""),
     [authBusy, setAuthBusy] = useState(false);
+  const [registrationIdentity, setRegistrationIdentity] =
+    useState<ProfileIdentityDraft>(emptyProfileIdentity);
   const [registering, setRegistering] = useState(false),
     [firstName, setFirstName] = useState(""),
     [lastName, setLastName] = useState(""),
@@ -574,11 +585,19 @@ function AppContent() {
     try {
       if (registering && password !== confirmPassword)
         throw Error("Las contraseñas no coinciden.");
+      if (registering && !identityComplete(registrationIdentity))
+        throw Error("Completa el tipo, nombre visible y @usuario del perfil.");
       const value = await api<Session>(
         registering ? "/auth/register" : "/auth/login",
         {
           method: "POST",
-          body: { email: email.trim(), password, firstName, lastName },
+          body: {
+            email: email.trim(),
+            password,
+            firstName,
+            lastName,
+            ...(registering ? registrationIdentity : {}),
+          },
         },
       );
       await SecureStore.setItemAsync(sessionKey, JSON.stringify(value));
@@ -1055,7 +1074,16 @@ function AppContent() {
           )}
           {registering && (
             <>
-              <Text style={s.label}>Nombre</Text>
+              <ProfileIdentityFields
+                value={registrationIdentity}
+                onChange={setRegistrationIdentity}
+                disabled={authBusy}
+              />
+              <Text style={s.label}>
+                {registrationIdentity.profile_kind === "company"
+                  ? "Nombre del contacto"
+                  : "Nombre"}
+              </Text>
               <TextInput
                 style={s.input}
                 value={firstName}
@@ -1063,7 +1091,11 @@ function AppContent() {
                 accessibilityLabel="Nombre"
                 autoComplete="given-name"
               />
-              <Text style={s.label}>Apellido</Text>
+              <Text style={s.label}>
+                {registrationIdentity.profile_kind === "company"
+                  ? "Apellido del contacto"
+                  : "Apellido"}
+              </Text>
               <TextInput
                 style={s.input}
                 value={lastName}
@@ -1129,7 +1161,8 @@ function AppContent() {
               !email ||
               !password ||
               (registering &&
-                (!firstName.trim() ||
+                (!identityComplete(registrationIdentity) ||
+                  !firstName.trim() ||
                   !lastName.trim() ||
                   password.length < 10 ||
                   password !== confirmPassword))
@@ -1404,6 +1437,12 @@ function AppContent() {
             session={session}
           />
         ),
+        profileSearch: (
+          <ProfileSearchScreen
+            key={session?.user.id || "guest"}
+            session={session}
+          />
+        ),
         activity: (
           <ActivityScreen
             key={session?.user.id || "guest"}
@@ -1501,6 +1540,14 @@ function AppContent() {
                 onPress={() => {
                   setAccountMenu(false);
                   router.push("/actividad");
+                }}
+              />
+              <Button
+                label="Buscar perfiles"
+                secondary
+                onPress={() => {
+                  setAccountMenu(false);
+                  router.push("/buscar-perfiles");
                 }}
               />
               <Button
