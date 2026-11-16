@@ -1,3 +1,6 @@
+import { beginVideoLoad, videoSourceReady } from "./playback-metrics";
+import { VideoCover } from "./VideoCover";
+import { VideoSurface, DelayedVideoSpinner } from "./VideoSurface";
 import {
   ProfileIdentityFields,
   ProfileIdentityDraft,
@@ -26,7 +29,7 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useVideoPlayer, VideoView } from "expo-video";
+import { useVideoPlayer } from "expo-video";
 import * as ImagePicker from "expo-image-picker";
 import { File } from "expo-file-system";
 import { randomUUID } from "expo-crypto";
@@ -36,29 +39,11 @@ import { SocialVideoActions } from "./SocialVideoActions";
 import { SellerPanel } from "./SellerPanel";
 
 function VideoThumbnail({ video }: { video: ProfileVideo }) {
-  const [attempt, setAttempt] = useState(0);
-  const retry = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(
-    () => () => {
-      if (retry.current) clearTimeout(retry.current);
-    },
-    [],
-  );
-  const url = video.thumbnail_url;
-  if (!url) return <View style={StyleSheet.absoluteFill} />;
   return (
-    <Image
-      key={attempt}
-      source={{ uri: mediaUrl(url) }}
-      style={StyleSheet.absoluteFill}
-      resizeMode="cover"
-      onError={() => {
-        if (attempt < 8)
-          retry.current = setTimeout(
-            () => setAttempt((value) => value + 1),
-            1500 + attempt * 700,
-          );
-      }}
+    <VideoCover
+      url={video.thumbnail_url}
+      preview={video.thumbnail_preview}
+      fit="cover"
     />
   );
 }
@@ -81,19 +66,19 @@ function FullVideoPlayer({
   initialCommentId?: string;
 }) {
   const [paused, setPaused] = useState(false),
-    [foreground, setForeground] = useState(AppState.currentState === "active"),
-    [error, setError] = useState("");
+    [foreground, setForeground] = useState(AppState.currentState === "active");
   const fallbackUsed = useRef(false);
   const allowedToPlay = useRef(false);
   const player = useVideoPlayer(
     playbackSource(preferredVideoUrl(video)),
     (p) => {
+      beginVideoLoad(p);
       p.loop = true;
       p.muted = false;
       p.volume = 1;
       p.bufferOptions = {
-        minBufferForPlayback: 1.5,
-        preferredForwardBufferDuration: 20,
+        minBufferForPlayback: 0.65,
+        preferredForwardBufferDuration: 12,
         maxBufferBytes: 8 * 1024 * 1024,
       };
     },
@@ -122,34 +107,22 @@ function FullVideoPlayer({
         return;
       }
       if (e.status === "readyToPlay") {
+        videoSourceReady(player);
         if (allowedToPlay.current) player.play();
         else player.pause();
       }
-      if (e.status === "error")
-        setError(
-          "No se pudo reproducir. Cierra y vuelve a abrir el video para renovar el acceso.",
-        );
-      else setError("");
     });
     return () => sub.remove();
   }, [player, video.hls_url, video.url]);
   return (
     <View style={StyleSheet.absoluteFill}>
-      <Pressable
-        accessibilityLabel={paused ? "Reproducir video" : "Pausar video"}
-        style={StyleSheet.absoluteFill}
-        onPress={() => setPaused((v) => !v)}
-      >
-        <VideoView
-          style={StyleSheet.absoluteFill}
-          player={player}
-          nativeControls={false}
-          contentFit="contain"
-          surfaceType="surfaceView"
-        />
-        {paused && <Text style={s.play}>▶</Text>}
-      </Pressable>
-      {!!error && <Text style={s.playerError}>{error}</Text>}
+      <VideoSurface
+        player={player}
+        url={preferredVideoUrl(video)}
+        active={active && foreground}
+        paused={paused}
+        onPause={() => setPaused((value) => !value)}
+      />
       <SocialVideoActions
         videoId={video.id}
         session={session}
@@ -196,15 +169,23 @@ export function FullVideo(props: {
       live = false;
     };
   }, [own, props.video.id, props.session?.access_token]);
-  return url ? (
-    <FullVideoPlayer
-      {...props}
-      video={{ ...props.video, url, hls_url: hlsUrl }}
-    />
-  ) : error ? (
-    <Text style={s.playerError}>{error}</Text>
-  ) : (
-    <ActivityIndicator color="#0866f5" />
+  return (
+    <View style={StyleSheet.absoluteFill}>
+      <VideoCover
+        url={props.video.thumbnail_url}
+        preview={props.video.thumbnail_preview}
+      />
+      {url ? (
+        <FullVideoPlayer
+          {...props}
+          video={{ ...props.video, url, hls_url: hlsUrl }}
+        />
+      ) : error ? (
+        <Text style={s.playerError}>{error}</Text>
+      ) : (
+        <DelayedVideoSpinner waiting={props.active} />
+      )}
+    </View>
   );
 }
 export function VideoProfile({
@@ -875,13 +856,14 @@ export function VideoProfile({
               }
               initialNumToRender={1}
               windowSize={3}
+              removeClippedSubviews={false}
               renderItem={({ item, index }) => (
                 <View style={{ height, backgroundColor: "#000" }}>
-                  {index === active && (
+                  {(index === active || index === active + 1) && (
                     <FullVideo
                       key={item.id}
                       video={item}
-                      active
+                      active={index === active}
                       session={session}
                       onChanged={() => {
                         setChanged(true);

@@ -1,3 +1,4 @@
+import { videoCoverPreview } from './video-cover-preview';
 import { notBlocked, notHidden } from './moderation-rules';
 import { compressVideo } from './video-compression';
 import { videoPoster } from './video-poster';
@@ -85,6 +86,7 @@ export class PropertyVideosService {
         hls: await this.hls.available(),
         storage: this.storage.enabled ? 'spaces' : 'local',
         version: 1,
+        inline_covers: true,
         social: this.config.get('SOCIAL_VIDEOS_ENABLED') === 'true',
       };
     } catch {
@@ -118,6 +120,9 @@ export class PropertyVideosService {
       [...params, ...(seed ? [seed] : []), limit, (page - 1) * limit],
     );
     const hlsUrls = await this.hls.urls(rows.map((v: { id: string }) => v.id));
+    const covers = await this.posterPreviews(
+      rows.map((v: { id: string }) => v.id),
+    );
     return {
       items: await Promise.all(
         rows.map(async (v: any) => ({
@@ -125,6 +130,7 @@ export class PropertyVideosService {
           url: `/api/videos/${v.id}/content`,
           hls_url: hlsUrls.get(v.id) || null,
           thumbnail_url: `/api/videos/${v.id}/thumbnail`,
+          thumbnail_preview: covers.get(v.id) || null,
           creator: { id: v.creator_id, display_name: v.creator_name },
           property: v.property_id ? await this.estate.get(v.property_id) : null,
         })),
@@ -133,6 +139,28 @@ export class PropertyVideosService {
       page,
       pages: Math.ceil(Number(count.total) / limit),
     };
+  }
+  async posterPreviews(ids: string[]) {
+    const result = new Map<string, string>();
+    if (!ids.length) return result;
+    try {
+      const rows = await this.db.query<{ video_id: string; jpeg: Buffer }[]>(
+        `SELECT video_id,jpeg FROM property_video_posters WHERE video_id IN (${ids
+          .slice(0, 24)
+          .map(() => '?')
+          .join(',')})`,
+        ids.slice(0, 24),
+      );
+      await Promise.all(
+        rows.map(async (row) => {
+          const cover = await videoCoverPreview(row.jpeg);
+          if (cover) result.set(row.video_id, cover);
+        }),
+      );
+    } catch (error) {
+      if ((error as { code?: string }).code !== 'ER_NO_SUCH_TABLE') throw error;
+    }
+    return result;
   }
   async hlsUrls(ids: string[]) {
     return this.hls.urls(ids);
@@ -160,7 +188,7 @@ export class PropertyVideosService {
       throw new ForbiddenException('Este video no te pertenece.');
     ownership(actor, video.advertiser_id);
   }
-  async preview(actor: Actor, id: string) {
+  async preview(actor: Actor, id: string, includeCover = true) {
     this.guard();
     await this.managedVideo(actor, id);
     const signature = this.jwt.sign(
@@ -168,8 +196,12 @@ export class PropertyVideosService {
       { expiresIn: '2m' },
     );
     const hlsUrls = await this.hls.urls([id], signature);
+    const covers = includeCover
+      ? await this.posterPreviews([id])
+      : new Map<string, string>();
     return {
       hls_url: hlsUrls.get(id) || null,
+      thumbnail_preview: covers.get(id) || null,
       url: `/api/videos/${id}/preview?signature=${encodeURIComponent(signature)}`,
       thumbnail_url: `/api/videos/${id}/thumbnail?signature=${encodeURIComponent(signature)}`,
     };

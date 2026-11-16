@@ -1,112 +1,14 @@
-import { playbackSource, preferredVideoUrl } from "./video-source";
-import { useEffect, useRef, useState } from "react";
-import {
-  ActivityIndicator,
-  Image,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
-import { VideoPlayer, VideoView } from "expo-video";
-import { mediaUrl, Video, Session } from "./api";
+import { VideoCover } from "./VideoCover";
+import { VideoSurface, DelayedVideoSpinner } from "./VideoSurface";
+import { preferredVideoUrl } from "./video-source";
+import { useEffect, useState } from "react";
+import { Image, Pressable, StyleSheet, Text, View } from "react-native";
+import { VideoPlayer } from "expo-video";
+import { Video, Session } from "./api";
 import { videoColors } from "./video-colors";
 import { videoIcons } from "./video-icons";
 import { SocialVideoActions } from "./SocialVideoActions";
 
-function Player({
-  url,
-  player,
-  paused,
-  onPause,
-  poster,
-}: {
-  url: string;
-  player: VideoPlayer;
-  paused: boolean;
-  onPause: () => void;
-  poster?: string;
-}) {
-  const [error, setError] = useState(() =>
-      player.status === "error" ? "No se pudo reproducir este video." : "",
-    ),
-    [loading, setLoading] = useState(() => player.status === "loading");
-  const playingAllowed = useRef(!paused);
-  const [firstFrame, setFirstFrame] = useState(false);
-  useEffect(() => {
-    playingAllowed.current = !paused;
-    if (!paused) player.play();
-    else player.pause();
-    return () => {
-      playingAllowed.current = false;
-    };
-  }, [paused, player]);
-  useEffect(() => {
-    const sub = player.addListener("statusChange", (event) => {
-      setLoading(event.status === "loading");
-      if (event.status === "readyToPlay") {
-        if (playingAllowed.current) player.play();
-        else player.pause();
-      }
-      setError(
-        event.status === "error" ? "No se pudo reproducir este video." : "",
-      );
-    });
-    return () => sub.remove();
-  }, [player]);
-  return (
-    <Pressable
-      style={StyleSheet.absoluteFill}
-      accessibilityLabel={paused ? "Reproducir video" : "Pausar video"}
-      onPress={onPause}
-    >
-      <VideoView
-        style={StyleSheet.absoluteFill}
-        player={player}
-        nativeControls={false}
-        contentFit="contain"
-        surfaceType="textureView"
-        onFirstFrameRender={() => setFirstFrame(true)}
-      />
-      {!firstFrame && poster && (
-        <Image
-          pointerEvents="none"
-          fadeDuration={0}
-          source={{ uri: mediaUrl(poster) }}
-          style={StyleSheet.absoluteFill}
-          resizeMode="contain"
-        />
-      )}
-      {loading && (
-        <ActivityIndicator style={styles.center} color="#fff" size="large" />
-      )}
-      {paused && !error && <Text style={styles.play}>▶</Text>}
-      {!!error && (
-        <View style={styles.error}>
-          <Text style={styles.white}>{error}</Text>
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => {
-              setError("");
-              setLoading(true);
-              setFirstFrame(false);
-              void player
-                .replaceAsync(playbackSource(url))
-                .then(() => {
-                  if (playingAllowed.current) player.play();
-                })
-                .catch(() =>
-                  setError("Video no disponible. Desliza para continuar."),
-                );
-            }}
-          >
-            <Text style={styles.retry}>Reintentar</Text>
-          </Pressable>
-        </View>
-      )}
-    </Pressable>
-  );
-}
 export function VideoCard({
   item,
   height,
@@ -142,26 +44,21 @@ export function VideoCard({
   }, [active]);
   return (
     <View style={[styles.card, { height }]}>
-      {(!active || !player) && !!(item.thumbnail_url || p?.media[0]?.url) && (
-        <Image
-          source={{ uri: mediaUrl(item.thumbnail_url || p!.media[0].url) }}
-          style={StyleSheet.absoluteFill}
-          resizeMode="cover"
-        />
-      )}
-      {active && player && (
-        <Player
+      <VideoCover
+        url={item.thumbnail_url || p?.media[0]?.url}
+        preview={item.thumbnail_preview}
+      />
+      {player && (
+        <VideoSurface
           key={item.id}
           url={preferredVideoUrl(item)}
-          poster={item.thumbnail_url || p?.media[0]?.url}
           player={player}
+          active={active}
           paused={paused}
           onPause={() => setPaused((value) => !value)}
         />
       )}
-      {active && !player && (
-        <ActivityIndicator style={styles.center} color="#fff" />
-      )}
+      {!player && <DelayedVideoSpinner waiting={active} />}
       <View pointerEvents="none" style={styles.shade} />
       {!social && (
         <View style={styles.actions}>

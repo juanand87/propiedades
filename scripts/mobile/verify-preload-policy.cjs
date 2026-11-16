@@ -18,15 +18,15 @@ class Player{
   pause(){}
   emit(status,buffer=this.bufferedPosition,message){this.status=status;this.bufferedPosition=buffer;for(const fn of this.listeners)fn({status,error:message?{message}:undefined});}
 }
-const hook=load('useVideoPreload.ts',name=>({react,'react-native':{Image:{prefetch:()=>Promise.resolve()},Platform:{OS:'android'}},'expo-video':{createVideoPlayer:()=>{const p=new Player();players.push(p);return p;},setVideoCacheSizeAsync:()=>Promise.resolve()},'./api':{mediaUrl:u=>u},'./video-source':source,'./video-playback-policy':policy}[name]));
+const hook=load('useVideoPreload.ts',name=>({react,'react-native':{Image:{prefetch:()=>Promise.resolve()},Platform:{OS:'android'}},'expo-video':{createVideoPlayer:()=>{const p=new Player();players.push(p);return p;},setVideoCacheSizeAsync:()=>Promise.resolve()},'./api':{mediaUrl:u=>u},'./video-source':source,'./video-playback-policy':policy,'./playback-metrics':{beginVideoLoad:()=>{},videoSourceReady:()=>{}}}[name]));
 const videos=[1,2,3].map(id=>({id:String(id),url:'mp4-'+id,hls_url:'hls-'+id}));let active=0,suspended=false,result;
 function render(){let count=0;while(dirty){assert.ok(++count<20,'Hook render loop');dirty=false;cursor=0;pending=[];result=hook.useVideoPreload(videos,active,true,suspended);for(const effect of pending)effect();}}
 function tick(){for(const fn of [...timers])fn();render();}
 render();assert.equal(players.length,1);assert.equal(result.get('1').player,players[0]);
 players[0].emit('readyToPlay',1);render();tick();assert.equal(players.length,1,'Do not preload ahead with one second of buffer');
-players[0].bufferedPosition=8;tick();assert.equal(players.length,2,'Start next video only after active has buffer');
+players[0].bufferedPosition=3;tick();assert.equal(players.length,2,'Prepare the immediate next video with three seconds buffered');players[0].bufferedPosition=8;tick();assert.equal(players.length,2,'Start next video only after active has buffer');
 players[1].emit('readyToPlay',2);render();assert.equal(players.length,3,'Prepare second neighbor sequentially');
-players[0].emit('loading',0.5);tick();assert.equal(players[0].released,false,'Keep active player when signal drops');assert.ok(players[1].released&&players[2].released,'Cancel competing downloads while active buffers');assert.equal(result.size,1);
+players[0].emit('loading',0.5);tick();assert.equal(players[0].released,false,'Keep active player when signal drops');assert.equal(players[1].released,false,'Keep already-ready neighbor for quick return');assert.ok(players[2].released,'Cancel pending competing download while active buffers');assert.equal(result.size,2);
 players[0].emit('error',0,'Network timeout');render();assert.deepEqual(players[0].sources,['hls-1'],'Keep HLS on transient network error');
 players[0].emit('error',0,'HTTP 404');render();assert.deepEqual(players[0].sources,['hls-1','mp4-1'],'MP4 fallback only when HLS is unavailable');
 for(const effect of effects)effect?.cleanup?.();assert.ok(players.every(p=>p.released),'Release native players on unmount');assert.equal(timers.size,0);

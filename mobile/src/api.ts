@@ -31,6 +31,7 @@ export type Video = {
   hls_url?: string | null;
   id: string;
   thumbnail_url?: string;
+  thumbnail_preview?: string | null;
   property_id: string | null;
   title: string;
   url: string;

@@ -1,3 +1,5 @@
+import { playbackSummary } from "./playback-metrics";
+import { attachPreparedVideo } from "./video-playback-policy";
 import { ProfileSearchScreen } from "./ProfileSearchScreen";
 import {
   ProfileIdentityFields,
@@ -839,6 +841,13 @@ function AppContent() {
               ? "Conectando con Proppix…"
               : "Conectando con el backend NestJS local. Sin conexión a producción."}
           </Text>
+          <Button
+            label="Ver tiempos de reproducción"
+            secondary
+            onPress={() =>
+              Alert.alert("Rendimiento de videos", playbackSummary())
+            }
+          />
           <Text style={s.code}>{API_URL}</Text>
           {booting ? (
             <ActivityIndicator color={videoColors.cyan} />
@@ -881,9 +890,10 @@ function AppContent() {
               offset: height * i,
               index: i,
             })}
-            initialNumToRender={2}
-            maxToRenderPerBatch={2}
-            windowSize={3}
+            initialNumToRender={3}
+            maxToRenderPerBatch={3}
+            windowSize={5}
+            removeClippedSubviews={false}
             extraData={[active, preparedVideos, foreground, detail, favorites]}
             onScrollBeginDrag={() => {
               feedDragging.current = true;
@@ -938,7 +948,7 @@ function AppContent() {
                 height={height}
                 active={index === active && feedVisible}
                 player={
-                  feedVisible && index === active
+                  attachPreparedVideo(videos, index, active)
                     ? preparedPlayerFor(item, preparedVideos.get(item.id))
                     : undefined
                 }

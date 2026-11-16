@@ -278,12 +278,16 @@ export class VideoSocialService {
     const publicHls = await this.videos.hlsUrls(
       rows.map((v: { id: string }) => v.id),
     );
+    const covers = await this.videos.posterPreviews(
+      rows.map((v: { id: string }) => v.id),
+    );
     const items = await Promise.all(
       rows.map(async (v: { id: string; [key: string]: unknown }) => {
         const preview =
-          own && !saved ? await this.videos.preview(actor!, v.id) : null;
+          own && !saved ? await this.videos.preview(actor!, v.id, false) : null;
         return {
           ...v,
+          thumbnail_preview: covers.get(v.id) || null,
           thumbnail_url:
             preview?.thumbnail_url || `/api/videos/${v.id}/thumbnail`,
           url: preview?.url || `/api/videos/${v.id}/content`,

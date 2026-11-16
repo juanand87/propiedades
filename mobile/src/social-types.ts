@@ -14,6 +14,7 @@ export type ProfileVideo = {
   moderation_hidden?: boolean;
   hls_url?: string | null;
   thumbnail_url?: string;
+  thumbnail_preview?: string | null;
   created_by: string;
   id: string;
   title: string;

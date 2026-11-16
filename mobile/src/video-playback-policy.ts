@@ -29,3 +29,30 @@ export function captureCatalogSwipe(dx: number, dy: number, touches = 1) {
 export function finishCatalogSwipe(dx: number, dy: number) {
   return dx <= -65 && -dx > Math.abs(dy) * 1.6;
 }
+
+export function preloadAheadCount(
+  status: string,
+  buffered: number,
+  current: number,
+  duration: number,
+  previous: number,
+) {
+  if (status !== "readyToPlay" || buffered < 0) return 0;
+  const ahead = Math.max(0, buffered - current),
+    remaining = Math.max(0, duration - current);
+  if (duration > 0 && ahead >= remaining - 0.25) return 2;
+  if (ahead >= (previous === 2 ? 3 : 6)) return 2;
+  return ahead >= (previous >= 1 ? 1.5 : 2.5) ? 1 : 0;
+}
+export function attachPreparedVideo(
+  videos: { id: string }[],
+  index: number,
+  active: number,
+) {
+  if (Math.abs(index - active) > 1 || !videos[index]) return false;
+  return (
+    [active, active + 1, active - 1].find(
+      (i) => videos[i]?.id === videos[index].id,
+    ) === index
+  );
+}
