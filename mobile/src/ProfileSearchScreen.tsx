@@ -18,6 +18,7 @@ type Person = Pick<
   | "id"
   | "display_name"
   | "avatar_url"
+  | "avatar_thumbnail_url"
   | "followed"
   | "username"
   | "profile_kind"
@@ -252,10 +253,14 @@ export function ProfileSearchScreen({ session }: { session: Session | null }) {
                     })
                   }
                 >
-                  {item.avatar_url ? (
+                  {item.avatar_thumbnail_url || item.avatar_url ? (
                     <Image
                       fadeDuration={0}
-                      source={{ uri: mediaUrl(item.avatar_url) }}
+                      source={{
+                        uri: mediaUrl(
+                          item.avatar_thumbnail_url || item.avatar_url!,
+                        ),
+                      }}
                       style={s.avatar}
                     />
                   ) : (

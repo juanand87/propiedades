@@ -47,6 +47,7 @@ export function SocialVideoActions({
     id: string;
     display_name: string;
     avatar_url?: string | null;
+    avatar_thumbnail_url?: string | null;
   };
   initialTitle?: string;
   initiallyPublished?: boolean;
@@ -262,6 +263,7 @@ export function SocialVideoActions({
     </Pressable>
   );
   const creator = data?.creator || initialCreator;
+  const avatar = creator?.avatar_thumbnail_url || creator?.avatar_url;
   const propertyId = data?.property_id;
   const saved = !!propertyId && !!propertyFavorite?.ids.includes(propertyId);
   return (
@@ -278,10 +280,10 @@ export function SocialVideoActions({
             })
           }
         >
-          {creator?.avatar_url ? (
+          {avatar ? (
             <Image
               fadeDuration={0}
-              source={{ uri: mediaUrl(creator.avatar_url) }}
+              source={{ uri: mediaUrl(avatar) }}
               style={s.avatar}
             />
           ) : (

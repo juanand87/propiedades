@@ -46,8 +46,12 @@ export function useVideoPreload(
     for (const video of videos.slice(Math.max(0, active - 1), active + 5)) {
       if (video.thumbnail_url)
         void Image.prefetch(mediaUrl(video.thumbnail_url)).catch(() => {});
-      if (video.creator?.avatar_url)
-        void Image.prefetch(mediaUrl(video.creator.avatar_url)).catch(() => {});
+      if (video.creator?.avatar_thumbnail_url || video.creator?.avatar_url)
+        void Image.prefetch(
+          mediaUrl(
+            video.creator.avatar_thumbnail_url || video.creator.avatar_url!,
+          ),
+        ).catch(() => {});
     }
   }, [videos, active, enabled]);
   const aheadPermission = useRef({ id: "", count: 0 });

@@ -153,6 +153,12 @@ export class PropertyVideosService {
             display_name:
               profiles.get(v.creator_id)?.display_name || v.creator_name,
             avatar_url: profiles.get(v.creator_id)?.avatar_media_id
+              ? this.estate.mediaUrl(
+                  profiles.get(v.creator_id).avatar_media_id,
+                  { id: v.creator_id } as Actor,
+                )
+              : null,
+            avatar_thumbnail_url: profiles.get(v.creator_id)?.avatar_media_id
               ? this.estate.avatarUrl(
                   v.creator_id,
                   profiles.get(v.creator_id).avatar_media_id,

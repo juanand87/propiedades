@@ -27,7 +27,7 @@ export type Property = {
   };
 };
 export type Video = {
-  creator?: { id: string; display_name: string; avatar_url?: string | null };
+  creator?: { id: string; display_name: string; avatar_url?: string | null; avatar_thumbnail_url?:string|null };
   hls_url?: string | null;
   id: string;
   thumbnail_url?: string;

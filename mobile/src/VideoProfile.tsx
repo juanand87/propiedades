@@ -231,7 +231,12 @@ export function VideoProfile({
   }, [own, token, videosRefresh]);
   const [followersOpen, setFollowersOpen] = useState(false);
   const [followers, setFollowers] = useState<
-    { id: string; display_name: string; avatar_url?: string | null }[]
+    {
+      id: string;
+      display_name: string;
+      avatar_url?: string | null;
+      avatar_thumbnail_url?: string | null;
+    }[]
   >([]);
   const [followersPage, setFollowersPage] = useState(1);
   const [followersMore, setFollowersMore] = useState(false);
@@ -466,10 +471,14 @@ export function VideoProfile({
           onPress={() => void choosePhoto()}
           style={s.avatarWrap}
         >
-          {profile?.avatar_url ? (
+          {profile?.avatar_thumbnail_url || profile?.avatar_url ? (
             <Image
               fadeDuration={0}
-              source={{ uri: mediaUrl(profile.avatar_url) }}
+              source={{
+                uri: mediaUrl(
+                  profile!.avatar_thumbnail_url || profile!.avatar_url!,
+                ),
+              }}
               style={s.avatar}
             />
           ) : (
@@ -694,10 +703,14 @@ export function VideoProfile({
                   });
                 }}
               >
-                {person.avatar_url ? (
+                {person.avatar_thumbnail_url || person.avatar_url ? (
                   <Image
                     fadeDuration={0}
-                    source={{ uri: mediaUrl(person.avatar_url) }}
+                    source={{
+                      uri: mediaUrl(
+                        person.avatar_thumbnail_url || person.avatar_url!,
+                      ),
+                    }}
                     style={s.avatar}
                   />
                 ) : (

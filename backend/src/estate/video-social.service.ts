@@ -103,6 +103,9 @@ export class VideoSocialService {
         username: row.username,
         followed: !!Number(row.followed),
         avatar_url: row.avatar_media_id
+          ? this.estate.mediaUrl(row.avatar_media_id, { id: row.id } as Actor)
+          : null,
+        avatar_thumbnail_url: row.avatar_media_id
           ? this.estate.avatarUrl(row.id, row.avatar_media_id)
           : null,
       })),
@@ -182,6 +185,9 @@ export class VideoSocialService {
       username: identity?.username || null,
       identity_configured: !!identity,
       avatar_url: u.avatar_media_id
+        ? this.estate.mediaUrl(u.avatar_media_id, { id: u.id } as Actor)
+        : null,
+      avatar_thumbnail_url: u.avatar_media_id
         ? this.estate.avatarUrl(u.id, u.avatar_media_id)
         : null,
       following: Number(following.n),
@@ -302,6 +308,7 @@ export class VideoSocialService {
                   id: userId,
                   display_name: ownerProfile.display_name,
                   avatar_url: ownerProfile.avatar_url,
+                  avatar_thumbnail_url: ownerProfile.avatar_thumbnail_url,
                 }
               : undefined,
           thumbnail_preview: covers.get(v.id) || null,
@@ -420,6 +427,9 @@ export class VideoSocialService {
         id,
         display_name,
         avatar_url: avatar_media_id
+          ? this.estate.mediaUrl(avatar_media_id, { id } as Actor)
+          : null,
+        avatar_thumbnail_url: avatar_media_id
           ? this.estate.avatarUrl(id, avatar_media_id)
           : null,
       })),

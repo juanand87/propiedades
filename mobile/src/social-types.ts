@@ -5,6 +5,7 @@ export type VideoProfileData = {
   id: string;
   display_name: string;
   avatar_url: string | null;
+  avatar_thumbnail_url?: string | null;
   following: number;
   followers: number;
   likes: number;
