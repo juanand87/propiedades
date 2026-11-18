@@ -7,6 +7,7 @@ import {
   Post,
   Query,
   Req,
+  Res,
   UseGuards,
 } from '@nestjs/common';
 import { EstateGuard, OptionalEstateGuard } from './estate.guard';
@@ -19,7 +20,13 @@ export class VideoSocialController {
   async capabilities() {
     this.social.guard();
     const ready = await this.social.identitiesAvailable();
-    return { enabled: true, search: ready, profile_types: ready };
+    return {
+      enabled: true,
+      search: ready,
+      profile_types: ready,
+      directory_version: 2,
+      avatar_version: 1,
+    };
   }
   @Get('video-profiles/search')
   @UseGuards(EstateGuard)
@@ -28,6 +35,16 @@ export class VideoSocialController {
     @Req() req: { user: Actor },
   ) {
     return this.social.search(q, req.user);
+  }
+  @Get('video-profiles/:id/avatar')
+  async avatar(@Param('id') id: string, @Res() res: any) {
+    const bytes = await this.social.avatar(id);
+    res.set({
+      'Content-Type': 'image/webp',
+      'Content-Length': bytes.length,
+      'Cache-Control': 'public,max-age=3600',
+    });
+    res.send(bytes);
   }
   @Get('video-profiles/:id')
   @UseGuards(OptionalEstateGuard)

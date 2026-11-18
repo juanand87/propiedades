@@ -134,6 +134,14 @@ export class EstateController {
   @Post('auth/register') register(@Body() b: any, @Req() req: any) {
     return this.estate.register(b, req.ip);
   }
+  @Post('auth/refresh') refreshSession(@Body() body: any, @Req() req: any) {
+    return this.estate.refreshSession(body, req.ip);
+  }
+  @Post('auth/session') @UseGuards(EstateGuard) persistentSession(
+    @Req() req: any,
+  ) {
+    return this.estate.persistentSession(req.user);
+  }
   @Get('auth/profile') @UseGuards(EstateGuard) profile(@Req() req: any) {
     return req.user;
   }
@@ -257,8 +265,12 @@ export class EstateController {
       limits: { fileSize: 8 * 1024 * 1024, files: 1 },
     }),
   )
-  upload(@Req() req: any, @UploadedFile() file: any) {
-    return this.estate.upload(req.user, file);
+  upload(@Req() req: any, @UploadedFile() file: any, @Body() body: any) {
+    return this.estate.upload(
+      req.user,
+      file,
+      body?.purpose === 'avatar' ? 'avatar' : undefined,
+    );
   }
   @Delete('manage/media/:id') @UseGuards(EstateGuard) remove(
     @Req() req: any,

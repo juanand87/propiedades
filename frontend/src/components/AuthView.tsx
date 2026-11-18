@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowUpRight, ShieldCheck } from "lucide-react";
-import { request, send } from "@/lib/estate-api";
+import { request, send, saveBrowserSession } from "@/lib/estate-api";
 import { Notice, useEstate } from "./EstateApp";
 export function AuthView({
   register = false,
@@ -32,7 +32,7 @@ export function AuthView({
   const { user, setUser, loading } = useEstate(),
     router = useRouter();
   function finish(r: any) {
-    localStorage.setItem("propiedades:token", r.access_token);
+    saveBrowserSession(r);
     setUser(r.user);
     if (r.user.role !== "admin" && r.user.account_type === null) {
       setChoosing(true);

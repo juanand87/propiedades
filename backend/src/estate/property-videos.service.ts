@@ -127,6 +127,19 @@ export class PropertyVideosService {
     const covers = await this.posterPreviews(
       rows.map((v: { id: string }) => v.id),
     );
+    const creatorIds = [...new Set<string>(rows.map((v: any) => v.creator_id))];
+    const creatorProfiles =
+      creatorIds.length && this.config.get('SOCIAL_VIDEOS_ENABLED') === 'true'
+        ? await this.db.query(
+            'SELECT user_id,display_name,avatar_media_id FROM estate_video_profiles WHERE user_id IN (' +
+              creatorIds.map(() => '?').join(',') +
+              ')',
+            creatorIds,
+          )
+        : [];
+    const profiles = new Map<string, any>(
+      creatorProfiles.map((profile: any) => [profile.user_id, profile]),
+    );
     return {
       items: await Promise.all(
         rows.map(async (v: any) => ({
@@ -135,7 +148,17 @@ export class PropertyVideosService {
           hls_url: hlsUrls.get(v.id) || null,
           thumbnail_url: `/api/videos/${v.id}/thumbnail`,
           thumbnail_preview: covers.get(v.id) || null,
-          creator: { id: v.creator_id, display_name: v.creator_name },
+          creator: {
+            id: v.creator_id,
+            display_name:
+              profiles.get(v.creator_id)?.display_name || v.creator_name,
+            avatar_url: profiles.get(v.creator_id)?.avatar_media_id
+              ? this.estate.avatarUrl(
+                  v.creator_id,
+                  profiles.get(v.creator_id).avatar_media_id,
+                )
+              : null,
+          },
           property: v.property_id ? await this.estate.get(v.property_id) : null,
         })),
       ),

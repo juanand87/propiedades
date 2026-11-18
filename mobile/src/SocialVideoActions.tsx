@@ -32,6 +32,9 @@ import { VideoSocialData } from "./social-types";
 export function SocialVideoActions({
   videoId,
   session,
+  initialCreator,
+  initialTitle,
+  initiallyPublished = false,
   onChanged,
   propertyActions,
   propertyFavorite,
@@ -40,6 +43,13 @@ export function SocialVideoActions({
   initialCommentId,
 }: {
   videoId: string;
+  initialCreator?: {
+    id: string;
+    display_name: string;
+    avatar_url?: string | null;
+  };
+  initialTitle?: string;
+  initiallyPublished?: boolean;
   session: Session | null;
   onChanged?: () => void;
   paused?: boolean;
@@ -251,6 +261,7 @@ export function SocialVideoActions({
       </Text>
     </Pressable>
   );
+  const creator = data?.creator || initialCreator;
   const propertyId = data?.property_id;
   const saved = !!propertyId && !!propertyFavorite?.ids.includes(propertyId);
   return (
@@ -260,50 +271,50 @@ export function SocialVideoActions({
           accessibilityRole="button"
           accessibilityLabel="Ver perfil del creador"
           onPress={() =>
-            data &&
+            creator &&
             router.push({
               pathname: "/perfil/[userId]",
-              params: { userId: data.creator.id },
+              params: { userId: creator!.id },
             })
           }
         >
-          {data?.creator.avatar_url ? (
+          {creator?.avatar_url ? (
             <Image
               fadeDuration={0}
-              source={{ uri: mediaUrl(data.creator.avatar_url) }}
+              source={{ uri: mediaUrl(creator.avatar_url) }}
               style={s.avatar}
             />
           ) : (
             <View style={s.avatar}>
               <Text style={s.white}>
-                {data?.creator.display_name.slice(0, 1) || "●"}
+                {creator?.display_name.slice(0, 1) || "●"}
               </Text>
             </View>
           )}
         </Pressable>
-        {data && session?.user.id !== data.creator.id && (
+        {creator && session?.user.id !== creator.id && (
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={
-              data.creator.followed
+              data?.creator.followed
                 ? "Dejar de seguir al creador"
                 : "Seguir al creador"
             }
             accessibilityState={{
-              selected: data.creator.followed,
-              disabled: busy,
+              selected: data?.creator.followed,
+              disabled: busy || !data,
             }}
-            disabled={busy}
-            style={[s.follow, data.creator.followed && s.following]}
+            disabled={busy || !data}
+            style={[s.follow, data?.creator.followed && s.following]}
             onPress={() => {
-              if (!requireSession()) return;
+              if (!data || !requireSession()) return;
               void run(async () => {
                 const creator = await api<VideoSocialData["creator"]>(
                   `/video-profiles/${data.creator.id}/follow`,
                   {
                     method: "POST",
                     token,
-                    body: { active: !data.creator.followed },
+                    body: { active: !data?.creator.followed },
                   },
                 );
                 setData({ ...data, creator });
@@ -311,14 +322,17 @@ export function SocialVideoActions({
             }}
           >
             <ProppixIcon
-              name={data.creator.followed ? "check" : "plus"}
+              name={data?.creator.followed ? "check" : "plus"}
               size={13}
-              color={data.creator.followed ? "#fff" : "#052553"}
+              color={data?.creator.followed ? "#fff" : "#052553"}
             />
             <Text
-              style={[s.followText, data.creator.followed && { color: "#fff" }]}
+              style={[
+                s.followText,
+                data?.creator.followed && { color: "#fff" },
+              ]}
             >
-              {data.creator.followed ? "Siguiendo" : "Seguir"}
+              {data?.creator.followed ? "Siguiendo" : "Seguir"}
             </Text>
           </Pressable>
         )}
@@ -375,11 +389,16 @@ export function SocialVideoActions({
           )}
         {propertyActions
           ? action("share", "Compartir", propertyActions.onShare)
-          : data?.status === "published" &&
+          : (data?.status === "published" || (!data && initiallyPublished)) &&
             action(
               "share",
               "Compartir",
-              () => void Share.share({ message: data.share_url }),
+              () =>
+                void Share.share({
+                  message:
+                    data?.share_url ||
+                    `https://propiedades-eta.vercel.app/descubrir?video=${videoId}`,
+                }),
             )}
       </View>
       <View
@@ -415,9 +434,7 @@ export function SocialVideoActions({
             Oculto por moderación
           </Text>
         )}
-        <Text style={s.name}>
-          @{data?.creator.display_name || "Propiedades"}
-        </Text>
+        <Text style={s.name}>@{creator?.display_name || "Proppix"}</Text>
         {propertyFavorite &&
           data?.can_edit &&
           option("Editar video", () => {
@@ -426,7 +443,10 @@ export function SocialVideoActions({
             void run(() => loadProperties());
           })}
         <Text style={s.white}>
-          {data?.title.replace(/^Recorrido(?: ilustrativo)?\s*·\s*/i, "")}
+          {(data?.title || initialTitle)?.replace(
+            /^Recorrido(?: ilustrativo)?\s*·\s*/i,
+            "",
+          )}
         </Text>
         {propertyActions
           ? option("Ver propiedad ↗", propertyActions.onDetails)

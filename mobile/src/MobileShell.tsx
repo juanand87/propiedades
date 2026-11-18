@@ -54,6 +54,8 @@ import {
 } from "expo-router";
 import {
   api,
+  ApiError,
+  setSessionRefresher,
   API_URL,
   IS_PRODUCTION,
   checkEnvironment,
@@ -200,10 +202,34 @@ function AppContent() {
     [favorites, setFavorites] = useState<string[]>([]),
     [detail, setDetail] = useState<Property | null>(null),
     [detailBusy, setDetailBusy] = useState(false);
+  const sessionEpoch = useRef(0);
   const feedViewer = useRef(session?.access_token);
   useEffect(() => {
     feedViewer.current = session?.access_token;
   }, [session?.access_token]);
+  useEffect(() => {
+    let live = true;
+    setSessionRefresher(
+      session?.refresh_token
+        ? async (stale) => {
+            if (stale !== session.access_token) return session.access_token;
+            const renewed = await api<Session>("/auth/refresh", {
+              method: "POST",
+              body: { refresh_token: session.refresh_token },
+            });
+            if (!live) return null;
+            await SecureStore.setItemAsync(sessionKey, JSON.stringify(renewed));
+            if (!live) return null;
+            setSession(renewed);
+            return renewed.access_token;
+          }
+        : undefined,
+    );
+    return () => {
+      live = false;
+      setSessionRefresher();
+    };
+  }, [session]);
   const notifications = useMessageNotifications(session, ready);
   const [activityCount, setActivityCount] = useState({ userId: "", count: 0 });
   const activityUnread =
@@ -365,18 +391,48 @@ function AppContent() {
   useEffect(() => {
     mounted.current = true;
     const timer = setTimeout(() => void boot(), 0);
-    void SecureStore.getItemAsync(sessionKey).then(async (saved) => {
-      if (!saved) return;
-      try {
-        const parsed = JSON.parse(saved) as Session;
-        const user = await api<Session["user"]>("/auth/profile", {
-          token: parsed.access_token,
-        });
-        setSession({ ...parsed, user });
-      } catch {
-        await SecureStore.deleteItemAsync(sessionKey);
-      }
-    });
+    const restoreEpoch = sessionEpoch.current;
+    void SecureStore.getItemAsync(sessionKey)
+      .then(async (saved) => {
+        if (!saved) return;
+        let parsed: Session;
+        try {
+          parsed = JSON.parse(saved);
+          if (!parsed.access_token || !parsed.user?.id) throw new Error();
+        } catch {
+          await SecureStore.deleteItemAsync(sessionKey);
+          return;
+        }
+        if (!mounted.current || restoreEpoch !== sessionEpoch.current) return;
+        setSession(parsed);
+        try {
+          const restored = parsed.refresh_token
+            ? await api<Session>("/auth/refresh", {
+                method: "POST",
+                body: { refresh_token: parsed.refresh_token },
+              })
+            : await api<Session>("/auth/session", {
+                method: "POST",
+                token: parsed.access_token,
+                retrySession: false,
+              });
+          if (!mounted.current || restoreEpoch !== sessionEpoch.current) return;
+          await SecureStore.setItemAsync(sessionKey, JSON.stringify(restored));
+          setSession(restored);
+        } catch (e) {
+          // Offline and gateway failures must never erase the saved account.
+          if (
+            e instanceof ApiError &&
+            e.status === 401 &&
+            mounted.current &&
+            restoreEpoch === sessionEpoch.current
+          ) {
+            await SecureStore.deleteItemAsync(sessionKey);
+            setSession(null);
+          }
+        }
+      })
+      .catch(() => {});
     const sub = AppState.addEventListener("change", (state) =>
       setForeground(state === "active"),
     );
@@ -608,6 +664,7 @@ function AppContent() {
           },
         },
       );
+      sessionEpoch.current++;
       await SecureStore.setItemAsync(sessionKey, JSON.stringify(value));
       setSession(value);
       setPassword("");
@@ -660,6 +717,7 @@ function AppContent() {
           { method: "POST", body: { id: start.id, poll: start.poll } },
         );
         if (!result.pending) {
+          sessionEpoch.current++;
           await SecureStore.setItemAsync(sessionKey, JSON.stringify(result));
           setSession(result);
           setTab(
@@ -690,6 +748,7 @@ function AppContent() {
       return;
     }
     authRun.current++;
+    sessionEpoch.current++;
     await SecureStore.deleteItemAsync(sessionKey);
     setSession(null);
     setFavorites([]);

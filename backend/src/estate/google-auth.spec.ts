@@ -15,6 +15,11 @@ describe('Google identity boundaries', () => {
         db,
         throttle: jest.fn(),
         actor: jest.fn(),
+        persistentSession: jest.fn(async (user) => ({
+          access_token: 'session',
+          refresh_token: 'renewable',
+          user,
+        })),
       };
     db.transaction.mockImplementation((fn) => fn(db));
     const jwt: any = { sign: jest.fn(() => 'session') };
@@ -50,19 +55,17 @@ describe('Google identity boundaries', () => {
     f.db.query
       .mockResolvedValueOnce([{ nonce: 'expected', verifier: 'verifier' }])
       .mockResolvedValue([]);
-    jest
-      .spyOn(f.service, 'client')
-      .mockReturnValue({
-        getToken: async () => ({ tokens: { id_token: 'test' } }),
-        verifyIdToken: async () => ({
-          getPayload: () => ({
-            sub: 'subject',
-            email: 'qa@gmail.com',
-            email_verified: true,
-            nonce: 'wrong',
-          }),
+    jest.spyOn(f.service, 'client').mockReturnValue({
+      getToken: async () => ({ tokens: { id_token: 'test' } }),
+      verifyIdToken: async () => ({
+        getPayload: () => ({
+          sub: 'subject',
+          email: 'qa@gmail.com',
+          email_verified: true,
+          nonce: 'wrong',
         }),
-      } as any);
+      }),
+    } as any);
     await expect(f.service.finish('state', 'code', 'state')).rejects.toThrow();
     expect(
       f.db.query.mock.calls.some(([sql]) => sql.includes('INSERT INTO users')),
@@ -76,19 +79,17 @@ describe('Google identity boundaries', () => {
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce([{ id: 'existing' }])
       .mockResolvedValue([]);
-    jest
-      .spyOn(f.service, 'client')
-      .mockReturnValue({
-        getToken: async () => ({ tokens: { id_token: 'test' } }),
-        verifyIdToken: async () => ({
-          getPayload: () => ({
-            sub: 'subject',
-            email: 'qa@gmail.com',
-            email_verified: true,
-            nonce: 'expected',
-          }),
+    jest.spyOn(f.service, 'client').mockReturnValue({
+      getToken: async () => ({ tokens: { id_token: 'test' } }),
+      verifyIdToken: async () => ({
+        getPayload: () => ({
+          sub: 'subject',
+          email: 'qa@gmail.com',
+          email_verified: true,
+          nonce: 'expected',
         }),
-      } as any);
+      }),
+    } as any);
     await expect(f.service.finish('state', 'code', 'state')).rejects.toThrow(
       'Este correo ya tiene cuenta',
     );
@@ -106,8 +107,10 @@ describe('Google identity boundaries', () => {
     f.estate.actor.mockResolvedValue({ id: 'u' });
     expect(await f.service.result('request', 'private-secret', 'ip')).toEqual({
       access_token: 'session',
+      refresh_token: 'renewable',
       user: { id: 'u' },
     });
+    expect(f.estate.persistentSession).toHaveBeenCalledWith({ id: 'u' });
     expect(f.db.query.mock.calls[0][1][1]).toBe(
       createHash('sha256').update('private-secret').digest('hex'),
     );

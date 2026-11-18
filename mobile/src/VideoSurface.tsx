@@ -90,7 +90,7 @@ export function VideoSurface({
         style={[StyleSheet.absoluteFill, { opacity: firstFrame ? 1 : 0 }]}
         player={player}
         nativeControls={false}
-        contentFit="contain"
+        contentFit="cover"
         surfaceType="textureView"
         onFirstFrameRender={() => {
           frame.current = player;

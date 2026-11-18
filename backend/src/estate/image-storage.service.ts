@@ -86,6 +86,18 @@ export class ImageStorageService implements OnModuleDestroy {
       );
     }
   }
+  async readSmallImage(key: string) {
+    const { client, config } = this.ready(key);
+    const result = await client.send(
+      new GetObjectCommand({ Bucket: config.bucket, Key: key }),
+    );
+    if (!result.Body || Number(result.ContentLength) > 2 * 1024 * 1024)
+      throw new ServiceUnavailableException('Imagen demasiado grande.');
+    const buffer = Buffer.from(await result.Body.transformToByteArray());
+    if (buffer.length > 2 * 1024 * 1024)
+      throw new ServiceUnavailableException('Imagen demasiado grande.');
+    return buffer;
+  }
   async signedRead(key: string) {
     const { client, config } = this.ready(key);
     try {

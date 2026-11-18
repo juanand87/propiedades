@@ -4,7 +4,7 @@ import { SiteHeaderFrame } from "./SiteHeaderFrame";
 import Link from "next/link";
 import { createContext, useContext, useEffect, useState } from "react";
 import { House, Menu, X, ArrowUpRight, Heart } from "lucide-react";
-import { request } from "@/lib/estate-api";
+import { restoreBrowserSession, request } from "@/lib/estate-api";
 import { assetUrl } from "@/lib/estate-api";
 import {
   designStyle,
@@ -147,7 +147,7 @@ export default function EstateApp({
     reload().catch(() => {});
     const token = localStorage.getItem("propiedades:token");
     if (token) {
-      request("/auth/profile")
+      restoreBrowserSession()
         .then(setUser)
         .catch(() => setUser(null))
         .finally(() => setLoading(false));

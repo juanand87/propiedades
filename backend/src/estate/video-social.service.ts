@@ -76,10 +76,10 @@ export class VideoSocialService {
         followed: number;
       }[]
     >(
-      `SELECT candidate.id,COALESCE(vp.display_name,CONVERT(candidate.firstName USING utf8mb4) COLLATE utf8mb4_unicode_ci) display_name,vp.avatar_media_id,pi.profile_kind,pi.username,
+      `SELECT /*+ MAX_EXECUTION_TIME(4000) */ candidate.id,COALESCE(vp.display_name,CONVERT(candidate.firstName USING utf8mb4) COLLATE utf8mb4_unicode_ci) display_name,vp.avatar_media_id,pi.profile_kind,pi.username,
       EXISTS(SELECT 1 FROM estate_video_follows f WHERE f.follower_id=? AND f.followed_id=CONVERT(candidate.id USING utf8mb4) COLLATE utf8mb4_unicode_ci) followed
       FROM users candidate LEFT JOIN estate_video_profiles vp ON vp.user_id=CONVERT(candidate.id USING utf8mb4) COLLATE utf8mb4_unicode_ci LEFT JOIN estate_profile_identity pi ON pi.user_id=CONVERT(candidate.id USING utf8mb4) COLLATE utf8mb4_unicode_ci
-      WHERE candidate.isActive=1 AND candidate.id<>? AND (vp.user_id IS NOT NULL OR pi.user_id IS NOT NULL OR EXISTS(SELECT 1 ${videoJoined} WHERE v.created_by=CONVERT(candidate.id USING utf8mb4) COLLATE utf8mb4_unicode_ci AND ${videoVisible}))
+      WHERE candidate.isActive=1 AND candidate.id<>? AND CONVERT(candidate.id USING utf8mb4) COLLATE utf8mb4_unicode_ci IN (SELECT user_id FROM estate_video_profiles UNION SELECT user_id FROM estate_profile_identity UNION SELECT v.created_by ${videoJoined} WHERE ${videoVisible})
       AND (CONVERT(COALESCE(vp.display_name,CONVERT(candidate.firstName USING utf8mb4) COLLATE utf8mb4_unicode_ci) USING utf8mb4) COLLATE utf8mb4_unicode_ci LIKE ? ESCAPE '!' OR CONVERT(pi.username USING utf8mb4) COLLATE utf8mb4_unicode_ci LIKE ? ESCAPE '!')
       ${kind === 'all' ? '' : 'AND pi.profile_kind=?'} AND ${notBlocked('?', 'candidate.id')}
       ORDER BY (CONVERT(pi.username USING utf8mb4) COLLATE utf8mb4_unicode_ci=?) DESC,display_name,candidate.id LIMIT 25 OFFSET ?`,
@@ -103,7 +103,7 @@ export class VideoSocialService {
         username: row.username,
         followed: !!Number(row.followed),
         avatar_url: row.avatar_media_id
-          ? this.estate.mediaUrl(row.avatar_media_id, { id: row.id } as Actor)
+          ? this.estate.avatarUrl(row.id, row.avatar_media_id)
           : null,
       })),
       page,
@@ -132,6 +132,15 @@ export class VideoSocialService {
     if (actor && actor.id !== v.created_by)
       await this.moderation.assertContact(actor.id, v.created_by);
     return v;
+  }
+  async avatar(userId: string) {
+    this.guard();
+    const [profile] = await this.db.query(
+      'SELECT p.avatar_media_id FROM estate_video_profiles p JOIN users u ON CONVERT(u.id USING utf8mb4) COLLATE utf8mb4_unicode_ci=p.user_id WHERE p.user_id=? AND u.isActive=1',
+      [uuid(userId)],
+    );
+    if (!profile?.avatar_media_id) throw new NotFoundException();
+    return this.estate.profileAvatar(profile.avatar_media_id, userId);
   }
   async profile(userId: string, actor?: Actor) {
     this.guard();
@@ -173,7 +182,7 @@ export class VideoSocialService {
       username: identity?.username || null,
       identity_configured: !!identity,
       avatar_url: u.avatar_media_id
-        ? this.estate.mediaUrl(u.avatar_media_id, { id: u.id } as Actor)
+        ? this.estate.avatarUrl(u.id, u.avatar_media_id)
         : null,
       following: Number(following.n),
       followers: Number(followers.n),
@@ -256,7 +265,7 @@ export class VideoSocialService {
   }
   async gallery(userId: string, q: any, actor?: Actor) {
     this.guard();
-    await this.profile(userId, actor);
+    const ownerProfile = await this.profile(userId, actor);
     const own = actor?.id === userId;
     const saved = own && q.saved === 'true';
     const page = Math.max(1, Math.min(10000, parseInt(q.page, 10) || 1));
@@ -287,6 +296,14 @@ export class VideoSocialService {
           own && !saved ? await this.videos.preview(actor!, v.id, false) : null;
         return {
           ...v,
+          creator:
+            v.created_by === userId
+              ? {
+                  id: userId,
+                  display_name: ownerProfile.display_name,
+                  avatar_url: ownerProfile.avatar_url,
+                }
+              : undefined,
           thumbnail_preview: covers.get(v.id) || null,
           thumbnail_url:
             preview?.thumbnail_url || `/api/videos/${v.id}/thumbnail`,
@@ -403,7 +420,7 @@ export class VideoSocialService {
         id,
         display_name,
         avatar_url: avatar_media_id
-          ? this.estate.mediaUrl(avatar_media_id, { id } as Actor)
+          ? this.estate.avatarUrl(id, avatar_media_id)
           : null,
       })),
       has_more: rows.length > 24,

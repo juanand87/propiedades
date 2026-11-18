@@ -207,10 +207,7 @@ export class GoogleAuthService {
         "UPDATE estate_google_requests SET status='consumed',poll_hash='' WHERE id=?",
         [id],
       );
-      return {
-        access_token: this.jwt.sign({ sub: user.id, aud: 'estate-session' }),
-        user,
-      };
+      return this.estate.persistentSession(user);
     });
   }
 }

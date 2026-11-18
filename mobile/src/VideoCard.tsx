@@ -47,6 +47,7 @@ export function VideoCard({
       <VideoCover
         url={item.thumbnail_url || p?.media[0]?.url}
         preview={item.thumbnail_preview}
+        fit="cover"
       />
       {player && (
         <VideoSurface
@@ -59,7 +60,6 @@ export function VideoCard({
         />
       )}
       {!player && <DelayedVideoSpinner waiting={active} />}
-      <View pointerEvents="none" style={styles.shade} />
       {!social && (
         <View style={styles.actions}>
           <Pressable
@@ -95,6 +95,9 @@ export function VideoCard({
       {social && active && (
         <SocialVideoActions
           videoId={item.id}
+          initialCreator={item.creator}
+          initialTitle={item.title}
+          initiallyPublished
           session={session}
           paused={paused}
           onResume={() => setPaused(false)}
@@ -141,14 +144,6 @@ export function VideoCard({
 }
 const styles = StyleSheet.create({
   card: { backgroundColor: "#000", overflow: "hidden" },
-  shade: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: "48%",
-    backgroundColor: "rgba(0,0,0,.42)",
-  },
   center: { position: "absolute", top: "42%", left: "47%" },
   play: {
     position: "absolute",

@@ -166,6 +166,8 @@ export function Workspace({ path }: { path: string[] }) {
           className="text-button"
           onClick={() => {
             localStorage.removeItem("propiedades:token");
+            localStorage.removeItem("propiedades:refresh");
+            localStorage.removeItem("propiedades:user");
             setUser(null);
             router.push("/");
           }}

@@ -27,7 +27,7 @@ export type Property = {
   };
 };
 export type Video = {
-  creator?: { id: string; display_name: string };
+  creator?: { id: string; display_name: string; avatar_url?: string | null };
   hls_url?: string | null;
   id: string;
   thumbnail_url?: string;
@@ -46,6 +46,7 @@ export type ManagedVideo = {
   capture_seconds?: number;
 };
 export type Session = {
+  refresh_token?: string;
   access_token: string;
   user: {
     id: string;
@@ -91,18 +92,30 @@ if (!allowed.includes(API_URL))
     "La API configurada no corresponde al entorno de Propiedades seleccionado.",
   );
 export function mediaUrl(url: string) {
+  const avatar =
+    /^\/api\/video-profiles\/[a-f0-9-]{36}\/avatar\?v=[a-f0-9-]{36}$/i.test(
+      url,
+    );
   const hls =
     /^\/api\/videos\/[a-f0-9-]{36}\/hls\/master\.m3u8\?v=[a-f0-9-]{36}(?:&signature=[A-Za-z0-9_.%\-]+)?$/i.test(
       url,
     );
   if (
     !hls &&
+    !avatar &&
     !/^\/api\/(media|videos)\/[a-f0-9-]{36}(\/(content|preview|thumbnail))?(\?signature=[^\s]*)?$/i.test(
       url,
     )
   )
     throw new Error("Archivo local inválido.");
   return API_URL.replace(/\/api$/, "") + url;
+}
+let sessionRefresher: ((token: string) => Promise<string | null>) | undefined;
+let renewingSession: Promise<string | null> | undefined;
+export function setSessionRefresher(
+  handler?: (token: string) => Promise<string | null>,
+) {
+  sessionRefresher = handler;
 }
 export async function api<T>(
   path: string,
@@ -112,6 +125,7 @@ export async function api<T>(
     token?: string;
     signal?: AbortSignal;
     retryInvalidResponse?: boolean;
+    retrySession?: boolean;
   } = {},
 ): Promise<T> {
   if (!path.startsWith("/") || path.startsWith("//"))
@@ -142,6 +156,25 @@ export async function api<T>(
         : undefined,
       signal: controller.signal,
     });
+    if (
+      r.status === 401 &&
+      options.token &&
+      options.retrySession !== false &&
+      sessionRefresher
+    ) {
+      renewingSession ??= sessionRefresher(options.token).finally(() => {
+        renewingSession = undefined;
+      });
+      const renewed = await renewingSession;
+      if (renewed) {
+        clearTimeout(timer);
+        return await api<T>(path, {
+          ...options,
+          token: renewed,
+          retrySession: false,
+        });
+      }
+    }
     let value: any;
     try {
       value = JSON.parse(await r.text());

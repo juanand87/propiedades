@@ -302,8 +302,52 @@ export class EstateService {
     const actor = await this.actor(u.id);
     return {
       access_token: this.jwt.sign({ sub: u.id, aud: 'estate-session' }),
+      refresh_token: this.refreshCredential(u.id, u.password),
       user: actor,
     };
+  }
+  private refreshCredential(id: string, password: string) {
+    return this.jwt.sign(
+      {
+        sub: id,
+        aud: 'estate-refresh',
+        stamp: createHash('sha256').update(password).digest('hex'),
+      },
+      { expiresIn: '365d' },
+    );
+  }
+  async persistentSession(actor: Actor) {
+    const [user] = await this.db.query(
+      'SELECT password FROM users WHERE id=? AND isActive=1',
+      [actor.id],
+    );
+    if (!user) throw new UnauthorizedException('La cuenta no está activa.');
+    return {
+      access_token: this.jwt.sign({ sub: actor.id, aud: 'estate-session' }),
+      refresh_token: this.refreshCredential(actor.id, user.password),
+      user: actor,
+    };
+  }
+  async refreshSession(body: { refresh_token?: unknown }, ip: string) {
+    this.throttle('refresh:' + ip, 120);
+    let payload: { sub: string; stamp: string };
+    try {
+      payload = await this.jwt.verifyAsync(String(body?.refresh_token || ''), {
+        audience: 'estate-refresh',
+      });
+    } catch {
+      throw new UnauthorizedException('Inicia sesión nuevamente.');
+    }
+    const [user] = await this.db.query(
+      'SELECT password FROM users WHERE id=? AND isActive=1',
+      [uuid(payload.sub)],
+    );
+    if (
+      !user ||
+      payload.stamp !== createHash('sha256').update(user.password).digest('hex')
+    )
+      throw new UnauthorizedException('Inicia sesión nuevamente.');
+    return this.persistentSession(await this.actor(payload.sub));
   }
   async register(
     body: {
@@ -376,6 +420,7 @@ export class EstateService {
     }
     return {
       access_token: this.jwt.sign({ sub: id, aud: 'estate-session' }),
+      refresh_token: this.refreshCredential(id, password),
       user: await this.actor(id),
     };
   }
@@ -1264,7 +1309,45 @@ export class EstateService {
   mediaUrl(id: string, u?: Actor) {
     return `/api/media/${id}${u ? '?signature=' + encodeURIComponent(this.jwt.sign({ mid: id, owner: u.id, aud: 'estate-media' }, { expiresIn: '1h' })) : ''}`;
   }
-  async upload(u: Actor, file: any) {
+  private avatarCache = new Map<string, { bytes: Buffer; expires: number }>();
+  avatarUrl(userId: string, mediaId: string) {
+    return '/api/video-profiles/' + userId + '/avatar?v=' + mediaId;
+  }
+  async profileAvatar(mediaId: string, ownerId: string) {
+    const cacheKey = ownerId + ':' + mediaId;
+    const cached = this.avatarCache.get(cacheKey);
+    if (cached && cached.expires > Date.now()) return cached.bytes;
+    const [media] = await this.db.query(
+      'SELECT content FROM estate_media WHERE id=? AND owner_id=?',
+      [mediaId, ownerId],
+    );
+    if (!media) throw new NotFoundException();
+    let source: Buffer = media.content;
+    if (!source.length) {
+      const [object] = await this.db.query(
+        "SELECT object_key,bucket FROM estate_media_objects WHERE media_id=? AND status='ready'",
+        [mediaId],
+      );
+      if (
+        !object ||
+        !this.images?.enabled ||
+        object.bucket !== this.images.config?.bucket
+      )
+        throw new NotFoundException();
+      source = await this.images.readSmallImage(object.object_key);
+    }
+    const bytes = await sharp(source, { limitInputPixels: 4000000 })
+      .rotate()
+      .resize(256, 256, { fit: 'cover', withoutEnlargement: true })
+      .webp({ quality: 78 })
+      .toBuffer();
+    this.avatarCache.delete(cacheKey);
+    this.avatarCache.set(cacheKey, { bytes, expires: Date.now() + 600000 });
+    while (this.avatarCache.size > 128)
+      this.avatarCache.delete(this.avatarCache.keys().next().value!);
+    return bytes;
+  }
+  async upload(u: Actor, file: any, purpose?: string) {
     if (!file?.buffer || file.size > 8 * 1024 * 1024)
       throw new BadRequestException('Sube JPG, PNG o WebP de hasta 8 MB.');
     const [usage] = await this.db.query(
@@ -1283,7 +1366,14 @@ export class EstateService {
         throw new Error();
       buffer = await image
         .rotate()
-        .resize(1600, 1600, { fit: 'inside', withoutEnlargement: true })
+        .resize(
+          purpose === 'avatar' ? 512 : 1600,
+          purpose === 'avatar' ? 512 : 1600,
+          {
+            fit: purpose === 'avatar' ? 'cover' : 'inside',
+            withoutEnlargement: true,
+          },
+        )
         .webp({ quality: 82 })
         .toBuffer();
     } catch {

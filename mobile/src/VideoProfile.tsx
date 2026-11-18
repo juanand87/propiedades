@@ -125,6 +125,9 @@ function FullVideoPlayer({
       />
       <SocialVideoActions
         videoId={video.id}
+        initialCreator={video.creator}
+        initiallyPublished={video.status === "published"}
+        initialTitle={video.title}
         session={session}
         onChanged={onChanged}
         propertyFavorite={propertyFavorite}
@@ -377,6 +380,7 @@ export function VideoProfile({
       if (r.canceled) return;
       const fd = new FormData();
       fd.append("file", new File(r.assets[0].uri));
+      fd.append("purpose", "avatar");
       const media = await api<{ id: string }>("/manage/media", {
         method: "POST",
         token,
