@@ -20,7 +20,7 @@ import { promisify } from 'node:util';
 import { mkdir, writeFile, unlink, stat } from 'node:fs/promises';
 import { createReadStream } from 'node:fs';
 import { resolve } from 'node:path';
-import { Actor, ownership, uuid, choice } from './rules';
+import { Actor, ownership, uuid, choice, text } from './rules';
 import {
   assertPropertyVideos,
   validateMp4,
@@ -101,14 +101,18 @@ export class PropertyVideosService {
       typeof q.type_id === 'string' && q.type_id.length <= 30 ? q.type_id : '';
     const videoId = q.video_id ? uuid(q.video_id) : null;
     const seed = q.seed ? uuid(q.seed) : null;
+    const search = text(q.search, 100).trim();
+    const pattern = '%' + search.replace(/[!%_]/g, (char) => '!' + char) + '%';
     const filter =
         (type ? ' AND p.type_id=?' : '') +
         (q.linked_only === 'true' ? ' AND v.property_id IS NOT NULL' : '') +
         (videoId ? ' AND v.id=?' : '') +
+        (search ? " AND v.title LIKE ? ESCAPE '!'" : '') +
         (actor ? ' AND ' + notBlocked('?', 'v.created_by') : ''),
       params = [
         ...(type ? [type] : []),
         ...(videoId ? [videoId] : []),
+        ...(search ? [pattern] : []),
         ...(actor ? [actor.id, actor.id] : []),
       ];
     const [count] = await this.db.query(

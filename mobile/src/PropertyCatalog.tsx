@@ -1,3 +1,7 @@
+import {
+  GestureDetector,
+  useNativeGesture,
+} from "react-native-gesture-handler";
 import { useRouter } from "expo-router";
 import {
   emptySearchFilters,
@@ -48,10 +52,12 @@ export function PropertyCatalog({
   activityUnread = 0,
   session,
   savedSearchId,
+  scrollGesture,
 }: {
   favorites: string[];
   session: Session | null;
   savedSearchId?: string;
+  scrollGesture: ReturnType<typeof useNativeGesture>;
   activityUnread?: number;
   onFavorite: (id: string) => void;
   onOpen: (property: Property) => void;
@@ -267,296 +273,307 @@ export function PropertyCatalog({
         ]}
         style={StyleSheet.absoluteFill}
       />
-      <ScrollView
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={s.content}
-        refreshControl={
-          <RefreshControl
-            refreshing={busy}
-            onRefresh={() => void load(true)}
-            tintColor="#fff"
-            colors={["#0866f5"]}
-          />
-        }
-      >
-        <View style={s.hero}>
-          <View style={s.heading}>
-            <ProppixBrand />
-            <View style={s.topActions}>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Ir a buscar propiedades"
-                hitSlop={8}
-                style={s.iconButton}
-                onPress={() => searchInput.current?.focus()}
-              >
-                <ProppixIcon name="search" size={27} />
-              </Pressable>
-              <ActivityBell unread={activityUnread} />
-            </View>
-          </View>
-          <Text style={s.headline}>
-            Encuentra el{"\n"}
-            <Text style={s.highlight}>hogar</Text> que buscas
-          </Text>
-          <View style={s.swoosh} />
-        </View>
-        <View style={s.searchRow}>
-          <View style={s.search}>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Buscar propiedades"
-              onPress={submitSearch}
-            >
-              <ProppixIcon name="search" color="#08275f" size={24} />
-            </Pressable>
-            <TextInput
-              ref={searchInput}
-              style={s.searchInput}
-              accessibilityLabel="Buscar por comuna, nombre o código"
-              placeholder="Buscar propiedades en Los Lagos…"
-              placeholderTextColor="#17335f"
-              returnKeyType="search"
-              maxLength={100}
-              value={search}
-              onChangeText={setSearch}
-              onSubmitEditing={submitSearch}
+      <GestureDetector gesture={scrollGesture}>
+        <ScrollView
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={s.content}
+          refreshControl={
+            <RefreshControl
+              refreshing={busy}
+              onRefresh={() => void load(true)}
+              tintColor="#fff"
+              colors={["#0866f5"]}
             />
-            {!!search && (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Limpiar búsqueda"
-                onPress={() => {
-                  setSearch("");
-                  setFilters((previous) => ({ ...previous, search: "" }));
-                }}
-              >
-                <ProppixIcon name="close" size={17} color="#17335f" />
-              </Pressable>
-            )}
-          </View>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={`Filtros${activeFilterCount ? `, ${activeFilterCount} activos` : ""}`}
-            onPress={() => {
-              setDraft(filters);
-              setFilterOpen(true);
-            }}
-            style={s.filterButton}
-          >
-            <ProppixIcon name="filters" color="#08275f" size={27} />
-            {activeFilterCount > 0 && (
-              <View style={s.badge}>
-                <Text style={s.badgeText}>{activeFilterCount}</Text>
-              </View>
-            )}
-          </Pressable>
-        </View>
-        <View
-          style={{
-            flexDirection: "row",
-            justifyContent: "space-between",
-            paddingHorizontal: 12,
-            paddingTop: 14,
-            gap: 10,
-          }}
+          }
         >
-          <Pressable
-            accessibilityRole="button"
-            onPress={beginSave}
-            style={s.more}
-          >
-            <ProppixIcon name="bell" color="#0866f5" size={18} />
-            <Text style={s.moreText}>Guardar búsqueda</Text>
-          </Pressable>
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => router.push("/busquedas")}
-            style={s.more}
-          >
-            <Text style={s.moreText}>Mis búsquedas</Text>
-          </Pressable>
-        </View>
-        <View style={s.categories}>
-          {categories.map((category) => {
-            const selected = category.type
-              ? filters.type_id === category.type
-              : filters.operation_type === category.operation;
-            return (
-              <Pressable
-                key={category.label}
-                accessibilityRole="button"
-                accessibilityState={{ selected }}
-                style={[s.category, selected && s.categorySelected]}
-                onPress={() =>
-                  setFilters((previous) =>
-                    category.type
-                      ? { ...previous, type_id: selected ? "" : category.type! }
-                      : {
-                          ...previous,
-                          operation_type: selected ? "" : category.operation!,
-                        },
-                  )
-                }
-              >
-                <ProppixIcon name={category.icon} size={30} />
-                <Text
-                  style={s.categoryLabel}
-                  numberOfLines={1}
-                  adjustsFontSizeToFit
+          <View style={s.hero}>
+            <View style={s.heading}>
+              <ProppixBrand />
+              <View style={s.topActions}>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Ir a buscar propiedades"
+                  hitSlop={8}
+                  style={s.iconButton}
+                  onPress={() => searchInput.current?.focus()}
                 >
-                  {category.label}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
-        {!!error && (
-          <View accessibilityRole="alert" style={s.notice}>
-            <Text style={s.white}>{error}</Text>
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => void load(true)}
-              style={s.more}
-            >
-              <Text style={s.moreText}>Reintentar</Text>
-            </Pressable>
-          </View>
-        )}
-        {busy && !loaded && (
-          <ActivityIndicator style={{ padding: 24 }} color="#fff" />
-        )}
-        {!busy && !error && loaded && items.length === 0 && (
-          <View style={s.notice}>
-            <Text style={s.emptyTitle}>Tu próximo hogar está por llegar</Text>
-            <Text style={s.white}>
-              No encontramos propiedades con estos filtros.
+                  <ProppixIcon name="search" size={27} />
+                </Pressable>
+                <ActivityBell unread={activityUnread} />
+              </View>
+            </View>
+            <Text style={s.headline}>
+              Encuentra el{"\n"}
+              <Text style={s.highlight}>hogar</Text> que buscas
             </Text>
-            <Pressable
-              accessibilityRole="button"
-              style={s.more}
-              onPress={() => {
-                setSearch("");
-                setFilters({ ...emptyFilters });
-              }}
-            >
-              <Text style={s.moreText}>Ver todas las propiedades</Text>
-            </Pressable>
+            <View style={s.swoosh} />
           </View>
-        )}
-        {items.map((property) => (
-          <View key={property.id} style={s.card}>
+          <View style={s.searchRow}>
+            <View style={s.search}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Buscar propiedades"
+                onPress={submitSearch}
+              >
+                <ProppixIcon name="search" color="#08275f" size={24} />
+              </Pressable>
+              <TextInput
+                ref={searchInput}
+                style={s.searchInput}
+                accessibilityLabel="Buscar por comuna, nombre o código"
+                placeholder="Buscar propiedades en Los Lagos…"
+                placeholderTextColor="#17335f"
+                returnKeyType="search"
+                maxLength={100}
+                value={search}
+                onChangeText={setSearch}
+                onSubmitEditing={submitSearch}
+              />
+              {!!search && (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Limpiar búsqueda"
+                  onPress={() => {
+                    setSearch("");
+                    setFilters((previous) => ({ ...previous, search: "" }));
+                  }}
+                >
+                  <ProppixIcon name="close" size={17} color="#17335f" />
+                </Pressable>
+              )}
+            </View>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel={`Ver ${property.title}`}
-              onPress={() => onOpen(property)}
-              style={StyleSheet.absoluteFill}
+              accessibilityLabel={`Filtros${activeFilterCount ? `, ${activeFilterCount} activos` : ""}`}
+              onPress={() => {
+                setDraft(filters);
+                setFilterOpen(true);
+              }}
+              style={s.filterButton}
             >
-              {property.media[0] ? (
-                <Image
-                  source={{ uri: mediaUrl(property.media[0].url) }}
-                  resizeMode="cover"
-                  style={StyleSheet.absoluteFill}
-                />
-              ) : (
-                <View style={s.missingPhoto}>
-                  <ProppixIcon name="house" size={56} />
-                  <Text style={s.white}>Fotografías próximamente</Text>
+              <ProppixIcon name="filters" color="#08275f" size={27} />
+              {activeFilterCount > 0 && (
+                <View style={s.badge}>
+                  <Text style={s.badgeText}>{activeFilterCount}</Text>
                 </View>
               )}
-              <LinearGradient
-                colors={["transparent", "rgba(0,9,19,.1)", "rgba(0,12,18,.94)"]}
-                locations={[0, 0.35, 1]}
-                style={StyleSheet.absoluteFill}
-              />
-              <View style={s.operation}>
-                <Text style={s.operationText}>
-                  {property.operation_type === "rent"
-                    ? "En Arriendo"
-                    : "En Venta"}
-                </Text>
-              </View>
-              <View style={s.cardCopy}>
-                <View style={s.location}>
-                  <ProppixIcon name="pin" size={15} />
-                  <Text style={s.locationText} numberOfLines={1}>
-                    {property.commune_name || property.region_name}
-                  </Text>
-                  {property.is_demo && <Text style={s.demo}>EJEMPLO</Text>}
-                </View>
-                <Text style={s.cardTitle} numberOfLines={2}>
-                  {property.title}
-                </Text>
-                <View style={s.cardBottom}>
-                  <View style={s.specs}>
-                    {property.bedrooms != null && (
-                      <View style={s.spec}>
-                        <ProppixIcon name="bed" size={19} />
-                        <Text style={s.specText}>{property.bedrooms}</Text>
-                      </View>
-                    )}
-                    {property.bathrooms != null && (
-                      <View style={s.spec}>
-                        <ProppixIcon name="bath" size={19} />
-                        <Text style={s.specText}>{property.bathrooms}</Text>
-                      </View>
-                    )}
-                    {(property.built_area || property.land_area) && (
-                      <View style={s.spec}>
-                        <ProppixIcon name="area" size={18} />
-                        <Text style={s.specText}>
-                          {Number(
-                            property.built_area || property.land_area,
-                          ).toLocaleString("es-CL")}{" "}
-                          m²
-                        </Text>
-                      </View>
-                    )}
-                  </View>
-                  <View style={s.more}>
-                    <Text style={s.moreText}>Ver más</Text>
-                    <ProppixIcon name="arrow" color="#08275f" size={18} />
-                  </View>
-                </View>
-              </View>
+            </Pressable>
+          </View>
+          <View
+            style={{
+              flexDirection: "row",
+              justifyContent: "space-between",
+              paddingHorizontal: 12,
+              paddingTop: 14,
+              gap: 10,
+            }}
+          >
+            <Pressable
+              accessibilityRole="button"
+              onPress={beginSave}
+              style={s.more}
+            >
+              <ProppixIcon name="bell" color="#0866f5" size={18} />
+              <Text style={s.moreText}>Guardar búsqueda</Text>
             </Pressable>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel={
-                favorites.includes(property.id)
-                  ? "Quitar propiedad de favoritos"
-                  : "Guardar propiedad en favoritos"
-              }
-              accessibilityState={{ selected: favorites.includes(property.id) }}
-              hitSlop={8}
-              style={s.favorite}
-              onPress={() => onFavorite(property.id)}
+              onPress={() => router.push("/busquedas")}
+              style={s.more}
             >
-              <ProppixIcon
-                name="heart"
-                size={28}
-                filled={favorites.includes(property.id)}
-                color={favorites.includes(property.id) ? "#2bc8f1" : "#fff"}
-              />
+              <Text style={s.moreText}>Mis búsquedas</Text>
             </Pressable>
           </View>
-        ))}
-        {hasMore && (
-          <Pressable
-            accessibilityRole="button"
-            disabled={busy}
-            style={[s.more, { alignSelf: "center", marginVertical: 14 }]}
-            onPress={() => void load(false)}
-          >
-            {busy ? (
-              <ActivityIndicator color="#0866f5" />
-            ) : (
-              <Text style={s.moreText}>Ver más propiedades</Text>
-            )}
-          </Pressable>
-        )}
-      </ScrollView>
+          <View style={s.categories}>
+            {categories.map((category) => {
+              const selected = category.type
+                ? filters.type_id === category.type
+                : filters.operation_type === category.operation;
+              return (
+                <Pressable
+                  key={category.label}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected }}
+                  style={[s.category, selected && s.categorySelected]}
+                  onPress={() =>
+                    setFilters((previous) =>
+                      category.type
+                        ? {
+                            ...previous,
+                            type_id: selected ? "" : category.type!,
+                          }
+                        : {
+                            ...previous,
+                            operation_type: selected ? "" : category.operation!,
+                          },
+                    )
+                  }
+                >
+                  <ProppixIcon name={category.icon} size={30} />
+                  <Text
+                    style={s.categoryLabel}
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                  >
+                    {category.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+          {!!error && (
+            <View accessibilityRole="alert" style={s.notice}>
+              <Text style={s.white}>{error}</Text>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => void load(true)}
+                style={s.more}
+              >
+                <Text style={s.moreText}>Reintentar</Text>
+              </Pressable>
+            </View>
+          )}
+          {busy && !loaded && (
+            <ActivityIndicator style={{ padding: 24 }} color="#fff" />
+          )}
+          {!busy && !error && loaded && items.length === 0 && (
+            <View style={s.notice}>
+              <Text style={s.emptyTitle}>Tu próximo hogar está por llegar</Text>
+              <Text style={s.white}>
+                No encontramos propiedades con estos filtros.
+              </Text>
+              <Pressable
+                accessibilityRole="button"
+                style={s.more}
+                onPress={() => {
+                  setSearch("");
+                  setFilters({ ...emptyFilters });
+                }}
+              >
+                <Text style={s.moreText}>Ver todas las propiedades</Text>
+              </Pressable>
+            </View>
+          )}
+          {items.map((property) => (
+            <View key={property.id} style={s.card}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`Ver ${property.title}`}
+                onPress={() => onOpen(property)}
+                style={StyleSheet.absoluteFill}
+              >
+                {property.media[0] ? (
+                  <Image
+                    source={{ uri: mediaUrl(property.media[0].url) }}
+                    resizeMode="cover"
+                    style={StyleSheet.absoluteFill}
+                  />
+                ) : (
+                  <View style={s.missingPhoto}>
+                    <ProppixIcon name="house" size={56} />
+                    <Text style={s.white}>Fotografías próximamente</Text>
+                  </View>
+                )}
+                <LinearGradient
+                  colors={[
+                    "transparent",
+                    "rgba(0,9,19,.1)",
+                    "rgba(0,12,18,.94)",
+                  ]}
+                  locations={[0, 0.35, 1]}
+                  style={StyleSheet.absoluteFill}
+                />
+                <View style={s.operation}>
+                  <Text style={s.operationText}>
+                    {property.operation_type === "rent"
+                      ? "En Arriendo"
+                      : "En Venta"}
+                  </Text>
+                </View>
+                <View style={s.cardCopy}>
+                  <View style={s.location}>
+                    <ProppixIcon name="pin" size={15} />
+                    <Text style={s.locationText} numberOfLines={1}>
+                      {property.commune_name || property.region_name}
+                    </Text>
+                    {property.is_demo && <Text style={s.demo}>EJEMPLO</Text>}
+                  </View>
+                  <Text style={s.cardTitle} numberOfLines={2}>
+                    {property.title}
+                  </Text>
+                  <View style={s.cardBottom}>
+                    <View style={s.specs}>
+                      {property.bedrooms != null && (
+                        <View style={s.spec}>
+                          <ProppixIcon name="bed" size={19} />
+                          <Text style={s.specText}>{property.bedrooms}</Text>
+                        </View>
+                      )}
+                      {property.bathrooms != null && (
+                        <View style={s.spec}>
+                          <ProppixIcon name="bath" size={19} />
+                          <Text style={s.specText}>{property.bathrooms}</Text>
+                        </View>
+                      )}
+                      {(property.built_area || property.land_area) && (
+                        <View style={s.spec}>
+                          <ProppixIcon name="area" size={18} />
+                          <Text style={s.specText}>
+                            {Number(
+                              property.built_area || property.land_area,
+                            ).toLocaleString("es-CL")}{" "}
+                            m²
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                    <View style={s.more}>
+                      <Text style={s.moreText}>Ver más</Text>
+                      <ProppixIcon name="arrow" color="#08275f" size={18} />
+                    </View>
+                  </View>
+                </View>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={
+                  favorites.includes(property.id)
+                    ? "Quitar propiedad de favoritos"
+                    : "Guardar propiedad en favoritos"
+                }
+                accessibilityState={{
+                  selected: favorites.includes(property.id),
+                }}
+                hitSlop={8}
+                style={s.favorite}
+                onPress={() => onFavorite(property.id)}
+              >
+                <ProppixIcon
+                  name="heart"
+                  size={28}
+                  filled={favorites.includes(property.id)}
+                  color={favorites.includes(property.id) ? "#2bc8f1" : "#fff"}
+                />
+              </Pressable>
+            </View>
+          ))}
+          {hasMore && (
+            <Pressable
+              accessibilityRole="button"
+              disabled={busy}
+              style={[s.more, { alignSelf: "center", marginVertical: 14 }]}
+              onPress={() => void load(false)}
+            >
+              {busy ? (
+                <ActivityIndicator color="#0866f5" />
+              ) : (
+                <Text style={s.moreText}>Ver más propiedades</Text>
+              )}
+            </Pressable>
+          )}
+        </ScrollView>
+      </GestureDetector>
       <Modal
         visible={saveOpen}
         transparent

@@ -111,6 +111,7 @@ export async function api<T>(
     body?: unknown;
     token?: string;
     signal?: AbortSignal;
+    retryInvalidResponse?: boolean;
   } = {},
 ): Promise<T> {
   if (!path.startsWith("/") || path.startsWith("//"))
@@ -128,6 +129,7 @@ export async function api<T>(
     const r = await fetch(API_URL + path, {
       method: options.method || "GET",
       headers: {
+        Accept: "application/json",
         ...(options.body && !form
           ? { "Content-Type": "application/json" }
           : {}),
@@ -140,9 +142,29 @@ export async function api<T>(
         : undefined,
       signal: controller.signal,
     });
-    const value = await r
-      .json()
-      .catch(() => ({ message: "Respuesta no válida del servidor local." }));
+    let value: any;
+    try {
+      value = JSON.parse(await r.text());
+      if (value === null || typeof value !== "object")
+        throw new Error("Invalid JSON response");
+    } catch {
+      if (
+        (!options.method || options.method === "GET") &&
+        options.retryInvalidResponse !== false &&
+        !controller.signal.aborted &&
+        (r.ok || [502, 503, 504].includes(r.status))
+      ) {
+        clearTimeout(timer);
+        return await api<T>(path, { ...options, retryInvalidResponse: false });
+      }
+      throw new ApiError(
+        r.status === 401
+          ? "La sesión venció. Inicia sesión nuevamente."
+          : "El servidor no pudo completar la respuesta. Intenta nuevamente." +
+              (r.ok ? "" : " (HTTP " + r.status + ")"),
+        r.status,
+      );
+    }
     if (!r.ok)
       throw new ApiError(
         r.status === 401
@@ -158,7 +180,9 @@ export async function api<T>(
       );
     if (e instanceof TypeError)
       throw new Error(
-        "No hay conexión con la API local. Inicia npm run mobile:backend desde la raíz.",
+        production
+          ? "No hay conexión con Proppix. Revisa tu conexión e intenta nuevamente."
+          : "No hay conexión con la API local. Inicia npm run mobile:backend desde la raíz.",
       );
     throw e;
   } finally {

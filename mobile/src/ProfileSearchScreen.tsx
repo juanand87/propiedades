@@ -62,6 +62,13 @@ export function ProfileSearchScreen({ session }: { session: Session | null }) {
       )
         .then((result) => {
           if (!controller.signal.aborted && run === generation.current) {
+            if (
+              !Array.isArray(result.items) ||
+              typeof result.has_more !== "boolean"
+            )
+              throw new Error(
+                "No se pudo cargar el directorio de perfiles. Intenta nuevamente.",
+              );
             setItems(result.items);
             setMore(result.has_more);
           }

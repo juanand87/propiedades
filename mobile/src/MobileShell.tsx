@@ -1,3 +1,4 @@
+import { VideoSearch } from "./VideoSearch";
 import { playbackSummary } from "./playback-metrics";
 import { attachPreparedVideo } from "./video-playback-policy";
 import { ProfileSearchScreen } from "./ProfileSearchScreen";
@@ -275,6 +276,7 @@ function AppContent() {
     else if (router.canGoBack()) router.back();
     else router.replace("/");
   }, [router, resumeVideoId]);
+  const [videoSearchOpen, setVideoSearchOpen] = useState(false);
   const [videos, setVideos] = useState<Video[]>([]),
     [page, setPage] = useState(0),
     [pages, setPages] = useState(1),
@@ -287,6 +289,7 @@ function AppContent() {
     ready &&
     foreground &&
     tab === "feed" &&
+    !videoSearchOpen &&
     !propertyRoute &&
     !detail &&
     !notificationVideoRoute &&
@@ -297,6 +300,9 @@ function AppContent() {
     !profileSearchRoute;
   const homePair = pathname === "/" || pathname === "/propiedades";
   const feedScrollGesture = useNativeGesture({ enabled: feedVisible });
+  const catalogScrollGesture = useNativeGesture({
+    enabled: homePair && tab === "catalog",
+  });
   const preparedVideos = useVideoPreload(videos, active, ready, !feedVisible);
   const feedRef = useRef<FlatList<Video>>(null),
     feedDragIndex = useRef(0),
@@ -1017,6 +1023,7 @@ function AppContent() {
     <PropertyCatalog
       key={savedSearchId || "catalog"}
       savedSearchId={savedSearchId}
+      scrollGesture={catalogScrollGesture}
       session={session}
       activityUnread={activityUnread}
       favorites={favorites}
@@ -1372,8 +1379,8 @@ function AppContent() {
       <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Buscar propiedades"
-          onPress={() => setTab("catalog")}
+          accessibilityLabel="Buscar videos"
+          onPress={() => setVideoSearchOpen(true)}
           style={{ padding: 9 }}
         >
           <ProppixIcon name="search" size={25} />
@@ -1616,11 +1623,33 @@ function AppContent() {
             </View>
           </Pressable>
         </Modal>
+        {videoSearchOpen && (
+          <VideoSearch
+            token={session?.access_token}
+            onClose={() => setVideoSearchOpen(false)}
+            onOpen={(id) => {
+              setVideoSearchOpen(false);
+              router.push({
+                pathname: "/video/[videoId]",
+                params: { videoId: id },
+              });
+            }}
+          />
+        )}
         {homePair && (
           <HomePager
             page={tab === "catalog" ? "catalog" : "feed"}
-            enabled={feedVisible}
-            scrollGesture={feedScrollGesture}
+            enabled={
+              ready &&
+              foreground &&
+              homePair &&
+              !detail &&
+              !videoSearchOpen &&
+              !accountMenu
+            }
+            scrollGesture={
+              tab === "catalog" ? catalogScrollGesture : feedScrollGesture
+            }
             feed={
               <>
                 {appHeader}
@@ -1628,6 +1657,7 @@ function AppContent() {
               </>
             }
             catalog={catalogScreen}
+            onFeed={() => router.replace("/")}
             onCatalog={() => {
               setDetail(null);
               router.replace("/propiedades");

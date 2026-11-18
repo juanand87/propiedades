@@ -22,6 +22,7 @@ export function HomePager({
   feed,
   catalog,
   onCatalog,
+  onFeed,
 }: {
   page: "feed" | "catalog";
   enabled: boolean;
@@ -29,6 +30,7 @@ export function HomePager({
   feed: ReactNode;
   catalog: ReactNode;
   onCatalog: () => void;
+  onFeed: () => void;
 }) {
   const { width } = useWindowDimensions();
   const progress = useSharedValue(page === "catalog" ? 1 : 0);
@@ -43,8 +45,8 @@ export function HomePager({
   }, [page, progress]);
   useEffect(() => () => cancelAnimation(progress), [progress]);
   const pan = usePanGesture({
-    enabled: enabled && page === "feed",
-    activeOffsetX: [-20, 100000],
+    enabled,
+    activeOffsetX: page === "feed" ? [-20, 100000] : [-100000, 20],
     failOffsetY: [-18, 18],
     maxPointers: 1,
     block: scrollGesture,
@@ -56,19 +58,21 @@ export function HomePager({
       progress.set(pageProgress(dragStart.get(), event.translationX, width));
     },
     onDeactivate: (event) => {
+      const returning = page === "catalog";
       const complete = completeCatalogSwipe(
-        progress.get(),
-        event.translationX,
+        returning ? 1 - progress.get() : progress.get(),
+        returning ? -event.translationX : event.translationX,
         event.translationY,
-        event.velocityX,
+        returning ? -event.velocityX : event.velocityX,
         event.canceled,
       );
       progress.set(
         withTiming(
-          complete ? 1 : 0,
+          complete ? (returning ? 0 : 1) : returning ? 1 : 0,
           { duration: 240, easing: Easing.out(Easing.cubic) },
           (finished) => {
-            if (finished && complete) scheduleOnRN(onCatalog);
+            if (finished && complete)
+              scheduleOnRN(returning ? onFeed : onCatalog);
           },
         ),
       );
