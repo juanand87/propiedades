@@ -1,5 +1,9 @@
 import { beginVideoLoad, videoSourceReady } from "./playback-metrics";
-import { preloadAheadCount, hlsUnavailable } from "./video-playback-policy";
+import {
+  preloadAheadCount,
+  hlsUnavailable,
+  playbackBuffer,
+} from "./video-playback-policy";
 import { useEffect, useRef, useState } from "react";
 import { Image, Platform } from "react-native";
 import {
@@ -17,12 +21,7 @@ type PreparedVideo = {
   role: string;
 };
 function configureBuffer(player: VideoPlayer, active: boolean) {
-  player.bufferOptions = {
-    minBufferForPlayback: 0.65,
-    preferredForwardBufferDuration: active ? 12 : 2,
-    maxBufferBytes: (active ? 8 : 1) * 1024 * 1024,
-    prioritizeTimeOverSizeThreshold: false,
-  };
+  player.bufferOptions = playbackBuffer(active);
 }
 let cacheSetup: Promise<void> | undefined;
 export function prepareVideoCache() {
@@ -79,7 +78,7 @@ export function useVideoPreload(
         setGeneration((value) => value + 1);
       }
     };
-    const timer = setInterval(inspect, 250);
+    const timer = setInterval(inspect, 100);
     return () => clearInterval(timer);
   }, [videos, active, enabled, suspended, canPrepare]);
   useEffect(() => {

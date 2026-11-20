@@ -79,7 +79,7 @@ export class VideoSocialService {
       `SELECT /*+ MAX_EXECUTION_TIME(4000) */ candidate.id,COALESCE(vp.display_name,CONVERT(candidate.firstName USING utf8mb4) COLLATE utf8mb4_unicode_ci) display_name,vp.avatar_media_id,pi.profile_kind,pi.username,
       EXISTS(SELECT 1 FROM estate_video_follows f WHERE f.follower_id=? AND f.followed_id=CONVERT(candidate.id USING utf8mb4) COLLATE utf8mb4_unicode_ci) followed
       FROM users candidate LEFT JOIN estate_video_profiles vp ON vp.user_id=CONVERT(candidate.id USING utf8mb4) COLLATE utf8mb4_unicode_ci LEFT JOIN estate_profile_identity pi ON pi.user_id=CONVERT(candidate.id USING utf8mb4) COLLATE utf8mb4_unicode_ci
-      WHERE candidate.isActive=1 AND candidate.id<>? AND CONVERT(candidate.id USING utf8mb4) COLLATE utf8mb4_unicode_ci IN (SELECT user_id FROM estate_video_profiles UNION SELECT user_id FROM estate_profile_identity UNION SELECT v.created_by ${videoJoined} WHERE ${videoVisible})
+      WHERE candidate.isActive=1 AND candidate.id<>? AND (vp.user_id IS NOT NULL OR pi.user_id IS NOT NULL OR EXISTS(SELECT 1 ${videoJoined} WHERE v.created_by=CONVERT(candidate.id USING utf8mb4) COLLATE utf8mb4_unicode_ci AND ${videoVisible}))
       AND (CONVERT(COALESCE(vp.display_name,CONVERT(candidate.firstName USING utf8mb4) COLLATE utf8mb4_unicode_ci) USING utf8mb4) COLLATE utf8mb4_unicode_ci LIKE ? ESCAPE '!' OR CONVERT(pi.username USING utf8mb4) COLLATE utf8mb4_unicode_ci LIKE ? ESCAPE '!')
       ${kind === 'all' ? '' : 'AND pi.profile_kind=?'} AND ${notBlocked('?', 'candidate.id')}
       ORDER BY (CONVERT(pi.username USING utf8mb4) COLLATE utf8mb4_unicode_ci=?) DESC,display_name,candidate.id LIMIT 25 OFFSET ?`,
@@ -307,6 +307,7 @@ export class VideoSocialService {
               ? {
                   id: userId,
                   display_name: ownerProfile.display_name,
+                  followed: ownerProfile.followed,
                   avatar_url: ownerProfile.avatar_url,
                   avatar_thumbnail_url: ownerProfile.avatar_thumbnail_url,
                 }

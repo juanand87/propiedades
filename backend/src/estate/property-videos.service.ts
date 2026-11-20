@@ -139,6 +139,20 @@ export class PropertyVideosService {
             creatorIds,
           )
         : [];
+    const followedRows =
+      actor &&
+      creatorIds.length &&
+      this.config.get('SOCIAL_VIDEOS_ENABLED') === 'true'
+        ? await this.db.query(
+            'SELECT followed_id FROM estate_video_follows WHERE follower_id=? AND followed_id IN (' +
+              creatorIds.map(() => '?').join(',') +
+              ')',
+            [actor.id, ...creatorIds],
+          )
+        : [];
+    const followedCreators = new Set(
+      followedRows.map((row: any) => row.followed_id),
+    );
     const profiles = new Map<string, any>(
       creatorProfiles.map((profile: any) => [profile.user_id, profile]),
     );
@@ -152,6 +166,7 @@ export class PropertyVideosService {
           thumbnail_preview: covers.get(v.id) || null,
           creator: {
             id: v.creator_id,
+            followed: actor ? followedCreators.has(v.creator_id) : undefined,
             display_name:
               profiles.get(v.creator_id)?.display_name || v.creator_name,
             avatar_url: profiles.get(v.creator_id)?.avatar_media_id

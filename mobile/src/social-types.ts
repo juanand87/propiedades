@@ -12,7 +12,12 @@ export type VideoProfileData = {
   followed: boolean;
 };
 export type ProfileVideo = {
-  creator?: { id: string; display_name: string; avatar_url?: string | null };
+  creator?: {
+    id: string;
+    display_name: string;
+    avatar_url?: string | null;
+    followed?: boolean;
+  };
   moderation_hidden?: boolean;
   hls_url?: string | null;
   thumbnail_url?: string;

@@ -1,3 +1,8 @@
+import {
+  followState,
+  rememberFollowState,
+  subscribeFollowState,
+} from "./follow-state";
 import { ModerationActions } from "./ModerationActions";
 import {
   ComponentRef,
@@ -5,6 +10,7 @@ import {
   useEffectEvent,
   useRef,
   useState,
+  useSyncExternalStore,
 } from "react";
 import {
   ActivityIndicator,
@@ -48,6 +54,7 @@ export function SocialVideoActions({
     display_name: string;
     avatar_url?: string | null;
     avatar_thumbnail_url?: string | null;
+    followed?: boolean;
   };
   initialTitle?: string;
   initiallyPublished?: boolean;
@@ -99,13 +106,31 @@ export function SocialVideoActions({
   const [properties, setProperties] = useState<Property[]>([]);
   const [propertyPage, setPropertyPage] = useState(0);
   const [propertyPages, setPropertyPages] = useState(0);
+  const creator = data?.creator || initialCreator;
+  const cachedFollowing = useSyncExternalStore(subscribeFollowState, () =>
+    followState(session?.user.id, creator?.id),
+  );
+  const followed =
+    cachedFollowing ??
+    data?.creator.followed ??
+    initialCreator?.followed ??
+    (session ? undefined : false);
   const token = session?.access_token;
   const sheetColors = panel === "comments" ? lightColors : videoColors;
   useEffect(() => {
     let live = true;
+    const knownAtStart = followState(session?.user.id, initialCreator?.id);
     void api<VideoSocialData>(`/videos/${videoId}/social`, { token })
       .then((d) => {
-        if (live) setData(d);
+        if (live) {
+          if (followState(session?.user.id, d.creator.id) === knownAtStart)
+            rememberFollowState(
+              session?.user.id,
+              d.creator.id,
+              d.creator.followed,
+            );
+          setData(d);
+        }
       })
       .catch((e) => {
         if (live) setError(e.message);
@@ -113,7 +138,7 @@ export function SocialVideoActions({
     return () => {
       live = false;
     };
-  }, [videoId, token]);
+  }, [videoId, token, session?.user.id, initialCreator?.id]);
   const run = async (action: () => Promise<void>) => {
     if (busy) return;
     setBusy(true);
@@ -239,8 +264,8 @@ export function SocialVideoActions({
         <ProppixIcon
           name={icon}
           size={icon === "bookmark" ? 29 : 37}
-          color={selected ? videoColors.cyan : "#fff"}
-          filled={icon !== "bookmark" || selected}
+          color="#fff"
+          filled={false}
         />
       </View>
       <Text style={[s.count, selected && { color: videoColors.cyan }]}>
@@ -262,7 +287,6 @@ export function SocialVideoActions({
       </Text>
     </Pressable>
   );
-  const creator = data?.creator || initialCreator;
   const avatar = creator?.avatar_thumbnail_url || creator?.avatar_url;
   const propertyId = data?.property_id;
   const saved = !!propertyId && !!propertyFavorite?.ids.includes(propertyId);
@@ -298,16 +322,14 @@ export function SocialVideoActions({
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={
-              data?.creator.followed
-                ? "Dejar de seguir al creador"
-                : "Seguir al creador"
+              followed ? "Dejar de seguir al creador" : "Seguir al creador"
             }
             accessibilityState={{
-              selected: data?.creator.followed,
-              disabled: busy || !data,
+              selected: followed,
+              disabled: busy || !data || followed === undefined,
             }}
-            disabled={busy || !data}
-            style={[s.follow, data?.creator.followed && s.following]}
+            disabled={busy || !data || followed === undefined}
+            style={[s.follow, followed && s.following]}
             onPress={() => {
               if (!data || !requireSession()) return;
               void run(async () => {
@@ -316,25 +338,25 @@ export function SocialVideoActions({
                   {
                     method: "POST",
                     token,
-                    body: { active: !data?.creator.followed },
+                    body: { active: !followed },
                   },
+                );
+                rememberFollowState(
+                  session?.user.id,
+                  creator.id,
+                  creator.followed,
                 );
                 setData({ ...data, creator });
               });
             }}
           >
             <ProppixIcon
-              name={data?.creator.followed ? "check" : "plus"}
+              name={followed ? "check" : "plus"}
               size={13}
-              color={data?.creator.followed ? "#fff" : "#052553"}
+              color="#fff"
             />
-            <Text
-              style={[
-                s.followText,
-                data?.creator.followed && { color: "#fff" },
-              ]}
-            >
-              {data?.creator.followed ? "Siguiendo" : "Seguir"}
+            <Text style={[s.followText, followed && { color: "#fff" }]}>
+              {followed === undefined ? "…" : followed ? "Siguiendo" : "Seguir"}
             </Text>
           </Pressable>
         )}
@@ -862,25 +884,27 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderRadius: 23,
-    backgroundColor: "#00142b22",
+    backgroundColor: "transparent",
   },
   follow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 3,
-    backgroundColor: videoColors.cyan,
+    backgroundColor: "transparent",
+    borderWidth: 1,
+    borderColor: "#fff",
     paddingVertical: 7,
     paddingHorizontal: 9,
     borderRadius: 16,
     minHeight: 30,
   },
   following: {
-    backgroundColor: "#092954bb",
+    backgroundColor: "transparent",
     borderWidth: 1,
-    borderColor: "#ffffff88",
+    borderColor: "#fff",
   },
-  followText: { color: "#052553", fontSize: 10, fontWeight: "800" },
+  followText: { color: "#fff", fontSize: 10, fontWeight: "800" },
   pausedOptions: {
     width: "90%",
     maxWidth: 420,

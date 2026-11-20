@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -59,7 +59,7 @@ export function VideoSurface({
       if (frame.current === player) videoFrameVisible(display.current, true);
     } else display.current = null;
   }, [player, active]);
-  useEffect(() => {
+  useLayoutEffect(() => {
     allowed.current = active && !paused;
     if (allowed.current) player.play();
     else player.pause();
@@ -83,10 +83,17 @@ export function VideoSurface({
   return (
     <Pressable
       style={StyleSheet.absoluteFill}
-      onPress={onPause}
+      onPress={() => {
+        // Native command runs in the tap handler, before the React state commit.
+        allowed.current = active && paused;
+        if (allowed.current) player.play();
+        else player.pause();
+        onPause();
+      }}
       accessibilityLabel={paused ? "Reproducir video" : "Pausar video"}
     >
       <VideoView
+        pointerEvents="none"
         style={[StyleSheet.absoluteFill, { opacity: firstFrame ? 1 : 0 }]}
         player={player}
         nativeControls={false}
@@ -103,7 +110,11 @@ export function VideoSurface({
           active && !paused && !error && (status === "loading" || !firstFrame)
         }
       />
-      {paused && active && !error && <Text style={s.play}>▶</Text>}
+      {paused && active && !error && (
+        <Text pointerEvents="none" style={s.play}>
+          ▶
+        </Text>
+      )}
       {!!error && active && (
         <View style={s.error}>
           <Text style={s.white}>{error}</Text>

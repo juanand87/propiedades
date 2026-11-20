@@ -2,7 +2,7 @@
   "expo": {
     "name": "Proppix",
     "slug": "proppix",
-    "version": "1.0.29",
+    "version": "1.0.30",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
@@ -20,7 +20,7 @@
         "android.permission.RECORD_AUDIO",
         "android.permission.CAMERA"
       ],
-      "versionCode": 30
+      "versionCode": 31
     },
     "web": {
       "favicon": "./assets/favicon.png"

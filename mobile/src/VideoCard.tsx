@@ -1,12 +1,12 @@
+import { ProppixIcon } from "./ProppixIcon";
 import { VideoCover } from "./VideoCover";
 import { VideoSurface, DelayedVideoSpinner } from "./VideoSurface";
 import { preferredVideoUrl } from "./video-source";
 import { useEffect, useState } from "react";
-import { Image, Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import { VideoPlayer } from "expo-video";
 import { Video, Session } from "./api";
 import { videoColors } from "./video-colors";
-import { videoIcons } from "./video-icons";
 import { SocialVideoActions } from "./SocialVideoActions";
 
 export function VideoCard({
@@ -70,10 +70,7 @@ export function VideoCard({
             onPress={onFavorite}
             style={styles.circle}
           >
-            <Image
-              source={videoIcons.heart}
-              style={{ width: 34, height: 34 }}
-            />
+            <ProppixIcon name="heart" size={34} color="#fff" />
             <Text style={styles.small}>
               {favorite ? "Guardado" : "Guardar"}
             </Text>
@@ -84,10 +81,7 @@ export function VideoCard({
             onPress={onShare}
             style={styles.circle}
           >
-            <Image
-              source={videoIcons.share}
-              style={{ width: 34, height: 34 }}
-            />
+            <ProppixIcon name="share" size={34} color="#fff" />
             <Text style={styles.small}>Compartir</Text>
           </Pressable>
         </View>

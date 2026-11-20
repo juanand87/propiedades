@@ -1,3 +1,4 @@
+import type { VideoPlayer } from "expo-video";
 // Keep background downloads behind the visible video, with hysteresis to avoid churn.
 export function canPreloadAhead(
   status: string,
@@ -41,8 +42,8 @@ export function preloadAheadCount(
   const ahead = Math.max(0, buffered - current),
     remaining = Math.max(0, duration - current);
   if (duration > 0 && ahead >= remaining - 0.25) return 2;
-  if (ahead >= (previous === 2 ? 3 : 6)) return 2;
-  return ahead >= (previous >= 1 ? 1.5 : 2.5) ? 1 : 0;
+  if (ahead >= (previous === 2 ? 2 : 4)) return 2;
+  return ahead >= (previous >= 1 ? 0.75 : 1.25) ? 1 : 0;
 }
 export function attachPreparedVideo(
   videos: { id: string }[],
@@ -55,4 +56,21 @@ export function attachPreparedVideo(
       (i) => videos[i]?.id === videos[index].id,
     ) === index
   );
+}
+
+// Keep start/resume below a frame transition; preload only behind a healthy active buffer.
+export function playbackBuffer(active: boolean) {
+  return {
+    minBufferForPlayback: 0.15,
+    preferredForwardBufferDuration: active ? 12 : 2,
+    maxBufferBytes: (active ? 8 : 1) * 1024 * 1024,
+    prioritizeTimeOverSizeThreshold: false,
+  };
+}
+
+export function configureVideoBuffer(
+  player: Pick<VideoPlayer, "bufferOptions">,
+  active: boolean,
+) {
+  player.bufferOptions = playbackBuffer(active);
 }

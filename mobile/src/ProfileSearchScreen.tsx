@@ -1,3 +1,4 @@
+import { rememberFollowState } from "./follow-state";
 import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -70,6 +71,9 @@ export function ProfileSearchScreen({ session }: { session: Session | null }) {
               throw new Error(
                 "No se pudo cargar el directorio de perfiles. Intenta nuevamente.",
               );
+            result.items.forEach((p) =>
+              rememberFollowState(session?.user.id, p.id, p.followed),
+            );
             setItems(result.items);
             setMore(result.has_more);
           }
@@ -87,7 +91,7 @@ export function ProfileSearchScreen({ session }: { session: Session | null }) {
       clearTimeout(timer);
       controller.abort();
     };
-  }, [q, kind, token, revision]);
+  }, [q, kind, token, revision, session?.user.id]);
   useEffect(() => {
     const pending = followRequests.current;
     return () => {
@@ -140,12 +144,14 @@ export function ProfileSearchScreen({ session }: { session: Session | null }) {
           body: { active: !person.followed },
         },
       );
-      if (!controller.signal.aborted)
+      if (!controller.signal.aborted) {
+        rememberFollowState(session?.user.id, result.id, result.followed);
         setItems((rows) =>
           rows.map((row) =>
             row.id === person.id ? { ...row, followed: result.followed } : row,
           ),
         );
+      }
     } catch (e) {
       if (!controller.signal.aborted)
         setError(

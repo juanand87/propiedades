@@ -1,3 +1,5 @@
+import { clampVideoOffset } from "./video-paging";
+import { rememberFollowState } from "./follow-state";
 import { beginVideoLoad, videoSourceReady } from "./playback-metrics";
 import { VideoCover } from "./VideoCover";
 import { VideoSurface, DelayedVideoSpinner } from "./VideoSurface";
@@ -8,7 +10,11 @@ import {
   identityComplete,
 } from "./ProfileIdentityFields";
 import { KeyboardSafeView } from "./KeyboardSafeView";
-import { hlsUnavailable } from "./video-playback-policy";
+import {
+  hlsUnavailable,
+  playbackBuffer,
+  configureVideoBuffer,
+} from "./video-playback-policy";
 import { ModerationActions } from "./ModerationActions";
 import { playbackSource, preferredVideoUrl } from "./video-source";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -68,7 +74,6 @@ function FullVideoPlayer({
   const [paused, setPaused] = useState(false),
     [foreground, setForeground] = useState(AppState.currentState === "active");
   const fallbackUsed = useRef(false);
-  const allowedToPlay = useRef(false);
   const player = useVideoPlayer(
     playbackSource(preferredVideoUrl(video)),
     (p) => {
@@ -76,11 +81,7 @@ function FullVideoPlayer({
       p.loop = true;
       p.muted = false;
       p.volume = 1;
-      p.bufferOptions = {
-        minBufferForPlayback: 0.65,
-        preferredForwardBufferDuration: 12,
-        maxBufferBytes: 8 * 1024 * 1024,
-      };
+      p.bufferOptions = playbackBuffer(active);
     },
   );
   useEffect(() => {
@@ -90,10 +91,8 @@ function FullVideoPlayer({
     return () => sub.remove();
   }, []);
   useEffect(() => {
-    allowedToPlay.current = active && foreground && !paused;
-    if (allowedToPlay.current) player.play();
-    else player.pause();
-  }, [active, foreground, paused, player]);
+    configureVideoBuffer(player, active);
+  }, [active, player]);
   useEffect(() => {
     const sub = player.addListener("statusChange", (e) => {
       if (
@@ -108,8 +107,6 @@ function FullVideoPlayer({
       }
       if (e.status === "readyToPlay") {
         videoSourceReady(player);
-        if (allowedToPlay.current) player.play();
-        else player.pause();
       }
     });
     return () => sub.remove();
@@ -282,6 +279,9 @@ export function VideoProfile({
   const [viewer, setViewer] = useState<number | null>(null),
     [active, setActive] = useState(0),
     [height, setHeight] = useState(1);
+  const viewerList = useRef<FlatList<ProfileVideo>>(null),
+    viewerDragIndex = useRef(0),
+    viewerDragging = useRef(false);
   const [editProfile, setEditProfile] = useState(false),
     [identity, setIdentity] =
       useState<ProfileIdentityDraft>(emptyProfileIdentity),
@@ -325,6 +325,7 @@ export function VideoProfile({
           ),
         ]);
         if (signal?.aborted) return;
+        rememberFollowState(session?.user.id, p.id, p.followed);
         setProfile(p);
         setVideos((old) =>
           next === 1
@@ -342,7 +343,7 @@ export function VideoProfile({
         if (!signal?.aborted) setLoading(false);
       }
     },
-    [target, token, section],
+    [target, token, section, session],
   );
   useEffect(() => {
     const controller = new AbortController();
@@ -564,17 +565,21 @@ export function VideoProfile({
         </View>
       ) : (
         session &&
+        profile &&
         button(
           profile?.followed ? "Siguiendo" : "Seguir",
           () =>
             void run(async () => {
-              setProfile(
-                await api(`/video-profiles/${target}/follow`, {
-                  method: "POST",
-                  token,
-                  body: { active: !profile?.followed },
-                }),
+              const updated = await api<VideoProfileData>(
+                `/video-profiles/${target}/follow`,
+                { method: "POST", token, body: { active: !profile?.followed } },
               );
+              rememberFollowState(
+                session?.user.id,
+                updated.id,
+                updated.followed,
+              );
+              setProfile(updated);
             }),
         )
       )}
@@ -855,6 +860,7 @@ export function VideoProfile({
           <StatusBar style="light" />
           {viewer !== null && height > 1 && (
             <FlatList
+              ref={viewerList}
               data={videos}
               keyExtractor={(v) => v.id}
               keyboardShouldPersistTaps="always"
@@ -862,21 +868,62 @@ export function VideoProfile({
               initialScrollIndex={viewer}
               pagingEnabled
               snapToInterval={height}
+              snapToAlignment="start"
+              disableIntervalMomentum
+              bounces={false}
+              overScrollMode="never"
+              showsVerticalScrollIndicator={false}
               decelerationRate="fast"
               getItemLayout={(_, i) => ({
                 index: i,
                 length: height,
                 offset: i * height,
               })}
-              onMomentumScrollEnd={(e) =>
-                setActive(Math.round(e.nativeEvent.contentOffset.y / height))
-              }
+              onScrollBeginDrag={() => {
+                viewerDragging.current = true;
+                viewerDragIndex.current = active;
+              }}
+              onScroll={(e) => {
+                if (!viewerDragging.current) return;
+                const offset = e.nativeEvent.contentOffset.y;
+                const bounded = clampVideoOffset(
+                  offset,
+                  height,
+                  viewerDragIndex.current,
+                  videos.length,
+                );
+                if (Math.abs(offset - bounded) > 1)
+                  viewerList.current?.scrollToOffset({
+                    offset: bounded,
+                    animated: false,
+                  });
+                setActive(Math.round(bounded / height));
+              }}
+              onMomentumScrollEnd={(e) => {
+                if (!viewerDragging.current) return;
+                viewerDragging.current = false;
+                const offset = e.nativeEvent.contentOffset.y;
+                const bounded = clampVideoOffset(
+                  offset,
+                  height,
+                  viewerDragIndex.current,
+                  videos.length,
+                );
+                const next = Math.round(bounded / height);
+                setActive(next);
+                if (Math.abs(offset - next * height) > 1)
+                  viewerList.current?.scrollToOffset({
+                    offset: next * height,
+                    animated: false,
+                  });
+              }}
+              scrollEventThrottle={16}
               initialNumToRender={1}
               windowSize={3}
               removeClippedSubviews={false}
               renderItem={({ item, index }) => (
                 <View style={{ height, backgroundColor: "#000" }}>
-                  {(index === active || index === active + 1) && (
+                  {Math.abs(index - active) <= 1 && (
                     <FullVideo
                       key={item.id}
                       video={item}

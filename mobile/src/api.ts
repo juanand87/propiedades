@@ -34,6 +34,7 @@ export type Property = {
 };
 export type Video = {
   creator?: {
+    followed?: boolean;
     id: string;
     display_name: string;
     avatar_url?: string | null;
