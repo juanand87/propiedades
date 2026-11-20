@@ -8,3 +8,5 @@
 - Buscar perfiles: elimina la unión global de perfiles y videos de la condición de búsqueda. Comprueba el perfil público directamente y solo busca un video visible del candidato como alternativa. Conserva filtros Persona/Empresa, bloqueos bilaterales, exclusión de cuentas inactivas y privacidad de cuentas sin perfil público.
 
 Sin SQL ni variables nuevas. Instalar el APK 1.0.30 sobre el actual. El backend se publica desde main.
+
+Se reproduce además el error de comparación de identificadores entre colaciones utf8mb4 distintas (ER_CANT_AGGREGATE_2COLLATIONS). La consulta de bloqueos del directorio convierte el identificador del candidato a utf8mb4_unicode_ci explícitamente, como los identificadores sociales. No cambia las tablas de usuarios. La regresión usa tablas temporales y comprueba ambos sentidos del bloqueo.

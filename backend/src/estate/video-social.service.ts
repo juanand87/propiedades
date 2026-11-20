@@ -81,7 +81,7 @@ export class VideoSocialService {
       FROM users candidate LEFT JOIN estate_video_profiles vp ON vp.user_id=CONVERT(candidate.id USING utf8mb4) COLLATE utf8mb4_unicode_ci LEFT JOIN estate_profile_identity pi ON pi.user_id=CONVERT(candidate.id USING utf8mb4) COLLATE utf8mb4_unicode_ci
       WHERE candidate.isActive=1 AND candidate.id<>? AND (vp.user_id IS NOT NULL OR pi.user_id IS NOT NULL OR EXISTS(SELECT 1 ${videoJoined} WHERE v.created_by=CONVERT(candidate.id USING utf8mb4) COLLATE utf8mb4_unicode_ci AND ${videoVisible}))
       AND (CONVERT(COALESCE(vp.display_name,CONVERT(candidate.firstName USING utf8mb4) COLLATE utf8mb4_unicode_ci) USING utf8mb4) COLLATE utf8mb4_unicode_ci LIKE ? ESCAPE '!' OR CONVERT(pi.username USING utf8mb4) COLLATE utf8mb4_unicode_ci LIKE ? ESCAPE '!')
-      ${kind === 'all' ? '' : 'AND pi.profile_kind=?'} AND ${notBlocked('?', 'candidate.id')}
+      ${kind === 'all' ? '' : 'AND pi.profile_kind=?'} AND ${notBlocked('?', 'CONVERT(candidate.id USING utf8mb4) COLLATE utf8mb4_unicode_ci')}
       ORDER BY (CONVERT(pi.username USING utf8mb4) COLLATE utf8mb4_unicode_ci=?) DESC,display_name,candidate.id LIMIT 25 OFFSET ?`,
       [
         actor.id,

@@ -24,7 +24,7 @@ export class VideoSocialController {
       enabled: true,
       search: ready,
       profile_types: ready,
-      directory_version: 3,
+      directory_version: 4,
       avatar_version: 1,
     };
   }
