@@ -32,6 +32,8 @@ import { formatClpInput } from "./clp";
 
 export function PropertyDictation({
   token,
+  initialVideoId,
+  videoMode = false,
   current,
   amenities = [],
   display,
@@ -39,6 +41,8 @@ export function PropertyDictation({
   onClose,
 }: {
   token: string;
+  initialVideoId?: string;
+  videoMode?: boolean;
   current: Record<string, string>;
   amenities?: DictationAmenity[];
   display: (key: string, value: string) => string;
@@ -54,6 +58,13 @@ export function PropertyDictation({
     [draft, setDraft] = useState<DictationDraft | null>(null),
     [selected, setSelected] = useState<string[]>([]),
     [configured, setConfigured] = useState<boolean | null>(null);
+  const [videoId, setVideoId] = useState(initialVideoId || ""),
+    [videos, setVideos] = useState<
+      { id: string; title: string; status: string }[]
+    >([]),
+    [videoPage, setVideoPage] = useState(0),
+    [moreVideos, setMoreVideos] = useState(false),
+    [loadingVideos, setLoadingVideos] = useState(videoMode);
   const live = useRef(true),
     lock = useRef(false),
     controller = useRef<AbortController | null>(null),
@@ -86,6 +97,27 @@ export function PropertyDictation({
       .catch((e) => {
         if (live.current) setError(e.message);
       });
+    if (videoMode)
+      void api<{
+        items: { id: string; title: string; status: string }[];
+        has_more: boolean;
+      }>("/manage/property-dictation/videos?page=1", {
+        token,
+        signal: request.signal,
+      })
+        .then((r) => {
+          if (!request.signal.aborted && live.current) {
+            setVideos(r.items);
+            setVideoPage(1);
+            setMoreVideos(r.has_more);
+          }
+        })
+        .catch((e) => {
+          if (!request.signal.aborted && live.current) setError(e.message);
+        })
+        .finally(() => {
+          if (!request.signal.aborted && live.current) setLoadingVideos(false);
+        });
     const sub = AppState.addEventListener("change", (value) => {
       if (value !== "active" && recorder.isRecording)
         void recorder.stop().catch(() => {});
@@ -103,7 +135,26 @@ export function PropertyDictation({
       sub.remove();
       void setAudioModeAsync({ allowsRecording: false }).catch(() => {});
     };
-  }, [token, recorder]);
+  }, [token, recorder, videoMode]);
+  async function loadVideos(page: number) {
+    if (loadingVideos) return;
+    setLoadingVideos(true);
+    setError("");
+    try {
+      const r = await api<{
+        items: { id: string; title: string; status: string }[];
+        has_more: boolean;
+      }>("/manage/property-dictation/videos?page=" + page, { token });
+      if (!live.current) return;
+      setVideos((old) => (page === 1 ? r.items : [...old, ...r.items]));
+      setVideoPage(page);
+      setMoreVideos(r.has_more);
+    } catch (e) {
+      if (live.current) setError((e as Error).message);
+    } finally {
+      if (live.current) setLoadingVideos(false);
+    }
+  }
   function eraseRecording() {
     const uri = owned.current || recorder.uri;
     owned.current = null;
@@ -169,7 +220,7 @@ export function PropertyDictation({
       void setAudioModeAsync({ allowsRecording: false }).catch(() => {});
     }
   }
-  async function interpret(useAudio: boolean) {
+  async function interpret(useAudio: boolean, fromVideo = false) {
     if (lock.current) return;
     lock.current = true;
     setError("");
@@ -177,8 +228,11 @@ export function PropertyDictation({
     const request = new AbortController();
     controller.current = request;
     try {
-      let body: FormData | { transcript: string };
-      if (useAudio) {
+      let body: FormData | { transcript: string } | { video_id: string };
+      if (fromVideo) {
+        if (!videoId) throw new Error("Selecciona un video propio.");
+        body = { video_id: videoId };
+      } else if (useAudio) {
         const uri = owned.current || recorder.uri;
         if (!uri) throw new Error("Graba primero una descripción.");
         owned.current = uri;
@@ -231,7 +285,9 @@ export function PropertyDictation({
       <SafeAreaView style={s.root}>
         <KeyboardSafeView>
           <View style={s.header}>
-            <Text style={s.title}>Dictar propiedad</Text>
+            <Text style={s.title}>
+              {videoMode ? "Usar audio del video" : "Dictar propiedad"}
+            </Text>
             <Pressable
               accessibilityLabel="Cerrar dictado"
               onPress={() => void close()}
@@ -250,6 +306,64 @@ export function PropertyDictation({
               otras características. Después revisa la propuesta: nada se guarda
               ni publica automáticamente.
             </Text>
+            {videoMode && !busy && !draft && phase !== "recording" && (
+              <>
+                <Text style={s.text}>
+                  Selecciona un video cargado. Solo su audio se enviará a
+                  OpenAI. Revisa los datos antes de aplicar: no se guarda ni se
+                  enlaza automáticamente.
+                </Text>
+                {loadingVideos && <ActivityIndicator color="#0866f5" />}
+                {videos.map((v) => (
+                  <Pressable
+                    key={v.id}
+                    accessibilityRole="radio"
+                    accessibilityState={{ checked: videoId === v.id }}
+                    style={s.proposal}
+                    onPress={() => {
+                      setVideoId(v.id);
+                      setDraft(null);
+                      setSelected([]);
+                      setTranscript("");
+                    }}
+                  >
+                    <Text style={s.label}>
+                      {videoId === v.id ? "●" : "○"} {v.title}
+                    </Text>
+                    <Text style={s.text}>
+                      {v.status === "published" ? "Publicado" : "Borrador"}
+                    </Text>
+                  </Pressable>
+                ))}
+                {initialVideoId &&
+                  !videos.some((v) => v.id === initialVideoId) && (
+                    <DictationButton
+                      label="Usar el video de origen"
+                      onPress={() => setVideoId(initialVideoId)}
+                      secondary
+                    />
+                  )}
+                {!loadingVideos && !videos.length && !initialVideoId && (
+                  <Text style={s.text}>
+                    No hay videos disponibles. Puedes dictar o escribir los
+                    datos.
+                  </Text>
+                )}
+                {moreVideos && (
+                  <DictationButton
+                    label="Cargar más videos"
+                    onPress={() => void loadVideos(videoPage + 1)}
+                    secondary
+                    disabled={loadingVideos}
+                  />
+                )}
+                <DictationButton
+                  label="Extraer audio y proponer datos"
+                  onPress={() => void interpret(false, true)}
+                  disabled={configured !== true || !videoId || loadingVideos}
+                />
+              </>
+            )}
             {configured === false && (
               <Text style={s.error}>
                 El dictado con IA todavía no está configurado. Puedes seguir

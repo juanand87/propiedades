@@ -32,6 +32,30 @@ export function PropertyDictation({
     [selected, setSelected] = useState<string[]>([]),
     [audio, setAudio] = useState<Blob | null>(null),
     [seconds, setSeconds] = useState(0);
+  const [videoMode, setVideoMode] = useState(false),
+    [videoId, setVideoId] = useState(""),
+    [videos, setVideos] = useState<
+      { id: string; title: string; status: string }[]
+    >([]),
+    [videoPage, setVideoPage] = useState(0),
+    [moreVideos, setMoreVideos] = useState(false),
+    [loadingVideos, setLoadingVideos] = useState(false);
+  async function loadVideos(page: number) {
+    if (loadingVideos) return;
+    setLoadingVideos(true);
+    setError("");
+    try {
+      const r = await request("/manage/property-dictation/videos?page=" + page);
+      if (!live.current) return;
+      setVideos((old) => (page === 1 ? r.items : [...old, ...r.items]));
+      setVideoPage(page);
+      setMoreVideos(r.has_more);
+    } catch (e) {
+      if (live.current) setError((e as Error).message);
+    } finally {
+      if (live.current) setLoadingVideos(false);
+    }
+  }
   const generation = useRef(0),
     recorder = useRef<MediaRecorder | null>(null),
     stream = useRef<MediaStream | null>(null),
@@ -81,6 +105,8 @@ export function PropertyDictation({
     }
     release();
     setOpen(false);
+    setVideoMode(false);
+    setVideoId("");
     setPhase("intro");
     setAudio(null);
     setDraft(null);
@@ -157,7 +183,7 @@ export function PropertyDictation({
       lock.current = false;
     }
   }
-  async function interpret(recorded: boolean) {
+  async function interpret(recorded: boolean, fromVideo = false) {
     if (lock.current) return;
     lock.current = true;
     setPhase("processing");
@@ -166,7 +192,10 @@ export function PropertyDictation({
     requestRef.current = c;
     try {
       let body: FormData | string;
-      if (recorded) {
+      if (fromVideo) {
+        if (!videoId) throw Error("Selecciona un video propio.");
+        body = JSON.stringify({ video_id: videoId });
+      } else if (recorded) {
         if (!audio) throw Error("Graba primero una descripción.");
         if (audio.size > 12 * 1024 * 1024)
           throw Error("El audio supera 12 MB.");
@@ -239,6 +268,17 @@ export function PropertyDictation({
       >
         🎙 Dictar propiedad
       </button>
+      <button
+        type="button"
+        className="button secondary"
+        onClick={() => {
+          setVideoMode(true);
+          setOpen(true);
+          void loadVideos(1);
+        }}
+      >
+        Usar audio del video
+      </button>
       {open &&
         createPortal(
           <div
@@ -275,7 +315,9 @@ export function PropertyDictation({
                   alignItems: "center",
                 }}
               >
-                <h2 id="dictation-title">Dictar propiedad</h2>
+                <h2 id="dictation-title">
+                  {videoMode ? "Usar audio del video" : "Dictar propiedad"}
+                </h2>
                 <button
                   type="button"
                   aria-label="Cerrar dictado"
@@ -289,6 +331,59 @@ export function PropertyDictation({
                 minutos. La IA propondrá datos para revisar: no guarda ni
                 publica la propiedad automáticamente.
               </p>
+              {videoMode && !busy && !draft && phase !== "recording" && (
+                <>
+                  <p>
+                    Selecciona uno de tus videos cargados. Solo su audio se
+                    enviará a OpenAI. Revisa la transcripción y los datos antes
+                    de aplicar; no se guarda ni se enlaza automáticamente.
+                  </p>
+                  <label>
+                    Video cargado
+                    <select
+                      value={videoId}
+                      onChange={(e) => {
+                        setVideoId(e.target.value);
+                        setDraft(null);
+                        setSelected([]);
+                        setTranscript("");
+                      }}
+                    >
+                      <option value="">Seleccionar video</option>
+                      {videos.map((v) => (
+                        <option key={v.id} value={v.id}>
+                          {v.title} ·{" "}
+                          {v.status === "published" ? "Publicado" : "Borrador"}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  {loadingVideos && <p role="status">Cargando tus videos…</p>}
+                  {!loadingVideos && !videos.length && (
+                    <p>
+                      No hay videos disponibles. Puedes grabar un dictado o
+                      escribir los datos.
+                    </p>
+                  )}
+                  {moreVideos && (
+                    <button
+                      type="button"
+                      disabled={loadingVideos}
+                      onClick={() => void loadVideos(videoPage + 1)}
+                    >
+                      Cargar más videos
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className="button"
+                    disabled={enabled !== true || !videoId || loadingVideos}
+                    onClick={() => void interpret(false, true)}
+                  >
+                    Extraer audio y proponer datos
+                  </button>
+                </>
+              )}
               {enabled === false && (
                 <p role="status">
                   El dictado con IA todavía no está configurado.

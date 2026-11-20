@@ -89,6 +89,7 @@ export function SellerPanel({
   const [list, setList] = useState<Page<Property> | null>(null);
   const [amenityIds, setAmenityIds] = useState<string[]>([]);
   const [dictationOpen, setDictationOpen] = useState(false);
+  const [videoDictation, setVideoDictation] = useState(false);
   const token = session.access_token;
   const [linked, setLinked] = useState(false);
   const linkingExisting =
@@ -483,7 +484,16 @@ export function SellerPanel({
             Completa los datos y fotografías de tu propiedad. Revisaremos la
             publicación antes de mostrarla.
           </Text>
+          {button("Usar audio del video", () => {
+            if (!catalog) {
+              Alert.alert("Espera un momento", "Se está cargando el catálogo.");
+              return;
+            }
+            setVideoDictation(true);
+            setDictationOpen(true);
+          })}
           {button("Dictar propiedad", () => {
+            setVideoDictation(false);
             if (!catalog) {
               Alert.alert("Espera un momento", "Se está cargando el catálogo.");
               return;
@@ -671,6 +681,8 @@ export function SellerPanel({
       )}
       {dictationOpen && (
         <PropertyDictation
+          initialVideoId={pendingVideoId}
+          videoMode={videoDictation}
           token={token}
           current={{
             ...form,

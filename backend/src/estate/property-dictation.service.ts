@@ -1,3 +1,4 @@
+import { PropertyVideosService } from './property-videos.service';
 import {
   Injectable,
   BadRequestException,
@@ -21,6 +22,7 @@ export class PropertyDictationService {
   constructor(
     private config: ConfigService,
     private estate: EstateService,
+    private videos?: PropertyVideosService,
   ) {}
   get enabled() {
     return (
@@ -187,10 +189,29 @@ export class PropertyDictationService {
         await rm(folder, { recursive: true, force: true });
     }
   }
-  async propose(actor: Actor, input: { transcript?: unknown }, file?: any) {
+  async videoChoices(actor: Actor, page: number) {
+    if (!this.videos) throw new ServiceUnavailableException();
+    return this.videos.dictationVideos(actor, page);
+  }
+  async propose(
+    actor: Actor,
+    input: { transcript?: unknown; video_id?: unknown },
+    file?: any,
+  ) {
     this.authorize(actor);
     this.active.add(actor.id);
     try {
+      if (input?.video_id !== undefined) {
+        if (file || input.transcript)
+          throw new BadRequestException(
+            'Elige solo un origen: video, audio o texto.',
+          );
+        if (!this.videos)
+          throw new ServiceUnavailableException(
+            'Audio de video no disponible.',
+          );
+        file = await this.videos.dictationAudio(actor, String(input.video_id));
+      }
       let transcript = text(input?.transcript, 12001);
       if (transcript.length > 12000)
         throw new BadRequestException(

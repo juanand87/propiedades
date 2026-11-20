@@ -1,3 +1,5 @@
+import { readFile } from 'node:fs/promises';
+import { extractPropertyAudio } from './video-property-audio';
 import { videoCoverPreview } from './video-cover-preview';
 import { notBlocked, notHidden } from './moderation-rules';
 import { compressVideo } from './video-compression';
@@ -220,6 +222,44 @@ export class PropertyVideosService {
     if (!video.advertiser_id)
       throw new ForbiddenException('Este video no te pertenece.');
     ownership(actor, video.advertiser_id);
+  }
+  async dictationVideos(actor: Actor, page = 1) {
+    this.guard();
+    if (!actor.advertiser_id && actor.role !== 'admin')
+      throw new ForbiddenException('Activa tu perfil de vendedor.');
+    const current = Math.max(1, Math.min(10000, Math.floor(Number(page) || 1)));
+    const rows = await this.db.query(
+      "SELECT v.id,v.title,v.status,v.property_id FROM property_videos v LEFT JOIN properties p ON p.id=v.property_id WHERE v.status<>'archived' AND (v.created_by=? OR p.advertiser_id=?) ORDER BY v.created_at DESC,v.id LIMIT 21 OFFSET ?",
+      [actor.id, actor.advertiser_id || '', (current - 1) * 20],
+    );
+    return {
+      items: rows.slice(0, 20),
+      page: current,
+      has_more: rows.length > 20,
+    };
+  }
+  async dictationAudio(actor: Actor, id: string) {
+    this.guard();
+    const video = await this.managedVideo(actor, id);
+    if (Number(video.size_bytes) > 50 * 1024 * 1024)
+      throw new BadRequestException('Video demasiado grande.');
+    let bytes: Buffer;
+    if (this.storage.enabled) {
+      const [object] = await this.db.query(
+        "SELECT object_key,bucket FROM property_video_objects WHERE video_id=? AND status='ready'",
+        [uuid(id)],
+      );
+      if (!object || object.bucket !== this.storage.config?.bucket)
+        throw new NotFoundException('Video no disponible.');
+      bytes = await this.storage.readOriginal(object.object_key);
+    } else {
+      if (this.config.get('NODE_ENV') === 'production')
+        throw new ServiceUnavailableException(
+          'Almacenamiento privado de videos no disponible.',
+        );
+      bytes = await readFile(resolve(this.folder, uuid(id) + '.mp4'));
+    }
+    return extractPropertyAudio(bytes);
   }
   async preview(actor: Actor, id: string, includeCover = true) {
     this.guard();

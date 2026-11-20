@@ -424,4 +424,48 @@ describe('Property dictation proposals', () => {
       }),
     ).toThrow();
   });
+  it('uses only authorized server video audio and returns a proposal without saving or linking', async () => {
+    const { service, estate } = fixture();
+    const videos = {
+      dictationAudio: jest
+        .fn()
+        .mockResolvedValue({
+          buffer: Buffer.alloc(100),
+          originalname: 'video.m4a',
+        }),
+    };
+    (service as any).videos = videos;
+    jest
+      .spyOn(service, 'validateAudio')
+      .mockResolvedValue({ extension: 'm4a', duration: 6 });
+    const f = jest
+      .spyOn(global, 'fetch')
+      .mockResolvedValueOnce(
+        response({ text: 'Casa en Puerto Varas por 150 millones de pesos.' }),
+      )
+      .mockResolvedValueOnce(response(completion()));
+    const result = await service.propose(actor, { video_id: 'owned-video' });
+    expect(videos.dictationAudio).toHaveBeenCalledWith(actor, 'owned-video');
+    expect(result.review_required).toBe(true);
+    expect(f).toHaveBeenCalledTimes(2);
+    expect(estate.saveProperty).not.toHaveBeenCalled();
+  });
+  it('rejects mixed video sources and authorization failures before paid requests', async () => {
+    const { service } = fixture();
+    const videos = {
+      dictationAudio: jest
+        .fn()
+        .mockRejectedValue(new Error('Este video no te pertenece.')),
+    };
+    (service as any).videos = videos;
+    const f = jest.spyOn(global, 'fetch');
+    await expect(
+      service.propose(actor, { video_id: 'other', transcript: 'Otro texto' }),
+    ).rejects.toThrow('solo un origen');
+    expect(videos.dictationAudio).not.toHaveBeenCalled();
+    await expect(service.propose(actor, { video_id: 'other' })).rejects.toThrow(
+      'no te pertenece',
+    );
+    expect(f).not.toHaveBeenCalled();
+  });
 });

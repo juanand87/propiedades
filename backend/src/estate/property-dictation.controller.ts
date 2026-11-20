@@ -4,6 +4,7 @@ import {
   Get,
   Post,
   Req,
+  Query,
   UploadedFile,
   UseGuards,
   UseInterceptors,
@@ -17,6 +18,9 @@ export class PropertyDictationController {
   constructor(private dictation: PropertyDictationService) {}
   @Get('capabilities') capabilities() {
     return this.dictation.capabilities();
+  }
+  @Get('videos') videos(@Req() req: any, @Query('page') page: string) {
+    return this.dictation.videoChoices(req.user, Number(page));
   }
   @Post()
   @UseInterceptors(
