@@ -1,4 +1,4 @@
-# Dictar propiedad · Proppix 1.0.27
+# Dictar propiedad · Proppix 1.0.28
 
 ## Configurar la IA
 
@@ -19,9 +19,11 @@ Configura alertas de gasto y/o créditos prepagados en el proyecto OpenAI; una a
 
 ## Usar y revisar
 
-Instala el APK 1.0.27 sobre la versión actual. En Crear/Editar propiedad pulsa **Dictar propiedad**, permite el micrófono y describe hasta tres minutos. Termina la grabación y pulsa **Interpretar grabación**. También puedes corregir la transcripción o escribir el texto y volver a interpretarlo. La web ofrece el mismo flujo en el editor; grabar requiere un navegador con micrófono y HTTPS.
+Instala el APK 1.0.28 sobre la versión actual. En Crear/Editar propiedad pulsa **Dictar propiedad**, permite el micrófono y describe hasta tres minutos. Termina la grabación y pulsa **Interpretar grabación**. También puedes corregir la transcripción o escribir el texto y volver a interpretarlo. La web ofrece el mismo flujo en el editor; grabar requiere un navegador con micrófono y HTTPS.
 
 La propuesta muestra cada campo, sus valores anteriores y advertencias. Selecciona qué aplicar; precio/moneda y región/comuna se revisan juntos para evitar inconsistencias. Al aplicar, vuelve al formulario editable. Solo sus botones habituales guardan o envían a revisión. Elegir Arriendo conserva rent en el guardado; no se transforma silenciosamente en Venta. No se modifican fotos, propietario ni publicación mediante IA.
+
+El dictado admite los 28 campos de datos: título, resumen, descripción, tipo, operación, precio y moneda, región y comuna, sector, dirección privada, latitud y longitud privadas, tres superficies, dormitorios, baños, estacionamientos, bodegas, año de construcción, pisos, piso de unidad, estado, gastos comunes, contribuciones, moneda de gastos y periodicidad. También propone las 14 características del catálogo. Una característica afirmada se marca; una negada explícitamente se desmarca; las no mencionadas se conservan. Fotos, videos y autorización de mostrar dirección/coordenadas se controlan manualmente. No hay SQL nuevo.
 
 Los datos ausentes no se rellenan con suposiciones. Las ubicaciones se contrastan contra el catálogo de regiones y comunas; una comuna ambigua queda para selección manual. Las advertencias y el formulario permiten completar datos requeridos antes de guardar.
 
@@ -29,6 +31,6 @@ Los datos ausentes no se rellenan con suposiciones. Las ubicaciones se contrasta
 
 El audio y el texto se envían a OpenAI para transcripción y extracción. Proppix no crea tablas de audio ni guarda la transcripción como registro separado: solo queda lo que el usuario acepte y guarde en la propiedad. Se valida audio real, duración máxima de 181 segundos (tolerancia de finalización) y máximo de 12 MB. Los temporales del servidor se retiran al terminar, incluso ante errores; la app elimina su grabación al aplicarla o cerrar. Responses se solicita con store=false; el tratamiento del proveedor se rige por sus políticas de API, no por una promesa de retención cero.
 
-Se verificaron TypeScript y lint móvil, build backend, 201 pruebas unitarias (incluyen respuestas de IA simuladas), audio WAV/WebM real con FFprobe/FFmpeg, rechazo de archivos corruptos y largos, limpieza temporal, 10 comprobaciones HTTP locales de permisos y guardado explícito en borrador, y aplicación selectiva sin alterar campos protegidos. Build web con Webpack. Las pruebas no consumieron saldo de OpenAI. La prueba con voz e IA reales requiere completar la configuración anterior y conceder micrófono en el dispositivo.
+Se verificaron TypeScript y lint móvil, build backend, 206 pruebas unitarias (incluyen respuestas de IA simuladas), audio WAV/WebM real con FFprobe/FFmpeg, rechazo de archivos corruptos y largos, limpieza temporal, 10 comprobaciones HTTP locales de permisos y guardado explícito en borrador, y aplicación selectiva sin alterar campos protegidos. Build web con Webpack. Las pruebas no consumieron saldo de OpenAI. La prueba con voz e IA reales requiere completar la configuración anterior y conceder micrófono en el dispositivo.
 
 Referencias: https://developers.openai.com/api/docs/quickstart , https://developers.openai.com/api/docs/guides/speech-to-text , https://developers.openai.com/api/docs/guides/structured-outputs .
