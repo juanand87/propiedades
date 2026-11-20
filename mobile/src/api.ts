@@ -23,6 +23,8 @@ export type Property = {
   type_id?: string;
   operation_type?: string;
   publication_status?: string;
+  view_count?: number;
+  favorite_count?: number;
   is_demo: boolean;
   media: { id: string; url: string; alt_text: string }[];
   advertiser: {

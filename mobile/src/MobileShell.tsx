@@ -76,7 +76,7 @@ import { VideoProfile } from "./VideoProfile";
 import { PropertyCatalog } from "./PropertyCatalog";
 import { ProppixBrand } from "./ProppixBrand";
 import { ProppixIcon, ProppixIconName } from "./ProppixIcon";
-import { clampVideoOffset } from "./video-paging";
+import { clampVideoOffset, resumeVideoIndex } from "./video-paging";
 import { prepareVideoCache, useVideoPreload } from "./useVideoPreload";
 import { randomUUID } from "expo-crypto";
 import { PropertySlideshow } from "./PropertySlideshow";
@@ -149,6 +149,7 @@ function AppContent() {
     userId,
     videoId,
     propertyMode,
+    sourceTitle,
     profileSection,
     contact,
     conversationId,
@@ -163,6 +164,7 @@ function AppContent() {
     userId?: string;
     videoId?: string;
     propertyMode?: "new" | "link";
+    sourceTitle?: string;
     profileSection?: "properties";
     contact?: "1";
     conversationId?: string;
@@ -495,6 +497,22 @@ function AppContent() {
   useEffect(() => {
     if (!ready || propertyRoute || tab !== "feed" || !resumeVideoId) return;
     const controller = new AbortController();
+    const existing = resumeVideoIndex(videos, resumeVideoId, active);
+    if (existing >= 0) {
+      const timer = setTimeout(() => {
+        setActive(existing);
+        feedDragIndex.current = existing;
+        feedRef.current?.scrollToOffset({
+          offset: existing * height,
+          animated: false,
+        });
+        router.replace("/");
+      }, 0);
+      return () => {
+        clearTimeout(timer);
+        controller.abort();
+      };
+    }
     void api<Page<Video>>(
       `/videos?video_id=${encodeURIComponent(resumeVideoId)}`,
       { signal: controller.signal, token: session?.access_token },
@@ -503,14 +521,10 @@ function AppContent() {
         if (controller.signal.aborted) return;
         const video = result.items[0];
         if (!video) throw new Error("Este video ya no está publicado.");
-        feedGeneration.current++;
-        setVideos((previous) => [
-          video,
-          ...previous.filter((item) => item.id !== video.id),
-        ]);
-        setActive(0);
-        feedDragIndex.current = 0;
-        feedRef.current?.scrollToOffset({ offset: 0, animated: false });
+        const index = videos.length;
+        setVideos((previous) => [...previous, video]);
+        setActive(index);
+        feedDragIndex.current = index;
         router.replace("/");
       })
       .catch((error) => {
@@ -520,7 +534,17 @@ function AppContent() {
         }
       });
     return () => controller.abort();
-  }, [ready, propertyRoute, tab, resumeVideoId, router, session?.access_token]);
+  }, [
+    ready,
+    propertyRoute,
+    tab,
+    resumeVideoId,
+    router,
+    session?.access_token,
+    videos,
+    height,
+    active,
+  ]);
   useEffect(() => {
     if (
       !feedVisible ||
@@ -1478,26 +1502,45 @@ function AppContent() {
           />
         ),
         account: accountScreen,
-        manage: socialEnabled ? (
-          <VideoProfile
-            key={
-              videoId
-                ? videoId + ":" + propertyMode
-                : profileSection || "profile"
-            }
-            initialSection={profileSection}
-            pendingVideoId={videoId}
-            propertyMode={propertyMode}
-            propertyFavorite={{ ids: favorites, toggle: favorite }}
-            session={session}
-            onPropertiesChanged={() => {
-              void loadMine();
-              void loadFeed(true);
-            }}
-          />
-        ) : (
-          manageScreen
-        ),
+        manage:
+          videoId && propertyMode && session ? (
+            <ScrollView style={s.content} keyboardShouldPersistTaps="handled">
+              <SellerPanel
+                key={videoId + ":" + propertyMode}
+                session={session}
+                pendingVideoId={videoId}
+                sourceTitle={sourceTitle}
+                propertyMode={propertyMode}
+                onReturn={() =>
+                  router.canGoBack()
+                    ? router.back()
+                    : router.replace({
+                        pathname: "/",
+                        params: { resumeVideoId: videoId },
+                      })
+                }
+                onChanged={() => void loadMine()}
+              />
+            </ScrollView>
+          ) : socialEnabled ? (
+            <VideoProfile
+              key={
+                videoId
+                  ? videoId + ":" + propertyMode
+                  : profileSection || "profile"
+              }
+              initialSection={profileSection}
+              pendingVideoId={videoId}
+              propertyMode={propertyMode}
+              propertyFavorite={{ ids: favorites, toggle: favorite }}
+              session={session}
+              onPropertiesChanged={() => {
+                void loadMine();
+              }}
+            />
+          ) : (
+            manageScreen
+          ),
         videoProfile: (
           <VideoProfile
             session={session}

@@ -1,6 +1,12 @@
 import Svg, { Path, Circle, Rect } from "react-native-svg";
 
 export type ProppixIconName =
+  | "microphone"
+  | "video"
+  | "upload"
+  | "edit"
+  | "eye"
+  | "more"
   | "flag"
   | "home"
   | "search"
@@ -30,6 +36,13 @@ export type ProppixIconName =
   | "send";
 
 const paths: Partial<Record<ProppixIconName, string>> = {
+  microphone:
+    "M9 5a3 3 0 0 1 6 0v7a3 3 0 0 1-6 0ZM6 10v2a6 6 0 0 0 12 0v-2M12 18v4M8 22h8",
+  video: "M3 5h12v14H3ZM15 9l6-3v12l-6-3Z",
+  upload: "M12 16V3m-5 5 5-5 5 5M4 16v5h16v-5",
+  edit: "m4 16 12-12 4 4-12 12H4Zm10-10 4 4",
+  eye: "M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12ZM15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0",
+  more: "M12 4v.1M12 12v.1M12 20v.1",
   flag: "M5 22V3m0 0c4-4 9 4 14 0v11c-5 4-10-4-14 0",
   play: "M8 4 21 12 8 20Z",
   send: "M22 2 9 15M22 2l-8 20-5-7-7-5Z",

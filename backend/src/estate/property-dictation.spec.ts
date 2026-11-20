@@ -427,12 +427,10 @@ describe('Property dictation proposals', () => {
   it('uses only authorized server video audio and returns a proposal without saving or linking', async () => {
     const { service, estate } = fixture();
     const videos = {
-      dictationAudio: jest
-        .fn()
-        .mockResolvedValue({
-          buffer: Buffer.alloc(100),
-          originalname: 'video.m4a',
-        }),
+      dictationAudio: jest.fn().mockResolvedValue({
+        buffer: Buffer.alloc(100),
+        originalname: 'video.m4a',
+      }),
     };
     (service as any).videos = videos;
     jest
@@ -466,6 +464,35 @@ describe('Property dictation proposals', () => {
     await expect(service.propose(actor, { video_id: 'other' })).rejects.toThrow(
       'no te pertenece',
     );
+    expect(f).not.toHaveBeenCalled();
+  });
+  it('keeps reviewed context and the new dictation together without saving', async () => {
+    const { service, estate } = fixture();
+    const f = jest
+      .spyOn(global, 'fetch')
+      .mockResolvedValue(response(completion()));
+    const result = await service.propose(actor, {
+      context_transcript:
+        'Casa en Puerto Varas con tres dormitorios por 150 millones de pesos.',
+      transcript: 'Además tiene dos baños y 120 metros cuadrados construidos.',
+    });
+    expect(result.transcript).toContain('tres dormitorios');
+    expect(result.transcript).toContain('dos baños');
+    const body = JSON.parse(f.mock.calls[0][1]!.body as string);
+    expect(body.input[0].content).toContain('Datos previos ya revisados');
+    expect(body.instructions).toContain('corrección explícita');
+    expect(estate.saveProperty).not.toHaveBeenCalled();
+  });
+  it('rejects oversized previous context before paying for transcription', async () => {
+    const { service } = fixture();
+    const f = jest.spyOn(global, 'fetch');
+    await expect(
+      service.propose(
+        actor,
+        { context_transcript: 'x'.repeat(12001) },
+        { buffer: Buffer.alloc(100), originalname: 'voice.m4a' },
+      ),
+    ).rejects.toThrow('demasiado larga');
     expect(f).not.toHaveBeenCalled();
   });
 });

@@ -510,6 +510,7 @@ export function SocialVideoActions({
                   params: {
                     videoId,
                     propertyMode: "new",
+                    sourceTitle: data.property_title || data.title,
                     profileSection: "properties",
                   },
                 })
@@ -529,6 +530,7 @@ export function SocialVideoActions({
                   params: {
                     videoId,
                     propertyMode: "link",
+                    sourceTitle: data.property_title || data.title,
                     profileSection: "properties",
                   },
                 })
@@ -634,7 +636,12 @@ export function SocialVideoActions({
                       setPanel(null);
                       router.push({
                         pathname: "/mis-videos",
-                        params: { videoId, propertyMode: "new" },
+                        params: {
+                          videoId,
+                          propertyMode: "new",
+                          sourceTitle:
+                            data?.property_title || data?.title || initialTitle,
+                        },
                       });
                     })}
                   <Text style={[s.muted, { color: sheetColors.muted }]}>

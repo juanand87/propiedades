@@ -38,7 +38,7 @@ import {
   uploadName,
 } from './rules';
 
-const selection = `SELECT p.*,a.display_name,a.slug advertiser_slug,a.phone,a.whatsapp,a.public_email,r.name region_name,c.name commune_name FROM properties p JOIN advertisers a ON a.id=p.advertiser_id JOIN users owner ON CONVERT(owner.id USING utf8mb4) COLLATE utf8mb4_unicode_ci=a.user_id AND owner.isActive=1 LEFT JOIN estate_regions r ON r.id=p.region_id LEFT JOIN estate_communes c ON c.id=p.commune_id`;
+const selection = `SELECT p.*,(SELECT COUNT(*) FROM property_favorites pf WHERE pf.property_id=p.id) favorite_count,a.display_name,a.slug advertiser_slug,a.phone,a.whatsapp,a.public_email,r.name region_name,c.name commune_name FROM properties p JOIN advertisers a ON a.id=p.advertiser_id JOIN users owner ON CONVERT(owner.id USING utf8mb4) COLLATE utf8mb4_unicode_ci=a.user_id AND owner.isActive=1 LEFT JOIN estate_regions r ON r.id=p.region_id LEFT JOIN estate_communes c ON c.id=p.commune_id`;
 const numericFields = [
   'bedrooms',
   'bathrooms',
@@ -1702,7 +1702,7 @@ export class EstateService {
     const clause = isAdmin(u) ? '' : ' WHERE advertiser_id=?',
       params = isAdmin(u) ? [] : [u.advertiser_id || ''];
     const [row] = await this.db.query(
-      `SELECT COUNT(*) total,COALESCE(SUM(publication_status='published'),0) published,COALESCE(SUM(publication_status='pending_review'),0) pending,COALESCE(SUM(view_count),0) views,COALESCE(SUM(availability='sold'),0) sold FROM properties${clause}`,
+      `SELECT COUNT(*) total,COALESCE(SUM(publication_status='published'),0) published,COALESCE(SUM(publication_status='pending_review'),0) pending,COALESCE(SUM(publication_status='draft'),0) drafts,COALESCE(SUM(view_count),0) views,COALESCE(SUM(availability='sold'),0) sold FROM properties${clause}`,
       params,
     );
     const [leads] = await this.db.query(

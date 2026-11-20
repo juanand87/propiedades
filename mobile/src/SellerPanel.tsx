@@ -1,8 +1,14 @@
+import { ProppixIcon } from "./ProppixIcon";
+import {
+  missingPropertyData,
+  previousPropertyContext,
+} from "./property-guidance";
 import { PropertyDictation } from "./PropertyDictation";
 import {
   mergeDictatedFields,
   mergeDictatedAmenities,
   dictationEnumLabel,
+  dictationLabelsFor,
 } from "./property-dictation";
 import { formatClpInput, parseClpInput } from "./clp";
 import { lightColors as videoColors } from "./video-colors";
@@ -31,7 +37,12 @@ type Catalog = {
     cut_code?: string;
   }[];
 };
-type Allowance = { can_create: boolean; used: number; message: string };
+type Allowance = {
+  can_create: boolean;
+  used: number;
+  message: string;
+  plan?: string;
+};
 const publicationLabels: Record<string, string> = {
   draft: "Borrador",
   pending_review: "En revisión",
@@ -55,12 +66,22 @@ export function SellerPanel({
   pendingVideoId,
   propertyMode,
   onRecordFirst,
+  sourceTitle,
+  onReturn,
+  owner,
 }: {
   session: Session;
   onChanged: () => void;
   pendingVideoId?: string;
   propertyMode?: "new" | "link";
   onRecordFirst?: () => void;
+  sourceTitle?: string;
+  onReturn?: () => void;
+  owner?: {
+    display_name: string;
+    avatar_url?: string | null;
+    avatar_thumbnail_url?: string | null;
+  };
 }) {
   const [allowance, setAllowance] = useState<Allowance | null>(null),
     [catalog, setCatalog] = useState<Catalog | null>(null),
@@ -68,6 +89,10 @@ export function SellerPanel({
       likes: number;
       inquiries: number;
       views: number;
+      total: number;
+      published: number;
+      pending: number;
+      drafts: number;
     } | null>(null),
     [leads, setLeads] = useState<Lead[]>([]),
     [editing, setEditing] = useState(
@@ -78,6 +103,7 @@ export function SellerPanel({
     [success, setSuccess] = useState(""),
     [savedId, setSavedId] = useState<string | null>(null);
   const [form, setForm] = useState<Record<string, string>>({
+      title: sourceTitle || "",
       type_id: "house",
       price_unit: "CLP",
     }),
@@ -90,7 +116,11 @@ export function SellerPanel({
   const [amenityIds, setAmenityIds] = useState<string[]>([]);
   const [dictationOpen, setDictationOpen] = useState(false);
   const [videoDictation, setVideoDictation] = useState(false);
+  const [propertyFilter, setPropertyFilter] = useState("all");
+  const [sourceHeading, setSourceHeading] = useState(sourceTitle || "");
   const token = session.access_token;
+  const focused = !!pendingVideoId;
+  const missing = missingPropertyData(form);
   const [linked, setLinked] = useState(false);
   const linkingExisting =
     !!pendingVideoId && propertyMode === "link" && !linked;
@@ -99,7 +129,9 @@ export function SellerPanel({
     Promise.all([
       api<Allowance>("/me/publication-allowance", { token }),
       api<Catalog>("/catalog"),
-      api<typeof stats>("/manage/stats", { token }),
+      focused
+        ? Promise.resolve(null)
+        : api<typeof stats>("/manage/stats", { token }),
       session.user.advertiser_id
         ? api<Page<Property>>("/manage/properties?limit=24&page=1", { token })
         : Promise.resolve(null),
@@ -118,7 +150,24 @@ export function SellerPanel({
     return () => {
       live = false;
     };
-  }, [token, session.user.advertiser_id]);
+  }, [token, session.user.advertiser_id, focused]);
+  useEffect(() => {
+    if (!pendingVideoId || sourceTitle) return;
+    const request = new AbortController();
+    void api<{ title: string; property_title?: string }>(
+      `/videos/${pendingVideoId}/social`,
+      { token, signal: request.signal },
+    )
+      .then((video) => {
+        if (!request.signal.aborted) {
+          const title = video.property_title || video.title;
+          setSourceHeading(title);
+          setForm((old) => (old.title ? old : { ...old, title }));
+        }
+      })
+      .catch(() => {});
+    return () => request.abort();
+  }, [pendingVideoId, sourceTitle, token]);
   const button = (label: string, fn: () => void) => (
     <Pressable
       accessibilityRole="button"
@@ -238,6 +287,17 @@ export function SellerPanel({
         "/manage/properties/" + id,
         { token },
       );
+      if (
+        !sendForReview &&
+        ["pending_review", "rejected", "archived"].includes(
+          current.publication_status,
+        )
+      )
+        await api("/manage/properties/" + id + "/status", {
+          method: "PATCH",
+          token,
+          body: { status: "draft" },
+        });
       if (sendForReview && current.publication_status !== "pending_review")
         await api("/manage/properties/" + id + "/status", {
           method: "PATCH",
@@ -289,12 +349,12 @@ export function SellerPanel({
       setBusy(false);
     }
   }
-  async function loadProperties(page: number) {
+  async function loadProperties(page: number, status = propertyFilter) {
     setBusy(true);
     setError("");
     try {
       const result = await api<Page<Property>>(
-        `/manage/properties?limit=24&page=${page}`,
+        `/manage/properties?limit=24&page=${page}${status !== "all" ? "&status=" + status : ""}`,
         { token },
       );
       setList((previous) =>
@@ -391,65 +451,149 @@ export function SellerPanel({
                 ];
   return (
     <View style={s.card}>
-      <Text style={s.title}>
-        {pendingVideoId
-          ? propertyMode === "link"
-            ? "Vincular video a una propiedad"
-            : "Agregar datos de esta propiedad"
-          : "Mis propiedades"}
-      </Text>
-      {pendingVideoId && !linked && (
-        <Text style={s.text}>
-          Al vincularlo, el video queda en borrador. Podrás publicarlo cuando la
-          propiedad esté publicada.
-        </Text>
+      {focused ? (
+        <>
+          {onReturn && (
+            <Pressable onPress={onReturn} accessibilityRole="button">
+              <Text style={s.back}>‹ Volver al video</Text>
+            </Pressable>
+          )}
+          <Text style={s.kicker}>
+            {propertyMode === "link"
+              ? "ENLAZAR PROPIEDAD"
+              : "AGREGAR DATOS DE ESTA PROPIEDAD"}
+          </Text>
+          <Text style={s.pageTitle}>
+            {form.title || sourceHeading || "Tu propiedad"}
+          </Text>
+          {!success && (
+            <Text style={s.text}>
+              Completa los datos hablando o usa el audio de este video. Al
+              finalizar eliges publicar o guardar como borrador.
+            </Text>
+          )}
+        </>
+      ) : !editing ? (
+        <>
+          <View style={s.ownerRow}>
+            {owner?.avatar_thumbnail_url || owner?.avatar_url ? (
+              <Image
+                fadeDuration={0}
+                source={{
+                  uri: mediaUrl(
+                    owner.avatar_thumbnail_url || owner.avatar_url!,
+                  ),
+                }}
+                style={s.ownerAvatar}
+              />
+            ) : (
+              <View style={s.ownerAvatar}>
+                <ProppixIcon name="profile" color="#123b70" size={28} />
+              </View>
+            )}
+            <View style={{ flex: 1, gap: 4 }}>
+              <Text style={s.title}>
+                ¡Hola, {owner?.display_name || session.user.firstName}!
+              </Text>
+              <Text style={s.text}>
+                Gestiona tus propiedades y publicaciones
+              </Text>
+            </View>
+            {allowance?.plan && (
+              <Text style={s.plan}>
+                Plan{" "}
+                {allowance.plan === "pro"
+                  ? "Pro"
+                  : allowance.plan === "basic"
+                    ? "Básico"
+                    : "Gratis"}
+              </Text>
+            )}
+          </View>
+          <View style={s.statsRow}>
+            {[
+              [allowance?.used ?? stats?.total ?? 0, "Propiedades", "house"],
+              [stats?.views ?? 0, "Visitas", "eye"],
+              [stats?.likes ?? 0, "Me gusta", "heart"],
+              [stats?.inquiries ?? 0, "Mensajes", "messages"],
+            ].map(([n, label, icon]) => (
+              <View key={String(label)} style={s.stat}>
+                <ProppixIcon name={icon as "house"} color="#10376b" />
+                <Text style={s.statNumber}>{n}</Text>
+                <Text style={s.statLabel}>{label}</Text>
+              </View>
+            ))}
+          </View>
+          <View style={s.ownerRow}>
+            <Text style={[s.pageTitle, { flex: 1 }]}>Mis propiedades</Text>
+            <Pressable
+              style={s.newButton}
+              onPress={() => {
+                if (!allowance?.can_create) {
+                  Alert.alert(
+                    "Límite de propiedades",
+                    allowance?.message || "Espera que cargue tu cuenta.",
+                  );
+                  return;
+                }
+                setSavedId(null);
+                setForm({ type_id: "house", price_unit: "CLP" });
+                setPhotos([]);
+                setAmenityIds([]);
+                setEditing(true);
+                setSuccess("");
+              }}
+            >
+              <ProppixIcon name="plus" size={19} />
+              <Text style={s.buttonText}>Nueva propiedad</Text>
+            </Pressable>
+          </View>
+          <View style={s.filters}>
+            {[
+              ["all", "Todas", allowance?.used ?? 0],
+              ["published", "Publicadas", stats?.published ?? 0],
+              ["draft", "Borradores", stats?.drafts ?? 0],
+              ["pending_review", "En revisión", stats?.pending ?? 0],
+            ].map(([key, label, n]) => (
+              <Pressable
+                key={String(key)}
+                style={[s.filter, propertyFilter === key && s.activeFilter]}
+                onPress={() => {
+                  setPropertyFilter(String(key));
+                  void loadProperties(1, String(key));
+                }}
+              >
+                <Text
+                  style={[
+                    s.filterText,
+                    propertyFilter === key && { color: "#fff" },
+                  ]}
+                >
+                  {label} ({n})
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        </>
+      ) : (
+        <Text style={s.pageTitle}>{form.title || "Nueva propiedad"}</Text>
       )}
-      <Text style={s.text}>
-        {stats?.likes ?? 0} me gusta · {stats?.inquiries ?? 0} mensajes ·{" "}
-        {stats?.views ?? 0} visitas
-      </Text>
       {!!error && (
         <Text accessibilityRole="alert" style={s.error}>
           {error}
         </Text>
       )}
-      {allowance && <Text style={s.text}>{allowance.message}</Text>}
-      {!!success && <Text style={s.text}>{success}</Text>}
-      {!editing &&
-        !pendingVideoId &&
-        button(
-          allowance?.can_create
-            ? onRecordFirst
-              ? "Grabar video para una propiedad"
-              : "Crear propiedad gratis"
-            : "Límite de propiedades alcanzado",
-          () => {
-            if (!allowance) return;
-            if (!allowance.can_create) {
-              Alert.alert("Membresía", allowance.message);
-              return;
-            }
-            if (onRecordFirst) {
-              onRecordFirst();
-              return;
-            }
-            setSavedId(null);
-            setForm({ type_id: "house", price_unit: "CLP" });
-            setPhotos([]);
-            setAmenityIds([]);
-            setPicker(null);
-            setSuccess("");
-            setEditing(true);
-          },
-        )}
+
+      {!!success && (
+        <View style={s.voiceHero}>
+          <ProppixIcon name="check" color="#137338" size={32} />
+          <Text style={s.title}>{success}</Text>
+          {onReturn && button("Volver al video", onReturn)}
+        </View>
+      )}
       {linkingExisting &&
         button("Elegir propiedad existente", () => void loadProperties(1))}
-      {!pendingVideoId &&
-        allowance &&
-        allowance.used > 0 &&
-        !editing &&
-        button("Mis propiedades", () => void loadProperties(1))}
-      {!editing && list && (
+      {!editing && !success && list && (
         <>
           {linkingExisting && list.items.length === 0 && (
             <Text style={s.text}>
@@ -457,19 +601,96 @@ export function SellerPanel({
             </Text>
           )}
           {list.items.map((p) => (
-            <View key={p.id}>
-              {button(p.title, () =>
+            <Pressable
+              key={p.id}
+              style={s.propertyCard}
+              onPress={() =>
                 linkingExisting
                   ? void linkExistingProperty(p.id)
-                  : void editProperty(p.id),
-              )}
-              {p.publication_status && (
-                <Text style={s.text}>
-                  {publicationLabels[p.publication_status] ||
-                    p.publication_status}
+                  : void editProperty(p.id)
+              }
+            >
+              <View style={s.propertyImage}>
+                {p.media[0]?.url ? (
+                  <Image
+                    fadeDuration={0}
+                    source={{ uri: mediaUrl(p.media[0].url) }}
+                    style={StyleSheet.absoluteFill}
+                  />
+                ) : (
+                  <ProppixIcon name="house" color="#90acd0" size={38} />
+                )}
+                {p.media.length > 0 && (
+                  <Text style={s.photoCount}>▧ {p.media.length}</Text>
+                )}
+              </View>
+              <View style={{ flex: 1, gap: 7 }}>
+                <Text style={s.propertyTitle} numberOfLines={2}>
+                  {p.title || "Borrador sin título"}
                 </Text>
-              )}
-            </View>
+                <Text style={s.text}>
+                  ⌖ {p.commune_name || "Ubicación pendiente"}
+                </Text>
+                <Text style={s.price}>
+                  {p.price_amount
+                    ? (p.price_unit === "UF" ? "UF " : "$ ") +
+                      Number(p.price_amount).toLocaleString("es-CL", {
+                        maximumFractionDigits: p.price_unit === "UF" ? 4 : 0,
+                      })
+                    : "Precio pendiente"}
+                </Text>
+              </View>
+              <View style={{ alignItems: "flex-end", gap: 12 }}>
+                <Text
+                  style={[
+                    s.status,
+                    {
+                      backgroundColor:
+                        p.publication_status === "published"
+                          ? "#e1f7e7"
+                          : p.publication_status === "pending_review"
+                            ? "#fff0d3"
+                            : "#e6f3ff",
+                      color:
+                        p.publication_status === "published"
+                          ? "#137338"
+                          : p.publication_status === "pending_review"
+                            ? "#b66a08"
+                            : "#0755ad",
+                    },
+                  ]}
+                >
+                  {publicationLabels[p.publication_status || "draft"]}
+                </Text>
+                <View style={s.ownerRow}>
+                  <ProppixIcon name="eye" size={17} color="#315a87" />
+                  <Text style={s.statLabel}>{p.view_count ?? 0}</Text>
+                  <ProppixIcon name="heart" size={17} color="#315a87" />
+                  <Text style={s.statLabel}>{p.favorite_count ?? 0}</Text>
+                  <Pressable
+                    accessibilityLabel={"Opciones de " + p.title}
+                    hitSlop={8}
+                    onPress={(e) => {
+                      e.stopPropagation();
+                      Alert.alert(p.title, undefined, [
+                        {
+                          text: linkingExisting
+                            ? "Enlazar propiedad"
+                            : "Editar datos",
+                          onPress: () =>
+                            linkingExisting
+                              ? void linkExistingProperty(p.id)
+                              : void editProperty(p.id),
+                        },
+                        { text: "Cancelar", style: "cancel" },
+                      ]);
+                    }}
+                  >
+                    <ProppixIcon name="more" color="#123b70" size={21} />
+                  </Pressable>
+                </View>
+              </View>
+            </Pressable>
           ))}
           {list.page < list.pages &&
             button(
@@ -480,30 +701,49 @@ export function SellerPanel({
       )}
       {editing && (
         <>
-          <Text style={s.text}>
-            Completa los datos y fotografías de tu propiedad. Revisaremos la
-            publicación antes de mostrarla.
-          </Text>
-          {button("Usar audio del video", () => {
-            if (!catalog) {
-              Alert.alert("Espera un momento", "Se está cargando el catálogo.");
-              return;
-            }
-            setVideoDictation(true);
-            setDictationOpen(true);
-          })}
-          {button("Dictar propiedad", () => {
-            setVideoDictation(false);
-            if (!catalog) {
-              Alert.alert("Espera un momento", "Se está cargando el catálogo.");
-              return;
-            }
-            setDictationOpen(true);
-          })}
-          <Text style={s.text}>
-            Dicta las características y revisa los datos antes de aplicarlos al
-            formulario.
-          </Text>
+          <View style={s.voiceHero}>
+            <View style={s.ownerRow}>
+              <View style={s.micBadge}>
+                <ProppixIcon name="microphone" size={28} />
+              </View>
+              <View style={{ flex: 1, gap: 4 }}>
+                <Text style={s.heroTitle}>Tu propiedad, con tu voz</Text>
+                <Text style={s.text}>
+                  Cuéntanos sus características. Proppix completa el formulario
+                  para que lo revises.
+                </Text>
+              </View>
+            </View>
+            <Pressable
+              style={s.voicePrimary}
+              onPress={() => {
+                if (!catalog) return;
+                setVideoDictation(false);
+                setDictationOpen(true);
+              }}
+            >
+              <ProppixIcon name="microphone" />
+              <Text style={s.buttonText}>
+                {form.description ? "Completar por voz" : "Dictar mi propiedad"}
+              </Text>
+            </Pressable>
+            <Pressable
+              style={s.voiceSecondary}
+              onPress={() => {
+                if (!catalog) return;
+                setVideoDictation(true);
+                setDictationOpen(true);
+              }}
+            >
+              <ProppixIcon name="video" color="#0755ad" />
+              <Text style={s.voiceSecondaryText}>Usar audio del video</Text>
+            </Pressable>
+            <Text style={s.voiceHint}>
+              {missing.length
+                ? "Puedes completar: " + missing.join(", ") + "."
+                : "Los datos principales están completos. Revisa todo antes de guardar."}
+            </Text>
+          </View>
           {field("title", "Título · mínimo 8 caracteres")}
           {field("summary", "Resumen")}
           {field("description", "Descripción · mínimo 40 caracteres")}
@@ -651,6 +891,11 @@ export function SellerPanel({
               </Text>
             </Pressable>
           ))}
+          {photos.length === 0 && (
+            <Text style={s.text}>
+              Para publicar, agrega al menos una fotografía de la propiedad.
+            </Text>
+          )}
           {photos.map((p) => (
             <View key={p.id}>
               <Image
@@ -669,19 +914,36 @@ export function SellerPanel({
             () => void save(false),
           )}
           {button(
-            busy
-              ? "Guardando…"
-              : savedId
-                ? "Guardar y reenviar a revisión"
-                : "Enviar mi propiedad a revisión",
+            busy ? "Guardando…" : "Publicar propiedad",
             () => void save(),
           )}
-          {button("Cerrar formulario", () => setEditing(false))}
+          <Text style={s.text}>
+            Publicar envía los datos a revisión antes de mostrarlos. Guardar
+            borrador te permite completarlos después.
+          </Text>
+          {button(focused ? "Volver al video" : "Cerrar formulario", () =>
+            focused && onReturn ? onReturn() : setEditing(false),
+          )}
         </>
       )}
       {dictationOpen && (
         <PropertyDictation
           initialVideoId={pendingVideoId}
+          sourceVideoTitle={sourceHeading || form.title}
+          initialContext={previousPropertyContext(
+            form,
+            dictationLabelsFor(catalog?.amenities || []),
+            (key, value) =>
+              key === "region_id"
+                ? catalog?.regions.find((r) => String(r.id) === value)?.name ||
+                  value
+                : key === "commune_id"
+                  ? catalog?.communes.find((c) => String(c.id) === value)
+                      ?.name || value
+                  : key === "type_id"
+                    ? catalog?.types.find((t) => t.id === value)?.name || value
+                    : value,
+          )}
           videoMode={videoDictation}
           token={token}
           current={{
@@ -726,23 +988,27 @@ export function SellerPanel({
           onClose={() => setDictationOpen(false)}
         />
       )}
-      {button(
-        showMessages ? "Ocultar mensajes" : "Ver mensajes recibidos",
-        () => {
-          setShowMessages(!showMessages);
-          if (!showMessages && !loadingLeads) {
-            setError("");
-            setLoadingLeads(true);
-            void api<Lead[]>("/manage/inquiries", { token })
-              .then(setLeads)
-              .catch((e) =>
-                Alert.alert("No se pudieron cargar las consultas", e.message),
-              )
-              .finally(() => setLoadingLeads(false));
-          }
-        },
-      )}
-      {showMessages &&
+      {!focused &&
+        !editing &&
+        button(
+          showMessages ? "Ocultar mensajes" : "Ver mensajes recibidos",
+          () => {
+            setShowMessages(!showMessages);
+            if (!showMessages && !loadingLeads) {
+              setError("");
+              setLoadingLeads(true);
+              void api<Lead[]>("/manage/inquiries", { token })
+                .then(setLeads)
+                .catch((e) =>
+                  Alert.alert("No se pudieron cargar las consultas", e.message),
+                )
+                .finally(() => setLoadingLeads(false));
+            }
+          },
+        )}
+      {!focused &&
+        !editing &&
+        showMessages &&
         (loadingLeads ? (
           <Text style={s.text}>Cargando consultas…</Text>
         ) : leads.length ? (
@@ -802,6 +1068,138 @@ export function SellerPanel({
   );
 }
 const s = StyleSheet.create({
+  ownerRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+  ownerAvatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: "#e6f3ff",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  plan: {
+    backgroundColor: "#e2f1ff",
+    color: "#0755ad",
+    padding: 6,
+    borderRadius: 15,
+    fontSize: 11,
+    fontWeight: "700",
+  },
+  statsRow: {
+    flexDirection: "row",
+    padding: 14,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "#c9def4",
+    backgroundColor: "#f4f9ff",
+  },
+  stat: { flex: 1, alignItems: "center", gap: 5 },
+  statNumber: { fontSize: 24, fontWeight: "800", color: "#10376b" },
+  statLabel: { fontSize: 11, color: "#315a87" },
+  pageTitle: { fontSize: 26, fontWeight: "800", color: "#10376b" },
+  kicker: {
+    fontSize: 11,
+    letterSpacing: 1.5,
+    color: "#0866f5",
+    fontWeight: "800",
+  },
+  back: {
+    color: "#0755ad",
+    fontWeight: "700",
+    fontSize: 15,
+    paddingVertical: 8,
+  },
+  newButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "#0866f5",
+    borderRadius: 14,
+    padding: 12,
+  },
+  filters: { flexDirection: "row", gap: 6, flexWrap: "wrap" },
+  filter: {
+    backgroundColor: "#edf6ff",
+    borderWidth: 1,
+    borderColor: "#d5e6fa",
+    paddingVertical: 9,
+    paddingHorizontal: 10,
+    borderRadius: 14,
+  },
+  activeFilter: { backgroundColor: "#0755ad" },
+  filterText: { fontSize: 11, fontWeight: "600", color: "#123b70" },
+  propertyCard: {
+    flexDirection: "row",
+    gap: 10,
+    alignItems: "center",
+    padding: 8,
+    borderWidth: 1,
+    borderColor: "#d5e6fa",
+    borderRadius: 16,
+    backgroundColor: "#fff",
+    marginBottom: 9,
+  },
+  propertyImage: {
+    width: 86,
+    height: 90,
+    borderRadius: 11,
+    overflow: "hidden",
+    backgroundColor: "#edf6ff",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  photoCount: {
+    position: "absolute",
+    bottom: 5,
+    right: 5,
+    color: "#fff",
+    backgroundColor: "#062951bb",
+    padding: 3,
+    borderRadius: 5,
+    fontSize: 10,
+  },
+  propertyTitle: { color: "#10376b", fontWeight: "800", fontSize: 15 },
+  price: { color: "#0866f5", fontWeight: "800", fontSize: 17 },
+  status: { fontSize: 10, fontWeight: "700", padding: 6, borderRadius: 7 },
+  voiceHero: {
+    padding: 18,
+    gap: 14,
+    backgroundColor: "#eff7ff",
+    borderWidth: 1,
+    borderColor: "#bddaff",
+    borderRadius: 20,
+  },
+  micBadge: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#0866f5",
+  },
+  heroTitle: { color: "#10376b", fontSize: 20, fontWeight: "800" },
+  voicePrimary: {
+    flexDirection: "row",
+    gap: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#0866f5",
+    padding: 16,
+    borderRadius: 14,
+  },
+  voiceSecondary: {
+    flexDirection: "row",
+    gap: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#fff",
+    borderWidth: 1,
+    borderColor: "#a5c5eb",
+    padding: 14,
+    borderRadius: 14,
+  },
+  voiceSecondaryText: { fontWeight: "800", color: "#0755ad" },
+  voiceHint: { color: "#315a87", fontSize: 12, lineHeight: 19 },
   card: {
     padding: 14,
     gap: 12,

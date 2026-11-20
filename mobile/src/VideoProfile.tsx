@@ -1,3 +1,4 @@
+import { ProppixIcon } from "./ProppixIcon";
 import { clampVideoOffset } from "./video-paging";
 import { rememberFollowState } from "./follow-state";
 import { beginVideoLoad, videoSourceReady } from "./playback-metrics";
@@ -210,7 +211,7 @@ export function VideoProfile({
   const own = target === session?.user.id;
   const token = session?.access_token;
   const [videosRefresh, refreshQuota] = useState(0);
-  const [quota, setQuota] = useState<{
+  const [, setQuota] = useState<{
     plan: "free" | "basic" | "pro";
     video_limit: number | null;
     video_used: number;
@@ -218,7 +219,11 @@ export function VideoProfile({
   useEffect(() => {
     if (!own || !token) return;
     const controller = new AbortController();
-    void api<typeof quota>("/me/publication-allowance", {
+    void api<{
+      plan: "free" | "basic" | "pro";
+      video_limit: number | null;
+      video_used: number;
+    } | null>("/me/publication-allowance", {
       token,
       signal: controller.signal,
     })
@@ -271,6 +276,7 @@ export function VideoProfile({
     [videos, setVideos] = useState<ProfileVideo[]>([]),
     [page, setPage] = useState(0),
     [pages, setPages] = useState(0),
+    [videoCount, setVideoCount] = useState(0),
     [loading, setLoading] = useState(false),
     [error, setError] = useState("");
   const [section, setSection] = useState<"videos" | "saved" | "properties">(
@@ -335,6 +341,7 @@ export function VideoProfile({
                 ...r.items.filter((v) => !old.some((x) => x.id === v.id)),
               ],
         );
+        if (section === "videos") setVideoCount(r.total);
         setPage(r.page);
         setPages(r.pages);
       } catch (e) {
@@ -461,186 +468,222 @@ export function VideoProfile({
         {button("Ingresar a mi cuenta", () => router.push("/cuenta"))}
       </View>
     );
-  const header = (
-    <View style={s.header}>
-      {userId && button("← Volver", () => router.back(), true)}
-      <View style={s.topline}>
+  const sectionTabs = (
+    <View style={s.tabs}>
+      {(
+        ["videos", ...(own ? ["saved", "properties"] : [])] as (
+          | "videos"
+          | "saved"
+          | "properties"
+        )[]
+      ).map((k) => (
         <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={own ? "Cambiar foto de perfil" : "Foto de perfil"}
-          disabled={!own || busy}
-          onPress={() => void choosePhoto()}
-          style={s.avatarWrap}
+          key={k}
+          accessibilityRole="tab"
+          accessibilityState={{ selected: section === k }}
+          onPress={() => setSection(k)}
+          style={[s.tab, section === k && s.selectedTab]}
         >
-          {profile?.avatar_thumbnail_url || profile?.avatar_url ? (
-            <Image
-              fadeDuration={0}
-              source={{
-                uri: mediaUrl(
-                  profile!.avatar_thumbnail_url || profile!.avatar_url!,
-                ),
-              }}
-              style={s.avatar}
-            />
-          ) : (
-            <View style={s.avatar}>
-              <Text style={s.initial}>
-                {profile?.display_name.slice(0, 1) || "P"}
-              </Text>
-            </View>
-          )}
-          {own && (
-            <View style={s.camera}>
-              <Text>✎</Text>
-            </View>
-          )}
-        </Pressable>
-        <Text numberOfLines={1} style={[s.title, { flex: 1 }]}>
-          {profile?.display_name || "Tu perfil"}
-        </Text>
-        {own && (
-          <Pressable
-            accessibilityLabel="Editar perfil"
-            onPress={() => {
-              setIdentity({
-                profile_kind: profile?.profile_kind || null,
-                username: profile?.username || "",
-                display_name: profile?.display_name || "",
-              });
-              setEditProfile(true);
-            }}
-          >
-            <Text style={s.gear}>✎</Text>
-          </Pressable>
-        )}
-      </View>
-      <View
-        style={{
-          flexDirection: "row",
-          gap: 10,
-          alignItems: "center",
-          justifyContent: "center",
-          marginVertical: 10,
-        }}
-      >
-        {profile?.username && <Text style={s.muted}>@{profile.username}</Text>}
-        {profile?.profile_kind && (
-          <Text style={{ color: "#0866f5", fontWeight: "700" }}>
-            {profile.profile_kind === "company" ? "Empresa" : "Persona"}
+          <ProppixIcon
+            name={
+              k === "videos" ? "video" : k === "saved" ? "bookmark" : "house"
+            }
+            size={20}
+            color={section === k ? "#0866f5" : "#123b70"}
+          />
+          <Text style={[s.light, section === k && { color: "#0866f5" }]}>
+            {k === "videos"
+              ? `Videos (${videoCount})`
+              : k === "saved"
+                ? "Guardados"
+                : "Propiedades"}
           </Text>
-        )}
-      </View>
-      {button("Buscar perfiles", () => router.push("/buscar-perfiles"), true)}
-      <View style={s.counters}>
-        {(
-          [
-            [profile?.following || 0, "Siguiendo"],
-            [profile?.followers || 0, "Seguidores"],
-            [profile?.likes || 0, "Me gusta"],
-          ] as const
-        ).map(([n, label]) => (
-          <Pressable
-            key={label}
-            style={s.counter}
-            disabled={label === "Me gusta" || busy}
-            accessibilityRole={label !== "Me gusta" ? "button" : undefined}
-            onPress={() => {
-              setRelationSearch("");
-              void showFollowers(
-                1,
-                label === "Siguiendo" ? "following" : "followers",
-                "",
-              );
-            }}
-          >
-            <Text style={s.counterNumber}>{n}</Text>
-            <Text style={s.muted}>{label}</Text>
-          </Pressable>
-        ))}
-      </View>
-      {own ? (
-        <View style={s.row}>
-          {button("＋ Grabar", () => router.push("/grabar"))}
-          {button("Subir video", () => void pickVideo(), true)}
-        </View>
-      ) : (
-        session &&
-        profile &&
-        button(
-          profile?.followed ? "Siguiendo" : "Seguir",
-          () =>
-            void run(async () => {
-              const updated = await api<VideoProfileData>(
-                `/video-profiles/${target}/follow`,
-                { method: "POST", token, body: { active: !profile?.followed } },
-              );
-              rememberFollowState(
-                session?.user.id,
-                updated.id,
-                updated.followed,
-              );
-              setProfile(updated);
-            }),
-        )
-      )}
-      {own && (
-        <Text style={s.explainer}>
-          Tus videos primero. Vincular una propiedad es opcional.
-        </Text>
-      )}
-      {!own &&
-        profile &&
-        button(
-          "Enviar mensaje",
-          () =>
-            router.push({
-              pathname: "/mensajes",
-              params: { recipientId: profile.id },
-            }),
-          true,
-        )}
-      {!own && target && (
-        <ModerationActions
-          kind="user"
-          targetId={target}
-          authorId={target}
-          session={session}
-          label="Reportar o bloquear usuario"
-        />
-      )}
-      {error && (
-        <Text accessibilityRole="alert" style={s.error}>
-          {error}
-        </Text>
-      )}
-      {busy && <ActivityIndicator color="#0866f5" />}
-      <View style={s.tabs}>
-        {(
-          ["videos", ...(own ? ["saved", "properties"] : [])] as (
-            | "videos"
-            | "saved"
-            | "properties"
-          )[]
-        ).map((k) => (
-          <Pressable
-            key={k}
-            accessibilityRole="tab"
-            accessibilityState={{ selected: section === k }}
-            onPress={() => setSection(k)}
-            style={[s.tab, section === k && s.selectedTab]}
-          >
-            <Text style={s.light}>
-              {k === "videos"
-                ? "▦ Videos"
-                : k === "saved"
-                  ? "▢ Guardados"
-                  : "⌂ Propiedades"}
-            </Text>
-          </Pressable>
-        ))}
-      </View>
+        </Pressable>
+      ))}
     </View>
   );
+  const header =
+    section === "properties" ? (
+      <View style={{ paddingHorizontal: 16 }}>{sectionTabs}</View>
+    ) : (
+      <View style={s.header}>
+        {userId && button("← Volver", () => router.back(), true)}
+        <View style={s.topline}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={
+              own ? "Cambiar foto de perfil" : "Foto de perfil"
+            }
+            disabled={!own || busy}
+            onPress={() => void choosePhoto()}
+            style={s.avatarWrap}
+          >
+            {profile?.avatar_thumbnail_url || profile?.avatar_url ? (
+              <Image
+                fadeDuration={0}
+                source={{
+                  uri: mediaUrl(
+                    profile!.avatar_thumbnail_url || profile!.avatar_url!,
+                  ),
+                }}
+                style={s.avatar}
+              />
+            ) : (
+              <View style={s.avatar}>
+                <Text style={s.initial}>
+                  {profile?.display_name.slice(0, 1) || "P"}
+                </Text>
+              </View>
+            )}
+            {own && (
+              <View style={s.camera}>
+                <ProppixIcon name="edit" size={15} />
+              </View>
+            )}
+          </Pressable>
+          <View style={{ flex: 1, gap: 7 }}>
+            <Text numberOfLines={1} style={s.title}>
+              {profile?.display_name || "Tu perfil"}
+            </Text>
+            <View
+              style={{
+                flexDirection: "row",
+                flexWrap: "wrap",
+                gap: 7,
+                alignItems: "center",
+              }}
+            >
+              {profile?.username && (
+                <Text style={s.handle}>@{profile.username}</Text>
+              )}
+              {profile?.profile_kind && (
+                <Text style={s.kindBadge}>
+                  {profile.profile_kind === "company" ? "Empresa" : "Persona"}
+                </Text>
+              )}
+            </View>
+          </View>
+          {own && (
+            <Pressable
+              accessibilityLabel="Editar perfil"
+              onPress={() => {
+                setIdentity({
+                  profile_kind: profile?.profile_kind || null,
+                  username: profile?.username || "",
+                  display_name: profile?.display_name || "",
+                });
+                setEditProfile(true);
+              }}
+            >
+              <View style={s.editButton}>
+                <ProppixIcon name="edit" color="#123b70" size={17} />
+                <Text style={s.light}>Editar perfil</Text>
+              </View>
+            </Pressable>
+          )}
+        </View>
+        <View style={s.counters}>
+          {(
+            [
+              [profile?.following || 0, "Siguiendo"],
+              [profile?.followers || 0, "Seguidores"],
+              [profile?.likes || 0, "Me gusta"],
+            ] as const
+          ).map(([n, label]) => (
+            <Pressable
+              key={label}
+              style={s.counter}
+              disabled={label === "Me gusta" || busy}
+              accessibilityRole={label !== "Me gusta" ? "button" : undefined}
+              onPress={() => {
+                setRelationSearch("");
+                void showFollowers(
+                  1,
+                  label === "Siguiendo" ? "following" : "followers",
+                  "",
+                );
+              }}
+            >
+              <Text style={s.counterNumber}>{n}</Text>
+              <Text style={s.muted}>{label}</Text>
+            </Pressable>
+          ))}
+        </View>
+        {own ? (
+          <View style={s.row}>
+            <Pressable
+              style={[s.recordButton, { flex: 1 }]}
+              onPress={() => router.push("/grabar")}
+            >
+              <ProppixIcon name="video" />
+              <Text style={s.buttonText}>Grabar video</Text>
+            </Pressable>
+            <Pressable
+              style={[s.uploadButton, { flex: 1 }]}
+              onPress={() => void pickVideo()}
+            >
+              <ProppixIcon name="upload" color="#123b70" />
+              <Text style={s.light}>Subir video</Text>
+            </Pressable>
+          </View>
+        ) : (
+          session &&
+          profile &&
+          button(
+            profile?.followed ? "Siguiendo" : "Seguir",
+            () =>
+              void run(async () => {
+                const updated = await api<VideoProfileData>(
+                  `/video-profiles/${target}/follow`,
+                  {
+                    method: "POST",
+                    token,
+                    body: { active: !profile?.followed },
+                  },
+                );
+                rememberFollowState(
+                  session?.user.id,
+                  updated.id,
+                  updated.followed,
+                );
+                setProfile(updated);
+              }),
+          )
+        )}
+        {own && (
+          <Text style={s.explainer}>
+            Tus videos primero. Vincular una propiedad es opcional.
+          </Text>
+        )}
+        {!own &&
+          profile &&
+          button(
+            "Enviar mensaje",
+            () =>
+              router.push({
+                pathname: "/mensajes",
+                params: { recipientId: profile.id },
+              }),
+            true,
+          )}
+        {!own && target && (
+          <ModerationActions
+            kind="user"
+            targetId={target}
+            authorId={target}
+            session={session}
+            label="Reportar o bloquear usuario"
+          />
+        )}
+        {error && (
+          <Text accessibilityRole="alert" style={s.error}>
+            {error}
+          </Text>
+        )}
+        {busy && <ActivityIndicator color="#0866f5" />}
+        {sectionTabs}
+      </View>
+    );
   return (
     <View style={s.root}>
       <Modal
@@ -755,24 +798,12 @@ export function VideoProfile({
           />
         </View>
       </Modal>
-      {own && quota && (
-        <Text style={[s.muted, { paddingHorizontal: 16, paddingVertical: 8 }]}>
-          {quota.plan === "free"
-            ? "Gratis"
-            : quota.plan === "basic"
-              ? "Básico"
-              : "Pro"}{" "}
-          ·{" "}
-          {quota.video_limit === null
-            ? "Videos ilimitados"
-            : `${quota.video_used}/${quota.video_limit} videos`}
-        </Text>
-      )}
       {section === "properties" && session ? (
         <ScrollView>
           {header}
           <SellerPanel
             session={session}
+            owner={profile || undefined}
             pendingVideoId={pendingVideoId}
             propertyMode={propertyMode}
             onRecordFirst={() => router.push("/grabar")}
@@ -813,17 +844,53 @@ export function VideoProfile({
             >
               {viewer === null && <VideoThumbnail video={item} />}
               <View style={s.tileShade} />
-              <Text style={s.tileTitle} numberOfLines={2}>
-                {item.title}
-              </Text>
-              <Text style={s.tileMeta}>
-                ♥ {item.likes}{" "}
-                {item.moderation_hidden
-                  ? " · Oculto por moderación"
-                  : item.status === "draft"
-                    ? " · Borrador"
-                    : ""}
-              </Text>
+              <View style={s.tileTitle}>
+                <ProppixIcon name="play" size={14} filled />
+                <Text style={s.tileTitleText} numberOfLines={2}>
+                  {item.title}
+                </Text>
+              </View>
+              <View style={s.tileMeta}>
+                <ProppixIcon name="heart" size={16} filled />
+                <Text style={s.tileTitleText}>{item.likes}</Text>
+                {item.status === "draft" && (
+                  <Text style={s.tileTitleText}> · Borrador</Text>
+                )}
+              </View>
+              {own && (
+                <Pressable
+                  accessibilityLabel={"Opciones de " + item.title}
+                  style={s.tileMore}
+                  hitSlop={8}
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    Alert.alert(item.title, undefined, [
+                      {
+                        text: "Ver video",
+                        onPress: () => {
+                          setActive(index);
+                          setViewer(index);
+                        },
+                      },
+                      {
+                        text: "Agregar datos de esta propiedad",
+                        onPress: () =>
+                          router.push({
+                            pathname: "/mis-videos",
+                            params: {
+                              videoId: item.id,
+                              propertyMode: "new",
+                              sourceTitle: item.property_title || item.title,
+                            },
+                          }),
+                      },
+                      { text: "Cancelar", style: "cancel" },
+                    ]);
+                  }}
+                >
+                  <ProppixIcon name="more" size={22} />
+                </Pressable>
+              )}
             </Pressable>
           )}
           ListEmptyComponent={
@@ -1037,6 +1104,51 @@ export function VideoProfile({
   );
 }
 const s = StyleSheet.create({
+  editButton: {
+    flexDirection: "row",
+    gap: 6,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: "#a5c1e1",
+    borderRadius: 13,
+    alignItems: "center",
+  },
+  kindBadge: {
+    color: "#0866f5",
+    fontSize: 11,
+    fontWeight: "700",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    backgroundColor: "#dcecff",
+  },
+  recordButton: {
+    flexDirection: "row",
+    gap: 8,
+    padding: 15,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#0866f5",
+    borderRadius: 16,
+  },
+  uploadButton: {
+    flexDirection: "row",
+    gap: 8,
+    padding: 15,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "#a5c1e1",
+    borderRadius: 16,
+    backgroundColor: "#fff",
+  },
+  tileTitleText: {
+    color: "#fff",
+    fontWeight: "700",
+    fontSize: 11,
+    flexShrink: 1,
+  },
+  tileMore: { position: "absolute", bottom: 6, right: 3, padding: 3 },
   root: { flex: 1, backgroundColor: "#fff" },
   header: {
     paddingHorizontal: 20,
@@ -1055,9 +1167,9 @@ const s = StyleSheet.create({
   gear: { color: "#0866f5", fontSize: 25, padding: 8 },
   avatarWrap: { position: "relative" },
   avatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 76,
+    height: 76,
+    borderRadius: 38,
     backgroundColor: "#edf4ff",
     alignItems: "center",
     justifyContent: "center",
@@ -1081,10 +1193,24 @@ const s = StyleSheet.create({
     width: "100%",
     paddingVertical: 4,
   },
-  counter: { alignItems: "center", gap: 4 },
-  counterNumber: { color: "#10376b", fontSize: 22, fontWeight: "800" },
+  counter: {
+    flex: 1,
+    alignItems: "center",
+    gap: 7,
+    paddingVertical: 12,
+    borderRightWidth: 1,
+    borderColor: "#e0e8f2",
+  },
+  counterNumber: { color: "#10376b", fontSize: 28, fontWeight: "800" },
   muted: { color: "#49658b", fontSize: 13 },
-  explainer: { color: "#49658b", fontSize: 12, textAlign: "center" },
+  explainer: {
+    color: "#315a87",
+    fontSize: 13,
+    lineHeight: 21,
+    padding: 14,
+    borderRadius: 16,
+    backgroundColor: "#edf6ff",
+  },
   row: { flexDirection: "row", gap: 10 },
   button: {
     paddingHorizontal: 18,
@@ -1107,13 +1233,21 @@ const s = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "#d3e0f2",
   },
-  tab: { flex: 1, paddingVertical: 16, alignItems: "center" },
+  tab: {
+    flex: 1,
+    paddingVertical: 16,
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: 6,
+  },
   selectedTab: { borderBottomColor: "#0866f5", borderBottomWidth: 3 },
   tile: {
     flex: 1 / 3,
     aspectRatio: 0.7,
     backgroundColor: "#edf4ff",
-    margin: 1,
+    margin: 4,
+    borderRadius: 14,
     overflow: "hidden",
   },
   tileShade: {
@@ -1125,9 +1259,9 @@ const s = StyleSheet.create({
     backgroundColor: "#0003",
   },
   tileTitle: {
-    color: "#fff",
-    fontWeight: "700",
-    fontSize: 11,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
     position: "absolute",
     left: 8,
     right: 8,
@@ -1136,6 +1270,9 @@ const s = StyleSheet.create({
     textShadowRadius: 4,
   },
   tileMeta: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
     position: "absolute",
     left: 8,
     bottom: 7,
