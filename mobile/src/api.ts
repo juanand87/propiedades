@@ -27,7 +27,12 @@ export type Property = {
   };
 };
 export type Video = {
-  creator?: { id: string; display_name: string; avatar_url?: string | null; avatar_thumbnail_url?:string|null };
+  creator?: {
+    id: string;
+    display_name: string;
+    avatar_url?: string | null;
+    avatar_thumbnail_url?: string | null;
+  };
   hls_url?: string | null;
   id: string;
   thumbnail_url?: string;
@@ -136,7 +141,9 @@ export async function api<T>(
   if (options.signal?.aborted) controller.abort();
   const timer = setTimeout(
     abort,
-    options.body instanceof FormData ? 120000 : 20000,
+    options.body instanceof FormData || path === "/manage/property-dictation"
+      ? 120000
+      : 20000,
   );
   try {
     const form = options.body instanceof FormData;

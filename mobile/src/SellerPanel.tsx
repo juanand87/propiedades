@@ -1,3 +1,5 @@
+import { PropertyDictation } from "./PropertyDictation";
+import { mergeDictatedFields } from "./property-dictation";
 import { formatClpInput, parseClpInput } from "./clp";
 import { lightColors as videoColors } from "./video-colors";
 import { useEffect, useState } from "react";
@@ -80,6 +82,7 @@ export function SellerPanel({
     [showMessages, setShowMessages] = useState(false);
   const [loadingLeads, setLoadingLeads] = useState(false);
   const [list, setList] = useState<Page<Property> | null>(null);
+  const [dictationOpen, setDictationOpen] = useState(false);
   const token = session.access_token;
   const [linked, setLinked] = useState(false);
   const linkingExisting =
@@ -311,18 +314,23 @@ export function SellerPanel({
       </View>
     );
   const options =
-    picker === "type_id"
-      ? catalog?.types
-      : picker === "region_id"
-        ? catalog?.regions
-        : picker === "commune_id"
-          ? catalog?.communes.filter(
-              (c) => String(c.region_id) === form.region_id,
-            )
-          : [
-              { id: "CLP", name: "Pesos chilenos" },
-              { id: "UF", name: "UF" },
-            ];
+    picker === "operation_type"
+      ? [
+          { id: "sale", name: "Venta" },
+          { id: "rent", name: "Arriendo" },
+        ]
+      : picker === "type_id"
+        ? catalog?.types
+        : picker === "region_id"
+          ? catalog?.regions
+          : picker === "commune_id"
+            ? catalog?.communes.filter(
+                (c) => String(c.region_id) === form.region_id,
+              )
+            : [
+                { id: "CLP", name: "Pesos chilenos" },
+                { id: "UF", name: "UF" },
+              ];
   return (
     <View style={s.card}>
       <Text style={s.title}>
@@ -417,20 +425,43 @@ export function SellerPanel({
             Completa los datos y fotografías de tu propiedad. Revisaremos la
             publicación antes de mostrarla.
           </Text>
+          {button("Dictar propiedad", () => {
+            if (!catalog) {
+              Alert.alert("Espera un momento", "Se está cargando el catálogo.");
+              return;
+            }
+            setDictationOpen(true);
+          })}
+          <Text style={s.text}>
+            Dicta las características y revisa los datos antes de aplicarlos al
+            formulario.
+          </Text>
           {field("title", "Título · mínimo 8 caracteres")}
           {field("description", "Descripción · mínimo 40 caracteres")}
-          {(["type_id", "region_id", "commune_id", "price_unit"] as const).map(
-            (k) => (
-              <View key={k}>
-                {button(
-                  {
-                    type_id: "Tipo de propiedad",
-                    region_id: "Región",
-                    commune_id: "Comuna",
-                    price_unit: "Moneda",
-                  }[k] +
-                    ": " +
-                    ((k === "type_id"
+          {(
+            [
+              "type_id",
+              "operation_type",
+              "region_id",
+              "commune_id",
+              "price_unit",
+            ] as const
+          ).map((k) => (
+            <View key={k}>
+              {button(
+                {
+                  type_id: "Tipo de propiedad",
+                  operation_type: "Operación",
+                  region_id: "Región",
+                  commune_id: "Comuna",
+                  price_unit: "Moneda",
+                }[k] +
+                  ": " +
+                  ((k === "operation_type"
+                    ? form.operation_type === "rent"
+                      ? "Arriendo"
+                      : "Venta"
+                    : k === "type_id"
                       ? catalog?.types.find((t) => t.id === form[k])?.name
                       : k === "region_id"
                         ? catalog?.regions.find((t) => String(t.id) === form[k])
@@ -440,24 +471,23 @@ export function SellerPanel({
                               (t) => String(t.id) === form[k],
                             )?.name
                           : form[k]) ||
-                      (k === "commune_id" && !form.region_id
-                        ? "Primero selecciona una región"
-                        : "Seleccionar")),
-                  () => {
-                    if (k === "commune_id" && !form.region_id) {
-                      Alert.alert(
-                        "Selecciona una región",
-                        "Las comunas se mostrarán según la región elegida.",
-                      );
-                      return;
-                    }
-                    setPicker(k);
-                    setSearch("");
-                  },
-                )}
-              </View>
-            ),
-          )}
+                    (k === "commune_id" && !form.region_id
+                      ? "Primero selecciona una región"
+                      : "Seleccionar")),
+                () => {
+                  if (k === "commune_id" && !form.region_id) {
+                    Alert.alert(
+                      "Selecciona una región",
+                      "Las comunas se mostrarán según la región elegida.",
+                    );
+                    return;
+                  }
+                  setPicker(k);
+                  setSearch("");
+                },
+              )}
+            </View>
+          ))}
           {picker && (
             <View>
               <TextInput
@@ -486,8 +516,14 @@ export function SellerPanel({
           {field("price_amount", "Precio", true)}
           {field("built_area", "Superficie construida (m²)", true)}
           {field("land_area", "Terreno (m²)", true)}
+          {field("neighborhood", "Sector o barrio")}
+          {field(
+            "address",
+            "Dirección · no se muestra públicamente por defecto",
+          )}
           {field("bedrooms", "Dormitorios", true)}
           {field("bathrooms", "Baños", true)}
+          {field("parking", "Estacionamientos", true)}
           {photos.map((p) => (
             <View key={p.id}>
               <Image
@@ -515,6 +551,34 @@ export function SellerPanel({
           )}
           {button("Cerrar formulario", () => setEditing(false))}
         </>
+      )}
+      {dictationOpen && (
+        <PropertyDictation
+          token={token}
+          current={form}
+          display={(key, value) =>
+            key === "type_id"
+              ? catalog?.types.find((t) => t.id === value)?.name || value
+              : key === "region_id"
+                ? catalog?.regions.find((r) => String(r.id) === value)?.name ||
+                  value
+                : key === "commune_id"
+                  ? catalog?.communes.find((c) => String(c.id) === value)
+                      ?.name || value
+                  : key === "operation_type"
+                    ? value === "rent"
+                      ? "Arriendo"
+                      : "Venta"
+                    : value
+          }
+          onApply={(fields, selected) => {
+            setForm((old) => mergeDictatedFields(old, fields, selected));
+            setSuccess(
+              "Datos aplicados. Revísalos en el formulario antes de guardar.",
+            );
+          }}
+          onClose={() => setDictationOpen(false)}
+        />
       )}
       {button(
         showMessages ? "Ocultar mensajes" : "Ver mensajes recibidos",

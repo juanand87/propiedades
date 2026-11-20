@@ -28,6 +28,7 @@ import { assetUrl, date, labels, price, request, send } from "@/lib/estate-api";
 import { Empty, Notice, useEstate } from "./EstateApp";
 import { DemoAdmin } from "./DemoAdmin";
 import { DesignAdmin } from "./DesignAdmin";
+import { PropertyDictation } from "./PropertyDictation";
 import { PropertyVideosEditor } from "./PropertyVideosEditor";
 import { VisitsAgenda } from "./VisitsAgenda";
 import { ModerationAdmin } from "./ModerationAdmin";
@@ -750,6 +751,13 @@ function PropertyEditor({ root, id }: { root: string; id?: string }) {
       <form onSubmit={save} className="property-editor">
         <section className="panel-card">
           <h2>01 · Lo esencial</h2>
+          <PropertyDictation
+            form={form}
+            catalog={catalog}
+            onApply={(patch) =>
+              setForm((previous: any) => ({ ...previous, ...patch }))
+            }
+          />
           <p>Puedes guardar un borrador incompleto y retomarlo más adelante.</p>
           {user.role === "admin" &&
             !id &&
@@ -777,7 +785,13 @@ function PropertyEditor({ root, id }: { root: string; id?: string }) {
             )}
             <label>
               Operación
-              <input value="Venta" readOnly />
+              <select
+                value={form.operation_type || "sale"}
+                onChange={(e) => set("operation_type", e.target.value)}
+              >
+                <option value="sale">Venta</option>
+                <option value="rent">Arriendo</option>
+              </select>
             </label>
           </div>
           <label>

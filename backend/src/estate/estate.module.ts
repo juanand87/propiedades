@@ -1,3 +1,5 @@
+import { PropertyDictationService } from './property-dictation.service';
+import { PropertyDictationController } from './property-dictation.controller';
 import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
@@ -46,6 +48,7 @@ import {
     }),
   ],
   controllers: [
+    PropertyDictationController,
     VisitsController,
     ModerationController,
     ModerationCapabilitiesController,
@@ -60,6 +63,7 @@ import {
     MessagingController,
   ],
   providers: [
+    PropertyDictationService,
     VisitsService,
     ModerationService,
     VideoHlsService,

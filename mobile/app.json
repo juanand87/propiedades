@@ -2,7 +2,7 @@
   "expo": {
     "name": "Proppix",
     "slug": "proppix",
-    "version": "1.0.26",
+    "version": "1.0.27",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
@@ -20,7 +20,7 @@
         "android.permission.RECORD_AUDIO",
         "android.permission.CAMERA"
       ],
-      "versionCode": 27
+      "versionCode": 28
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -44,6 +44,15 @@
           "cameraPermission": "Permite la cámara para grabar recorridos de tus propiedades.",
           "microphonePermission": "Permite el micrófono para añadir sonido al recorrido.",
           "recordAudioAndroid": true
+        }
+      ],
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "Permite el micrófono para dictar las características de una propiedad.",
+          "recordAudioAndroid": true,
+          "enableBackgroundRecording": false,
+          "enableBackgroundPlayback": false
         }
       ]
     ],

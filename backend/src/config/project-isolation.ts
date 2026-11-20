@@ -26,6 +26,7 @@ export function validateProjectEnvironment(env: Record<string, any>) {
     'USER_ONBOARDING_ENABLED',
     'GOOGLE_AUTH_ENABLED',
     'SOCIAL_VIDEOS_ENABLED',
+    'PROPERTY_DICTATION_ENABLED',
   ])
     if (![undefined, 'true', 'false'].includes(env[key]))
       throw Error(`${key} debe ser true o false.`);
@@ -157,8 +158,16 @@ export function assertConnectionAllowed(args: any[], env: Record<string, any>) {
     ['oauth2.googleapis.com', 'fcm.googleapis.com'].includes(host) &&
     Number(options?.port) === 443 &&
     !options?.path;
+  const isPropertyAI =
+    env.PROJECT_ID === 'propiedades' &&
+    env.PROPERTY_DICTATION_ENABLED === 'true' &&
+    Boolean(env.OPENAI_API_KEY) &&
+    host === 'api.openai.com' &&
+    Number(options?.port) === 443 &&
+    !options?.path;
   if (
     env.INTEGRATIONS_ENABLED !== 'true' &&
+    !isPropertyAI &&
     !isDatabase &&
     !isImageSpaces &&
     !isGoogleAuth &&
