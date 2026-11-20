@@ -111,6 +111,32 @@ describe('Property dictation proposals', () => {
     expect(conflicting.fields).toEqual({ region_id: '13' });
     expect(conflicting.warnings.length).toBeGreaterThan(0);
   });
+  it('warns about short generated text without inventing or changing facts', () => {
+    const short = 'Casa con jardín y calefacción a leña.';
+    const result = normalizeDictation(
+      { fields: { title: 'Casa', description: short } },
+      catalog,
+    );
+    expect(result.fields).toEqual({ title: 'Casa', description: short });
+    expect(result.warnings.join(' ')).toContain('8 caracteres');
+    expect(result.warnings.join(' ')).toContain('40 caracteres');
+  });
+  it('does not copy a private street address into proposed public text', () => {
+    const result = normalizeDictation(
+      {
+        fields: {
+          address: 'Calle Los Robles 123',
+          title: 'Casa en Calle Los Robles 123',
+          description: 'Casa familiar en Calle Los Robles 123.',
+        },
+      },
+      catalog,
+    );
+    expect(result.fields.address).toBe('Calle Los Robles 123');
+    expect(result.fields).not.toHaveProperty('title');
+    expect(result.fields).not.toHaveProperty('description');
+    expect(result.warnings.join(' ')).toContain('dirección exacta');
+  });
   it('rejects invalid quantities, separators, missing currency and forged types', () => {
     const result = normalizeDictation(
       {

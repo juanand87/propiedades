@@ -162,5 +162,25 @@ export function normalizeDictation(value: unknown, catalog: DictationCatalog) {
         `Comuna ambigua o no encontrada en la región: ${communeName.slice(0, 100)}. Selecciónala manualmente.`,
       );
   }
+  if (fields.address && normalize(fields.address).length >= 6) {
+    for (const key of ['title', 'description'])
+      if (
+        fields[key] &&
+        normalize(fields[key]).includes(normalize(fields.address))
+      ) {
+        delete fields[key];
+        warnings.push(
+          'La propuesta incluía la dirección exacta en un texto público. Completa ese texto manualmente sin la dirección.',
+        );
+      }
+  }
+  if (fields.title && fields.title.length < 8)
+    warnings.push(
+      'El título necesita al menos 8 caracteres. Complétalo en el formulario antes de guardar.',
+    );
+  if (fields.description && fields.description.length < 40)
+    warnings.push(
+      'La descripción necesita al menos 40 caracteres. Complétala en el formulario antes de guardar.',
+    );
   return { fields, warnings: [...new Set(warnings)].slice(0, 15) };
 }
