@@ -168,6 +168,112 @@ describe('Property dictation proposals', () => {
     expect(dictationSchema(['house']).additionalProperties).toBe(false);
     expect(() => normalizeDictation(null, catalog)).toThrow();
   });
+  it('extracts extended fields and only explicit catalog amenities', () => {
+    const c = {
+      ...catalog,
+      amenities: [
+        { id: 'pool', name: 'Piscina' },
+        { id: 'garden', name: 'Jardín' },
+        { id: 'water', name: 'Agua' },
+      ],
+    };
+    const result = normalizeDictation(
+      {
+        fields: {
+          summary: 'Resumen de prueba',
+          usable_area: '105',
+          storage_rooms: '1',
+          construction_year: '2020',
+          floors: '2',
+          floor_number: '-2',
+          condition_type: 'renovated',
+          latitude: '-41.3',
+          longitude: '-72.9',
+          common_expenses: '2.5',
+          contributions: '4',
+          expense_unit: 'UF',
+          contributions_period: 'yearly',
+          amenities: { pool: false, garden: true, water: null, forged: true },
+          show_exact_address: 'true',
+        },
+      },
+      c,
+    );
+    expect(result.fields).toMatchObject({
+      summary: 'Resumen de prueba',
+      usable_area: '105',
+      storage_rooms: '1',
+      construction_year: '2020',
+      floors: '2',
+      floor_number: '-2',
+      condition_type: 'renovated',
+      latitude: '-41.3',
+      longitude: '-72.9',
+      common_expenses: '2.5',
+      contributions: '4',
+      expense_unit: 'UF',
+      contributions_period: 'yearly',
+      'amenity:pool': 'false',
+      'amenity:garden': 'true',
+    });
+    expect(result.fields).not.toHaveProperty('amenity:water');
+    expect(result.fields).not.toHaveProperty('amenity:forged');
+    expect(result.fields).not.toHaveProperty('show_exact_address');
+  });
+  it('rejects incomplete geography and ambiguous expenses without guessing', () => {
+    const result = normalizeDictation(
+      {
+        fields: {
+          latitude: '-41.3',
+          longitude: null,
+          common_expenses: '120000',
+          contributions: '50000',
+          expense_unit: null,
+          contributions_period: null,
+          construction_year: '9999',
+          floor_number: '300',
+          condition_type: 'forged',
+        },
+      },
+      catalog,
+    );
+    expect(result.fields).toEqual({});
+    expect(result.warnings.length).toBeGreaterThan(0);
+    expect(
+      normalizeDictation(
+        { fields: { latitude: '-91', longitude: '200' } },
+        catalog,
+      ).fields,
+    ).toEqual({});
+    expect(
+      normalizeDictation(
+        { fields: { common_expenses: '0', contributions: '0' } },
+        catalog,
+      ).fields,
+    ).toEqual({ common_expenses: '0', contributions: '0' });
+    expect(
+      normalizeDictation(
+        { fields: { contributions: '4', expense_unit: 'UF' } },
+        catalog,
+      ).fields,
+    ).toEqual({ expense_unit: 'UF' });
+  });
+  it('keeps exact coordinates out of proposed public text', () => {
+    const result = normalizeDictation(
+      {
+        fields: {
+          latitude: '-41.3',
+          longitude: '-72.9',
+          summary: 'Coordenadas: -41.3, -72.9',
+          description: 'Propiedad en latitud -41.3 y longitud -72.9.',
+        },
+      },
+      catalog,
+    );
+    expect(result.fields.latitude).toBe('-41.3');
+    expect(result.fields).not.toHaveProperty('summary');
+    expect(result.fields).not.toHaveProperty('description');
+  });
   it('never contacts IA when disabled or user is not allowed', async () => {
     const fetcher = jest.spyOn(global, 'fetch');
     await expect(

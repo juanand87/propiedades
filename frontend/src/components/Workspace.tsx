@@ -752,11 +752,35 @@ function PropertyEditor({ root, id }: { root: string; id?: string }) {
         <section className="panel-card">
           <h2>01 · Lo esencial</h2>
           <PropertyDictation
-            form={form}
+            form={{
+              ...form,
+              ...Object.fromEntries(
+                catalog.amenities.map((a: any) => [
+                  "amenity:" + a.id,
+                  String(amenities.includes(a.id)),
+                ]),
+              ),
+            }}
             catalog={catalog}
-            onApply={(patch) =>
-              setForm((previous: any) => ({ ...previous, ...patch }))
-            }
+            onApply={(patch) => {
+              setForm((previous: any) => ({
+                ...previous,
+                ...Object.fromEntries(
+                  Object.entries(patch).filter(
+                    ([key]) => !key.startsWith("amenity:"),
+                  ),
+                ),
+              }));
+              setAmenities((previous) => {
+                const next = new Set(previous);
+                for (const a of catalog.amenities) {
+                  const v = patch["amenity:" + a.id];
+                  if (v === "true") next.add(a.id);
+                  else if (v === "false") next.delete(a.id);
+                }
+                return [...next];
+              });
+            }}
           />
           <p>Puedes guardar un borrador incompleto y retomarlo más adelante.</p>
           {user.role === "admin" &&

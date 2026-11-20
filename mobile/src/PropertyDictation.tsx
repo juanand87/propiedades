@@ -23,7 +23,9 @@ import { api } from "./api";
 import { KeyboardSafeView } from "./KeyboardSafeView";
 import {
   DictationDraft,
-  dictationLabels,
+  dictationLabelsFor,
+  DictationAmenity,
+  dictationEnumLabel,
   toggleDictationField,
 } from "./property-dictation";
 import { formatClpInput } from "./clp";
@@ -31,16 +33,19 @@ import { formatClpInput } from "./clp";
 export function PropertyDictation({
   token,
   current,
+  amenities = [],
   display,
   onApply,
   onClose,
 }: {
   token: string;
   current: Record<string, string>;
+  amenities?: DictationAmenity[];
   display: (key: string, value: string) => string;
   onApply: (fields: Record<string, string>, selected: string[]) => void;
   onClose: () => void;
 }) {
+  const dictationLabels = dictationLabelsFor(amenities);
   const [phase, setPhase] = useState<
     "intro" | "starting" | "recording" | "ready" | "processing" | "review"
   >("intro");
@@ -220,7 +225,7 @@ export function PropertyDictation({
   const value = (key: string, text: string) =>
     key === "price_amount" && draft?.fields.price_unit === "CLP"
       ? formatClpInput(text)
-      : display(key, text);
+      : dictationEnumLabel(key, display(key, text));
   return (
     <Modal visible animationType="slide" onRequestClose={() => void close()}>
       <SafeAreaView style={s.root}>
@@ -375,7 +380,8 @@ export function PropertyDictation({
                       <Text style={s.text}>{value(key, text)}</Text>
                       {!!current[key] && current[key] !== text && (
                         <Text style={s.previous}>
-                          Reemplazará: {display(key, current[key])}
+                          Reemplazará:{" "}
+                          {dictationEnumLabel(key, display(key, current[key]))}
                         </Text>
                       )}
                     </Pressable>

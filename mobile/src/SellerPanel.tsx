@@ -1,5 +1,9 @@
 import { PropertyDictation } from "./PropertyDictation";
-import { mergeDictatedFields } from "./property-dictation";
+import {
+  mergeDictatedFields,
+  mergeDictatedAmenities,
+  dictationEnumLabel,
+} from "./property-dictation";
 import { formatClpInput, parseClpInput } from "./clp";
 import { lightColors as videoColors } from "./video-colors";
 import { useEffect, useState } from "react";
@@ -18,6 +22,7 @@ import { File } from "expo-file-system";
 import { api, Page, Property, Session, mediaUrl } from "./api";
 type Catalog = {
   types: { id: string; name: string }[];
+  amenities: { id: string; name: string }[];
   regions: { id: number; name: string; cut_code?: string }[];
   communes: {
     id: number;
@@ -82,6 +87,7 @@ export function SellerPanel({
     [showMessages, setShowMessages] = useState(false);
   const [loadingLeads, setLoadingLeads] = useState(false);
   const [list, setList] = useState<Page<Property> | null>(null);
+  const [amenityIds, setAmenityIds] = useState<string[]>([]);
   const [dictationOpen, setDictationOpen] = useState(false);
   const token = session.access_token;
   const [linked, setLinked] = useState(false);
@@ -132,7 +138,9 @@ export function SellerPanel({
       ...(key === "region_id" ? { commune_id: "" } : {}),
     }));
   const clpPrice = (key: string) =>
-    key === "price_amount" && form.price_unit === "CLP";
+    (key === "price_amount" && form.price_unit === "CLP") ||
+    (["common_expenses", "contributions"].includes(key) &&
+      (form.expense_unit || "CLP") === "CLP");
   const field = (key: string, label: string, numeric = false) => (
     <View key={key}>
       <Text style={s.text}>{label}</Text>
@@ -142,10 +150,18 @@ export function SellerPanel({
         value={clpPrice(key) ? formatClpInput(form[key]) : form[key] || ""}
         onChangeText={(v) => set(key, clpPrice(key) ? parseClpInput(v) : v)}
         keyboardType={
-          clpPrice(key) ? "number-pad" : numeric ? "decimal-pad" : "default"
+          ["latitude", "longitude", "floor_number"].includes(key)
+            ? "default"
+            : clpPrice(key)
+              ? "number-pad"
+              : numeric
+                ? "decimal-pad"
+                : "default"
         }
         multiline={key === "description"}
-        maxLength={key === "description" ? 30000 : 180}
+        maxLength={
+          key === "description" ? 30000 : key === "summary" ? 400 : 180
+        }
       />
     </View>
   );
@@ -192,7 +208,14 @@ export function SellerPanel({
         const p = await api<{ id: string }>("/manage/properties", {
           method: "POST",
           token,
-          body: { ...form, media_ids: photos.map((p) => p.id) },
+          body: {
+            ...form,
+            show_exact_address:
+              form.show_exact_address === "true" ||
+              form.show_exact_address === "1",
+            amenity_ids: amenityIds,
+            media_ids: photos.map((p) => p.id),
+          },
         });
         id = p.id;
         setSavedId(id);
@@ -200,7 +223,14 @@ export function SellerPanel({
         await api("/manage/properties/" + id, {
           method: "PATCH",
           token,
-          body: { ...form, media_ids: photos.map((p) => p.id) },
+          body: {
+            ...form,
+            show_exact_address: ["true", "1"].includes(
+              form.show_exact_address || "",
+            ),
+            amenity_ids: amenityIds,
+            media_ids: photos.map((p) => p.id),
+          },
         });
       }
       const current = await api<{ publication_status: string }>(
@@ -296,6 +326,13 @@ export function SellerPanel({
             .map(([key, value]) => [key, String(value)]),
         ),
       );
+      setForm((old) => ({
+        ...old,
+        address: property.location?.address || "",
+        latitude: String(property.location?.latitude ?? ""),
+        longitude: String(property.location?.longitude ?? ""),
+      }));
+      setAmenityIds(property.amenities?.map((a) => a.id) || []);
       setPhotos(property.media);
       setPicker(null);
       setEditing(true);
@@ -313,24 +350,44 @@ export function SellerPanel({
         </Text>
       </View>
     );
+  const enumOptions: Record<string, { id: string; name: string }[]> = {
+    condition_type: [
+      { id: "unknown", name: "Sin especificar" },
+      { id: "new", name: "Nueva" },
+      { id: "used", name: "Usada" },
+      { id: "renovated", name: "Remodelada" },
+      { id: "project", name: "En proyecto" },
+    ],
+    contributions_period: [
+      { id: "monthly", name: "Mensual" },
+      { id: "quarterly", name: "Trimestral" },
+      { id: "yearly", name: "Anual" },
+    ],
+    expense_unit: [
+      { id: "CLP", name: "Pesos chilenos" },
+      { id: "UF", name: "UF" },
+    ],
+  };
   const options =
-    picker === "operation_type"
-      ? [
-          { id: "sale", name: "Venta" },
-          { id: "rent", name: "Arriendo" },
-        ]
-      : picker === "type_id"
-        ? catalog?.types
-        : picker === "region_id"
-          ? catalog?.regions
-          : picker === "commune_id"
-            ? catalog?.communes.filter(
-                (c) => String(c.region_id) === form.region_id,
-              )
-            : [
-                { id: "CLP", name: "Pesos chilenos" },
-                { id: "UF", name: "UF" },
-              ];
+    picker && enumOptions[picker]
+      ? enumOptions[picker]
+      : picker === "operation_type"
+        ? [
+            { id: "sale", name: "Venta" },
+            { id: "rent", name: "Arriendo" },
+          ]
+        : picker === "type_id"
+          ? catalog?.types
+          : picker === "region_id"
+            ? catalog?.regions
+            : picker === "commune_id"
+              ? catalog?.communes.filter(
+                  (c) => String(c.region_id) === form.region_id,
+                )
+              : [
+                  { id: "CLP", name: "Pesos chilenos" },
+                  { id: "UF", name: "UF" },
+                ];
   return (
     <View style={s.card}>
       <Text style={s.title}>
@@ -378,6 +435,7 @@ export function SellerPanel({
             setSavedId(null);
             setForm({ type_id: "house", price_unit: "CLP" });
             setPhotos([]);
+            setAmenityIds([]);
             setPicker(null);
             setSuccess("");
             setEditing(true);
@@ -437,6 +495,7 @@ export function SellerPanel({
             formulario.
           </Text>
           {field("title", "Título · mínimo 8 caracteres")}
+          {field("summary", "Resumen")}
           {field("description", "Descripción · mínimo 40 caracteres")}
           {(
             [
@@ -445,6 +504,9 @@ export function SellerPanel({
               "region_id",
               "commune_id",
               "price_unit",
+              "condition_type",
+              "expense_unit",
+              "contributions_period",
             ] as const
           ).map((k) => (
             <View key={k}>
@@ -455,6 +517,9 @@ export function SellerPanel({
                   region_id: "Región",
                   commune_id: "Comuna",
                   price_unit: "Moneda",
+                  condition_type: "Estado",
+                  expense_unit: "Moneda de gastos",
+                  contributions_period: "Periodicidad de contribuciones",
                 }[k] +
                   ": " +
                   ((k === "operation_type"
@@ -470,7 +535,7 @@ export function SellerPanel({
                           ? catalog?.communes.find(
                               (t) => String(t.id) === form[k],
                             )?.name
-                          : form[k]) ||
+                          : dictationEnumLabel(k, form[k] || "")) ||
                     (k === "commune_id" && !form.region_id
                       ? "Primero selecciona una región"
                       : "Seleccionar")),
@@ -515,6 +580,7 @@ export function SellerPanel({
           )}
           {field("price_amount", "Precio", true)}
           {field("built_area", "Superficie construida (m²)", true)}
+          {field("usable_area", "Superficie útil (m²)", true)}
           {field("land_area", "Terreno (m²)", true)}
           {field("neighborhood", "Sector o barrio")}
           {field(
@@ -524,6 +590,57 @@ export function SellerPanel({
           {field("bedrooms", "Dormitorios", true)}
           {field("bathrooms", "Baños", true)}
           {field("parking", "Estacionamientos", true)}
+          {field("storage_rooms", "Bodegas", true)}
+          {field("construction_year", "Año de construcción", true)}
+          {field("floors", "Pisos de la propiedad", true)}
+          {form.type_id === "apartment" &&
+            field("floor_number", "Piso de la unidad", true)}
+          {field("common_expenses", "Gastos comunes mensuales", true)}
+          {field("contributions", "Contribuciones", true)}
+          {field("latitude", "Latitud privada", true)}
+          {field("longitude", "Longitud privada", true)}
+          <Pressable
+            accessibilityRole="checkbox"
+            accessibilityState={{
+              checked: ["true", "1"].includes(form.show_exact_address || ""),
+            }}
+            onPress={() =>
+              set(
+                "show_exact_address",
+                ["true", "1"].includes(form.show_exact_address || "")
+                  ? "false"
+                  : "true",
+              )
+            }
+            style={s.input}
+          >
+            <Text style={s.text}>
+              {["true", "1"].includes(form.show_exact_address || "")
+                ? "☑"
+                : "☐"}{" "}
+              Mostrar dirección y coordenadas exactas públicamente
+            </Text>
+          </Pressable>
+          <Text style={s.text}>Características</Text>
+          {catalog?.amenities.map((a) => (
+            <Pressable
+              key={a.id}
+              accessibilityRole="checkbox"
+              accessibilityState={{ checked: amenityIds.includes(a.id) }}
+              onPress={() =>
+                setAmenityIds((old) =>
+                  old.includes(a.id)
+                    ? old.filter((id) => id !== a.id)
+                    : [...old, a.id],
+                )
+              }
+              style={s.input}
+            >
+              <Text style={s.text}>
+                {amenityIds.includes(a.id) ? "☑" : "☐"} {a.name}
+              </Text>
+            </Pressable>
+          ))}
           {photos.map((p) => (
             <View key={p.id}>
               <Image
@@ -555,7 +672,16 @@ export function SellerPanel({
       {dictationOpen && (
         <PropertyDictation
           token={token}
-          current={form}
+          current={{
+            ...form,
+            ...Object.fromEntries(
+              (catalog?.amenities || []).map((a) => [
+                "amenity:" + a.id,
+                String(amenityIds.includes(a.id)),
+              ]),
+            ),
+          }}
+          amenities={catalog?.amenities || []}
           display={(key, value) =>
             key === "type_id"
               ? catalog?.types.find((t) => t.id === value)?.name || value
@@ -573,6 +699,14 @@ export function SellerPanel({
           }
           onApply={(fields, selected) => {
             setForm((old) => mergeDictatedFields(old, fields, selected));
+            setAmenityIds((old) =>
+              mergeDictatedAmenities(
+                old,
+                fields,
+                selected,
+                catalog?.amenities || [],
+              ),
+            );
             setSuccess(
               "Datos aplicados. Revísalos en el formulario antes de guardar.",
             );

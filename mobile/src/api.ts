@@ -2,6 +2,12 @@ import { Platform } from "react-native";
 import { fetch } from "expo/fetch";
 
 export type Property = {
+  amenities?: { id: string; name: string }[];
+  location?: {
+    address?: string | null;
+    latitude?: string | number | null;
+    longitude?: string | number | null;
+  };
   id: string;
   slug: string;
   title: string;

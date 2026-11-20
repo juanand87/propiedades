@@ -1,28 +1,17 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import {
+  dictationLabelsFor,
+  dictationEnumLabel,
+  toggleDictationField,
+  dictatedPatch,
+} from "@/lib/property-dictation";
 import { request } from "@/lib/estate-api";
 type Draft = {
   transcript: string;
   fields: Record<string, string>;
   warnings: string[];
-};
-const labels: Record<string, string> = {
-  title: "Título",
-  description: "Descripción",
-  type_id: "Tipo",
-  operation_type: "Operación",
-  price_amount: "Precio",
-  price_unit: "Moneda",
-  region_id: "Región",
-  commune_id: "Comuna",
-  bedrooms: "Dormitorios",
-  bathrooms: "Baños",
-  parking: "Estacionamientos",
-  built_area: "Superficie construida (m²)",
-  land_area: "Terreno (m²)",
-  neighborhood: "Sector o barrio",
-  address: "Dirección",
 };
 export function PropertyDictation({
   form,
@@ -33,6 +22,7 @@ export function PropertyDictation({
   catalog: any;
   onApply: (fields: Record<string, string>) => void;
 }) {
+  const labels = dictationLabelsFor(catalog.amenities || []);
   const [open, setOpen] = useState(false),
     [enabled, setEnabled] = useState<boolean | null>(null),
     [phase, setPhase] = useState("intro"),
@@ -215,21 +205,7 @@ export function PropertyDictation({
     }
   }
   function toggle(key: string) {
-    const group = ["price_amount", "price_unit"].includes(key)
-      ? ["price_amount", "price_unit"]
-      : ["region_id", "commune_id"].includes(key)
-        ? ["region_id", "commune_id"]
-        : [key];
-    setSelected((old) =>
-      old.includes(key)
-        ? old.filter((k) => !group.includes(k))
-        : [
-            ...new Set([
-              ...old,
-              ...group.filter((k) => k in (draft?.fields || {})),
-            ]),
-          ],
-    );
+    setSelected((old) => toggleDictationField(old, key, draft?.fields || {}));
   }
   function display(key: string, value: unknown) {
     if (key === "type_id")
@@ -251,7 +227,7 @@ export function PropertyDictation({
       return value === "rent" ? "Arriendo" : "Venta";
     if (key === "price_amount" && draft?.fields.price_unit === "CLP")
       return Number(value).toLocaleString("es-CL");
-    return String(value);
+    return dictationEnumLabel(key, String(value));
   }
   const busy = phase === "starting" || phase === "processing";
   return (
@@ -440,25 +416,12 @@ export function PropertyDictation({
                     className="button"
                     disabled={!selected.length}
                     onClick={() => {
-                      const patch = Object.fromEntries(
-                        selected
-                          .filter((k) =>
-                            Object.prototype.hasOwnProperty.call(labels, k),
-                          )
-                          .map((k) => [k, draft.fields[k]]),
+                      const patch = dictatedPatch(
+                        form,
+                        draft.fields,
+                        selected,
+                        catalog.amenities || [],
                       );
-                      if (
-                        patch.region_id &&
-                        String(form.region_id) !== patch.region_id &&
-                        !patch.commune_id
-                      )
-                        patch.commune_id = "";
-                      if (
-                        patch.price_unit &&
-                        form.price_unit !== patch.price_unit &&
-                        !patch.price_amount
-                      )
-                        patch.price_amount = "";
                       onApply(patch);
                       close();
                     }}

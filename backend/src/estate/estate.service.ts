@@ -999,7 +999,7 @@ export class EstateService {
         summary: text(b.summary, 400) || null,
         description: text(b.description, 30000),
         type_id: typeId,
-        operation_type: choice(b.operation_type, ['sale','rent'], 'sale'),
+        operation_type: choice(b.operation_type, ['sale', 'rent'], 'sale'),
         price_unit: choice(b.price_unit, ['CLP', 'UF'], 'CLP'),
         region_id: integer(b.region_id, 999),
         commune_id: integer(b.commune_id, 99999),
@@ -1018,7 +1018,12 @@ export class EstateService {
           'quarterly',
         ),
       };
-      for (const f of decimalFields) data[f] = decimal(b[f], f);
+      for (const f of decimalFields)
+        data[f] =
+          ['common_expenses', 'contributions'].includes(f) &&
+          /^0(?:\.0+)?$/.test(String(b[f]))
+            ? '0'
+            : decimal(b[f], f);
       for (const f of numericFields) {
         if (
           f === 'floor_number' &&
