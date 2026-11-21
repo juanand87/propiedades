@@ -12,6 +12,7 @@ import {
   ServiceUnavailableException,
   UnauthorizedException,
   ForbiddenException,
+  Optional,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
@@ -37,6 +38,7 @@ import { VideoStorageService } from './video-storage.service';
 import { videoVisible, videoJoined } from './video-visibility';
 export { videoVisible, videoJoined } from './video-visibility';
 import { VideoHlsService } from './video-hls.service';
+import { PropertyVideoPublicationService } from './property-video-publication.service';
 const visible = videoVisible,
   joined = videoJoined;
 @Injectable()
@@ -50,6 +52,7 @@ export class PropertyVideosService {
     private storage: VideoStorageService,
     private jwt: JwtService,
     private hls: VideoHlsService,
+    @Optional() private videoPublication?: PropertyVideoPublicationService,
   ) {}
   private guard() {
     assertPropertyVideos(
@@ -86,6 +89,9 @@ export class PropertyVideosService {
       return {
         enabled: true,
         hls: await this.hls.available(),
+        automatic_property_publication: this.videoPublication
+          ? await this.videoPublication.available(this.db)
+          : false,
         storage: this.storage.enabled ? 'spaces' : 'local',
         version: 1,
         inline_covers: true,
@@ -221,8 +227,10 @@ export class PropertyVideosService {
   async list(actor: Actor, id: string) {
     this.guard();
     await this.estate.get(uuid(id), actor);
+    const automatic =
+      this.videoPublication && (await this.videoPublication.available(this.db));
     return this.db.query(
-      "SELECT v.id,v.property_id,v.title,v.status,v.size_bytes,v.created_at,r.duration_ms,r.capture_seconds FROM property_videos v LEFT JOIN property_video_recordings r ON r.video_id=v.id WHERE v.property_id=? AND v.status<>'archived' ORDER BY v.created_at DESC,v.id",
+      `SELECT v.id,v.property_id,v.title,v.status,v.size_bytes,v.created_at,r.duration_ms,r.capture_seconds,${automatic ? 'EXISTS(SELECT 1 FROM estate_property_video_publication intent WHERE intent.video_id=v.id AND intent.property_id=v.property_id)' : '0'} publish_with_property FROM property_videos v LEFT JOIN property_video_recordings r ON r.video_id=v.id WHERE v.property_id=? AND v.status<>'archived' ORDER BY v.created_at DESC,v.id`,
       [id],
     );
   }
@@ -576,6 +584,8 @@ export class PropertyVideosService {
         'UPDATE property_videos SET title=?,status=?,updated_at=NOW() WHERE id=?',
         [title, status, id],
       );
+      if (body.status !== undefined)
+        await this.videoPublication?.cancel(tx, id);
       if (status === 'archived' && this.storage.enabled)
         await tx.query(
           "UPDATE property_video_objects SET status='pending_delete' WHERE video_id=? AND status='ready'",

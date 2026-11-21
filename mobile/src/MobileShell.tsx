@@ -1512,12 +1512,10 @@ function AppContent() {
                 sourceTitle={sourceTitle}
                 propertyMode={propertyMode}
                 onReturn={() =>
-                  router.canGoBack()
-                    ? router.back()
-                    : router.replace({
-                        pathname: "/",
-                        params: { resumeVideoId: videoId },
-                      })
+                  router.replace({
+                    pathname: "/",
+                    params: { resumeVideoId: videoId },
+                  })
                 }
                 onChanged={() => void loadMine()}
               />

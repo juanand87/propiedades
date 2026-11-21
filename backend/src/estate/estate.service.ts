@@ -18,6 +18,7 @@ import { ImageStorageService } from './image-storage.service';
 import { VideoStorageService } from './video-storage.service';
 import { ConfigService } from '@nestjs/config';
 import { ReviewMailService } from './review-mail.service';
+import { PropertyVideoPublicationService } from './property-video-publication.service';
 import * as bcrypt from 'bcrypt';
 import sharp from 'sharp';
 import { DEMO_ADVERTISER_ID } from './demo-properties';
@@ -105,6 +106,7 @@ export class EstateService {
     @Optional() private videos?: VideoStorageService,
     @Optional() private config?: ConfigService,
     @Optional() private reviewMail?: ReviewMailService,
+    @Optional() private videoPublication?: PropertyVideoPublicationService,
   ) {}
   private attempts = new Map<string, { n: number; reset: number }>();
   get onboardingEnabled() {
@@ -1272,7 +1274,11 @@ export class EstateService {
         [next, reason || null, isAdmin(u) ? u.id : null, next, id],
       );
       await this.history(m, id, u.id, p.publication_status, next, reason);
-      return { success: true };
+      const videosPublished =
+        next === 'published'
+          ? (await this.videoPublication?.approve(m, id)) || 0
+          : 0;
+      return { success: true, videos_published: videosPublished };
     });
   }
   async availability(u: Actor, id: string, b: any) {

@@ -298,17 +298,19 @@ export function SellerPanel({
           token,
           body: { status: "draft" },
         });
+      // Register the source video before submission, so approval cannot race the link.
+      if (pendingVideoId && (sendForReview || !linked))
+        await linkVideo(id, sendForReview);
       if (sendForReview && current.publication_status !== "pending_review")
         await api("/manage/properties/" + id + "/status", {
           method: "PATCH",
           token,
           body: { status: "pending_review" },
         });
-      if (pendingVideoId && !linked) await linkVideo(id);
       setSuccess(
         pendingVideoId
           ? sendForReview
-            ? "Video vinculado. La propiedad fue enviada a revisión."
+            ? "La propiedad fue enviada a revisión. Al aprobarla, la propiedad y este video se publicarán juntos."
             : "Video vinculado. Los datos de la propiedad quedaron como borrador."
           : sendForReview
             ? "Tu propiedad fue enviada a revisión. Al aprobarla aparecerá en el recorrido."
@@ -326,12 +328,12 @@ export function SellerPanel({
       setBusy(false);
     }
   }
-  async function linkVideo(id: string) {
+  async function linkVideo(id: string, publishWithProperty = false) {
     if (!pendingVideoId) return;
     await api(`/manage/videos/${pendingVideoId}/property`, {
       method: "POST",
       token,
-      body: { property_id: id },
+      body: { property_id: id, publish_with_property: publishWithProperty },
     });
     setLinked(true);
     onChanged();

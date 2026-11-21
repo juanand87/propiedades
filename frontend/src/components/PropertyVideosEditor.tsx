@@ -8,6 +8,7 @@ type ManagedVideo = {
   title: string;
   status: "draft" | "published";
   duration_ms: number | null;
+  publish_with_property?: boolean | number;
 };
 
 export function PropertyVideosEditor({ propertyId }: { propertyId?: string }) {
@@ -103,9 +104,9 @@ export function PropertyVideosEditor({ propertyId }: { propertyId?: string }) {
         )}
       </div>
       <p>
-        Revisa los videos grabados desde Android y elige cuáles publicar. Para
-        publicarlos, la propiedad debe estar publicada y el anunciante aprobado
-        y activo.
+        El video preparado desde la app para publicarse con la propiedad se
+        publicará automáticamente al aprobarla. También puedes gestionar aquí
+        los estados de los videos manualmente.
       </p>
       {error && (
         <div className="notice error" role="alert">
@@ -137,6 +138,10 @@ export function PropertyVideosEditor({ propertyId }: { propertyId?: string }) {
                 ? ` · ${Math.round(video.duration_ms / 1000)} s`
                 : ""}
             </p>
+            {Boolean(video.publish_with_property) &&
+              video.status === "draft" && (
+                <p>Se publicará automáticamente al aprobar la propiedad.</p>
+              )}
             {preview?.id === video.id && (
               <video
                 key={preview.url}

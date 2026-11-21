@@ -1,5 +1,6 @@
 import { PropertyDictationService } from './property-dictation.service';
 import { ReviewMailService } from './review-mail.service';
+import { PropertyVideoPublicationService } from './property-video-publication.service';
 import { ReviewMailController } from './review-mail.controller';
 import { PropertyDictationController } from './property-dictation.controller';
 import { Module } from '@nestjs/common';
@@ -66,6 +67,7 @@ import {
     MessagingController,
   ],
   providers: [
+    PropertyVideoPublicationService,
     ReviewMailService,
     PropertyDictationService,
     VisitsService,

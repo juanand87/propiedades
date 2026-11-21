@@ -1,5 +1,6 @@
 import { profileIdentity } from './profile-identity';
 import { ModerationService } from './moderation.service';
+import { PropertyVideoPublicationService } from './property-video-publication.service';
 import { notBlocked, notHidden } from './moderation-rules';
 import {
   BadRequestException,
@@ -8,6 +9,7 @@ import {
   Injectable,
   NotFoundException,
   ServiceUnavailableException,
+  Optional,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { DataSource } from 'typeorm';
@@ -32,6 +34,7 @@ export class VideoSocialService {
     private push: PushService,
     private activity: ActivityService,
     private moderation: ModerationService,
+    @Optional() private videoPublication?: PropertyVideoPublicationService,
   ) {}
   private identityReady = false;
   async identitiesAvailable() {
@@ -515,17 +518,31 @@ export class VideoSocialService {
     });
     return this.comments(id, actor);
   }
-  async link(actor: Actor, id: string, propertyId: unknown) {
+  async link(
+    actor: Actor,
+    id: string,
+    propertyId: unknown,
+    publishWithProperty?: unknown,
+  ) {
+    if (
+      publishWithProperty !== undefined &&
+      typeof publishWithProperty !== 'boolean'
+    )
+      throw new BadRequestException(
+        'La opción de publicación debe ser verdadera o falsa.',
+      );
     const video = await this.access(id, actor);
     if (video.created_by !== actor.id && actor.role !== 'admin')
       throw new ForbiddenException('Solo puedes editar tus videos.');
     const target = propertyId === null ? null : uuid(propertyId);
     if (target) await this.estate.get(target, actor);
     await this.db.transaction(async (tx) => {
-      if (target)
-        await tx.query('SELECT id FROM properties WHERE id=? FOR UPDATE', [
-          target,
-        ]);
+      const [property] = target
+        ? await tx.query(
+            'SELECT id,publication_status FROM properties WHERE id=? FOR UPDATE',
+            [target],
+          )
+        : [];
       const [current] = await tx.query(
         'SELECT created_by,status,property_id FROM property_videos WHERE id=? FOR UPDATE',
         [id],
@@ -542,6 +559,14 @@ export class VideoSocialService {
       await tx.query(
         'UPDATE property_videos SET property_id=?,status=?,updated_at=UTC_TIMESTAMP() WHERE id=?',
         [target, status, id],
+      );
+      await this.videoPublication?.link(
+        tx,
+        id,
+        target,
+        actor.id,
+        property?.publication_status,
+        publishWithProperty === true,
       );
     });
     return this.details(id, actor);

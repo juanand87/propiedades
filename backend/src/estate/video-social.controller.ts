@@ -127,7 +127,12 @@ export class VideoSocialController {
   @Post('manage/videos/:id/property')
   @UseGuards(EstateGuard)
   link(@Param('id') id: string, @Body() body: any, @Req() req: any) {
-    return this.social.link(req.user, id, body.property_id);
+    return this.social.link(
+      req.user,
+      id,
+      body.property_id,
+      body.publish_with_property,
+    );
   }
   @Get('videos/:id/download')
   @UseGuards(EstateGuard)
