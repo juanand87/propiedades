@@ -1,5 +1,6 @@
 -- Ejecutar en propiedades antes del despliegue. Repetible.
 -- No publica ni cambia videos existentes.
+USE propiedades;
 CREATE TABLE IF NOT EXISTS estate_property_video_publication (
   video_id VARCHAR(36) NOT NULL PRIMARY KEY,
   property_id VARCHAR(36) NOT NULL,
