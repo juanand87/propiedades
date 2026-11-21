@@ -32,6 +32,7 @@ import { PropertyDictation } from "./PropertyDictation";
 import { PropertyVideosEditor } from "./PropertyVideosEditor";
 import { VisitsAgenda } from "./VisitsAgenda";
 import { ModerationAdmin } from "./ModerationAdmin";
+import { MailAdmin } from "./MailAdmin";
 
 function useLoad(path: string) {
   const [data, setData] = useState<any>(null),
@@ -132,6 +133,7 @@ export function Workspace({ path }: { path: string[] }) {
           { href: "ejemplos", name: "Propiedades de ejemplo", icon: Images },
           { href: "catalogos", name: "Tipos y ubicaciones", icon: ListFilter },
           { href: "diseno", name: "Diseño del sitio", icon: Images },
+          { href: "correos", name: "Correos y SMTP", icon: Settings },
           {
             href: "configuracion",
             name: "Configuración del sitio",
@@ -223,6 +225,8 @@ export function Workspace({ path }: { path: string[] }) {
           )
         ) : section === "diseno" && isAdmin ? (
           <DesignAdmin />
+        ) : section === "correos" && isAdmin ? (
+          <MailAdmin />
         ) : section === "configuracion" && isAdmin ? (
           <SettingsAdmin />
         ) : section === "" ? (

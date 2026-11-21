@@ -1,4 +1,6 @@
 import { PropertyDictationService } from './property-dictation.service';
+import { ReviewMailService } from './review-mail.service';
+import { ReviewMailController } from './review-mail.controller';
 import { PropertyDictationController } from './property-dictation.controller';
 import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
@@ -48,6 +50,7 @@ import {
     }),
   ],
   controllers: [
+    ReviewMailController,
     PropertyDictationController,
     VisitsController,
     ModerationController,
@@ -63,6 +66,7 @@ import {
     MessagingController,
   ],
   providers: [
+    ReviewMailService,
     PropertyDictationService,
     VisitsService,
     ModerationService,

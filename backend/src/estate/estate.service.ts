@@ -17,6 +17,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { ImageStorageService } from './image-storage.service';
 import { VideoStorageService } from './video-storage.service';
 import { ConfigService } from '@nestjs/config';
+import { ReviewMailService } from './review-mail.service';
 import * as bcrypt from 'bcrypt';
 import sharp from 'sharp';
 import { DEMO_ADVERTISER_ID } from './demo-properties';
@@ -103,6 +104,7 @@ export class EstateService {
     @Optional() private images?: ImageStorageService,
     @Optional() private videos?: VideoStorageService,
     @Optional() private config?: ConfigService,
+    @Optional() private reviewMail?: ReviewMailService,
   ) {}
   private attempts = new Map<string, { n: number; reset: number }>();
   get onboardingEnabled() {
@@ -1187,7 +1189,7 @@ export class EstateService {
       return { id };
     });
   }
-  private history(
+  private async history(
     m: EntityManager,
     id: string,
     actor: string,
@@ -1195,10 +1197,12 @@ export class EstateService {
     next: string,
     note: string,
   ) {
-    return m.query(
+    await m.query(
       'INSERT INTO property_status_history(id,property_id,actor_id,previous_status,next_status,note) VALUES (?,?,?,?,?,?)',
       [randomUUID(), id, actor, previous, next, note || null],
     );
+    if (next === 'pending_review' && previous !== next)
+      await this.reviewMail?.enqueue(m, id);
   }
   async setStatus(u: Actor, id: string, b: any) {
     return this.db.transaction(async (m) => {

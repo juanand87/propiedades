@@ -6,6 +6,19 @@ import { videoSpacesConfig } from './video-spaces';
 const inheritedResource =
   /mundobeat|clownfish-app-x3a5k|tiendas-chi|marketplace_music/i;
 
+// Only the SMTP service can temporarily approve its resolved destination.
+// This does not enable the other external integrations.
+const smtpDestinations = new Map<string, number>();
+export function allowSmtpDestination(host: string, port: number) {
+  const key = host.toLowerCase() + ':' + port;
+  smtpDestinations.set(key, (smtpDestinations.get(key) || 0) + 1);
+  return () => {
+    const n = (smtpDestinations.get(key) || 1) - 1;
+    if (n) smtpDestinations.set(key, n);
+    else smtpDestinations.delete(key);
+  };
+}
+
 function isApprovedSharedDatabase(env: Record<string, any>) {
   return (
     env.PROJECT_ID === 'propiedades' &&
@@ -165,13 +178,18 @@ export function assertConnectionAllowed(args: any[], env: Record<string, any>) {
     host === 'api.openai.com' &&
     Number(options?.port) === 443 &&
     !options?.path;
+  const isConfiguredSmtp =
+    env.PROJECT_ID === 'propiedades' &&
+    !options?.path &&
+    smtpDestinations.has(host + ':' + Number(options?.port));
   if (
     env.INTEGRATIONS_ENABLED !== 'true' &&
     !isPropertyAI &&
     !isDatabase &&
     !isImageSpaces &&
     !isGoogleAuth &&
-    !isFirebaseMessaging
+    !isFirebaseMessaging &&
+    !isConfiguredSmtp
   ) {
     throw new Error('Integraciones externas deshabilitadas en Propiedades.');
   }
