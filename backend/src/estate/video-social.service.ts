@@ -417,12 +417,14 @@ export class VideoSocialService {
     const other = following ? 'followed_id' : 'follower_id';
     const owner = following ? 'follower_id' : 'followed_id';
     const search = text(query, 100);
+    const displayName =
+      'COALESCE(p.display_name,CONVERT(u.firstName USING utf8mb4) COLLATE utf8mb4_unicode_ci)';
     const rows = await this.db.query(
-      `SELECT u.id,p.avatar_media_id,COALESCE(p.display_name,u.firstName) display_name
+      `SELECT u.id,p.avatar_media_id,${displayName} display_name
        FROM estate_video_follows f
        JOIN users u ON CONVERT(u.id USING utf8mb4) COLLATE utf8mb4_unicode_ci=f.${other}
        LEFT JOIN estate_video_profiles p ON p.user_id=f.${other}
-       WHERE f.${owner}=? AND u.isActive=1 AND LOCATE(?,COALESCE(p.display_name,u.firstName))>0 ${actor ? 'AND ' + notBlocked('?', 'u.id') : ''}
+       WHERE f.${owner}=? AND u.isActive=1 AND LOCATE(?,${displayName})>0 ${actor ? 'AND ' + notBlocked('?', 'CONVERT(u.id USING utf8mb4) COLLATE utf8mb4_unicode_ci') : ''}
        ORDER BY f.created_at DESC,f.${other} LIMIT 25 OFFSET ?`,
       [id, search, ...(actor ? [actor.id, actor.id] : []), (page - 1) * 24],
     );
