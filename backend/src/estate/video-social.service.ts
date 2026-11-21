@@ -527,17 +527,21 @@ export class VideoSocialService {
           target,
         ]);
       const [current] = await tx.query(
-        'SELECT created_by,status FROM property_videos WHERE id=? FOR UPDATE',
+        'SELECT created_by,status,property_id FROM property_videos WHERE id=? FOR UPDATE',
         [id],
       );
       if (!current || current.status === 'archived')
         throw new NotFoundException('Video no disponible.');
       if (current.created_by !== actor.id && actor.role !== 'admin')
         throw new ForbiddenException();
-      // Linking is an explicit edit; review publication separately rather than exposing a draft property.
+      // Linking keeps the user's publication choice. Public access still requires
+      // the linked property to be approved (videoVisible). Unlinking an existing
+      // property requires an explicit publication again as a standalone video.
+      const status =
+        target === null && current.property_id ? 'draft' : current.status;
       await tx.query(
-        "UPDATE property_videos SET property_id=?,status='draft' WHERE id=?",
-        [target, id],
+        'UPDATE property_videos SET property_id=?,status=?,updated_at=UTC_TIMESTAMP() WHERE id=?',
+        [target, status, id],
       );
     });
     return this.details(id, actor);

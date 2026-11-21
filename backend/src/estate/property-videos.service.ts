@@ -102,6 +102,7 @@ export class PropertyVideosService {
     const type =
       typeof q.type_id === 'string' && q.type_id.length <= 30 ? q.type_id : '';
     const videoId = q.video_id ? uuid(q.video_id) : null;
+    const propertyId = q.property_id ? uuid(q.property_id) : null;
     const seed = q.seed ? uuid(q.seed) : null;
     const search = text(q.search, 100).trim();
     const pattern = '%' + search.replace(/[!%_]/g, (char) => '!' + char) + '%';
@@ -109,11 +110,13 @@ export class PropertyVideosService {
         (type ? ' AND p.type_id=?' : '') +
         (q.linked_only === 'true' ? ' AND v.property_id IS NOT NULL' : '') +
         (videoId ? ' AND v.id=?' : '') +
+        (propertyId ? ' AND v.property_id=?' : '') +
         (search ? " AND v.title LIKE ? ESCAPE '!'" : '') +
         (actor ? ' AND ' + notBlocked('?', 'v.created_by') : ''),
       params = [
         ...(type ? [type] : []),
         ...(videoId ? [videoId] : []),
+        ...(propertyId ? [propertyId] : []),
         ...(search ? [pattern] : []),
         ...(actor ? [actor.id, actor.id] : []),
       ];

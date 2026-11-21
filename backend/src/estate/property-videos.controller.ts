@@ -44,6 +44,12 @@ export class PropertyVideosController {
   @Get('videos/capabilities') capabilities() {
     return this.videos.capabilities();
   }
+  @Get('properties/:id/videos') publicPropertyVideos(
+    @Param('id') id: string,
+    @Query('page') page: string,
+  ) {
+    return this.videos.feed({ property_id: id, limit: 20, page });
+  }
   @Get('videos/:id/content') content(
     @Param('id') id: string,
     @Req() req: any,

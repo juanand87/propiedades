@@ -2775,3 +2775,26 @@ td select {
   flex-wrap: wrap;
   gap: 10px;
 }
+.property-public-videos {
+  margin: 24px 0;
+}
+.property-public-videos h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.property-public-video {
+  display: block;
+  width: 100%;
+  height: clamp(300px, 65vh, 580px);
+  object-fit: contain;
+  background: #061831;
+  border-radius: 16px;
+}
+.property-video-choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0;
+}

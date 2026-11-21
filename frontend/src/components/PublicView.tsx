@@ -1,4 +1,5 @@
 "use client";
+import { PropertyPublicVideos } from "./PropertyPublicVideos";
 import Link from "next/link";
 import { Fragment, useEffect, useRef, useState } from "react";
 import { siteDesign } from "@/lib/site-design";
@@ -987,6 +988,7 @@ export function Detail({
               </button>
             ))}
           </div>
+          <PropertyPublicVideos key={p.id} propertyId={p.id} />
           <div className="detail-metrics">
             {metrics
               .filter((m) => m[1] !== null)
