@@ -34,13 +34,18 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { useRouter, usePreventRemove } from "expo-router";
+import {
+  uploadVideo,
+  type VideoUploadProgress as UploadProgress,
+} from "./video-upload";
+import { VideoUploadProgress } from "./VideoUploadProgress";
 import { StatusBar } from "expo-status-bar";
 import { useVideoPlayer } from "expo-video";
 import * as ImagePicker from "expo-image-picker";
 import { File } from "expo-file-system";
 import { randomUUID } from "expo-crypto";
-import { api, mediaUrl, Page, Session } from "./api";
+import { api, ApiError, mediaUrl, Page, Session } from "./api";
 import { ProfileVideo, VideoProfileData } from "./social-types";
 import { SocialVideoActions } from "./SocialVideoActions";
 import { SellerPanel } from "./SellerPanel";
@@ -316,6 +321,12 @@ export function VideoProfile({
   const [asset, setAsset] = useState<ImagePicker.ImagePickerAsset | null>(null),
     [title, setTitle] = useState(""),
     [uploadId, setUploadId] = useState("");
+  const [uploadProgress, setUploadProgress] = useState<UploadProgress | null>(
+    null,
+  );
+  const [uploadAttempt, setUploadAttempt] = useState(false);
+  const uploadLock = useRef(false);
+  const releaseUploadGuard = usePreventRemove(uploadProgress !== null);
   const [changed, setChanged] = useState(false);
   const load = useCallback(
     async (next = 1, signal?: AbortSignal) => {
@@ -350,7 +361,7 @@ export function VideoProfile({
         if (!signal?.aborted) setLoading(false);
       }
     },
-    [target, token, section, session],
+    [target, token, section, session, setProfile],
   );
   useEffect(() => {
     const controller = new AbortController();
@@ -425,30 +436,66 @@ export function VideoProfile({
       setAsset(file);
       setTitle("Mi nuevo video");
       setUploadId(randomUUID());
+      setUploadAttempt(false);
     });
   }
   async function upload() {
-    if (!asset || !title.trim()) return;
-    await run(async () => {
-      const fd = new FormData();
-      fd.append("file", new File(asset.uri));
-      fd.append("title", title);
-      fd.append("request_id", uploadId);
-      const result = await api<{ id: string }>("/manage/videos", {
-        method: "POST",
-        token,
-        body: fd,
+    if (!asset || !title.trim() || busy || uploadLock.current) return;
+    uploadLock.current = true;
+    try {
+      await run(async () => {
+        setUploadAttempt(true);
+        setUploadProgress({ phase: "connecting", sent: 0, total: 0 });
+        const result = await uploadVideo<{ id: string }>({
+          path: "/manage/videos",
+          uri: asset.uri,
+          token: token!,
+          parameters: { title, request_id: uploadId },
+          onProgress: setUploadProgress,
+        }).catch((error: unknown) => {
+          if (
+            error instanceof ApiError &&
+            error.status >= 400 &&
+            error.status < 500 &&
+            ![408, 409, 429].includes(error.status)
+          )
+            setUploadAttempt(false);
+          throw error;
+        });
+        if (!result.id)
+          throw Error("No se confirmó el guardado. Puedes reintentar.");
+        setUploadProgress(null);
+        releaseUploadGuard();
+        setAsset(null);
+        setUploadAttempt(false);
+        refreshQuota((n) => n + 1);
+        await load();
+        Alert.alert(
+          "Video guardado",
+          "Está en tu galería como borrador. Puedes publicarlo o vincularlo después a una propiedad.",
+        );
       });
-      if (!result.id)
-        throw Error("No se confirmó el guardado. Puedes reintentar.");
+    } finally {
+      uploadLock.current = false;
+      setUploadProgress(null);
+    }
+  }
+  function closeUpload() {
+    if (busy || uploadLock.current) return;
+    const close = () => {
       setAsset(null);
-      refreshQuota((n) => n + 1);
-      await load();
+      setUploadAttempt(false);
+    };
+    if (uploadAttempt)
       Alert.alert(
-        "Video guardado",
-        "Está en tu galería como borrador. Puedes publicarlo o vincularlo después a una propiedad.",
+        "¿Cerrar la carga?",
+        "La última carga no se confirmó. Revisa Mis videos antes de volver a subirlo.",
+        [
+          { text: "Seguir aquí", style: "cancel" },
+          { text: "Cerrar", onPress: close },
+        ],
       );
-    });
+    else close();
   }
   function closeViewer() {
     setViewer(null);
@@ -1076,29 +1123,49 @@ export function VideoProfile({
         visible={!!asset}
         transparent
         animationType="slide"
-        onRequestClose={() => {
-          if (!busy) setAsset(null);
-        }}
+        onRequestClose={closeUpload}
       >
-        <View style={s.overlay}>
-          <View style={s.dialog}>
-            <Text style={s.title}>Nuevo video</Text>
-            <Text style={s.muted}>No necesitas elegir una propiedad.</Text>
-            <TextInput
-              accessibilityLabel="Título del video"
-              value={title}
-              onChangeText={setTitle}
-              style={s.input}
-              maxLength={160}
-            />
-            {button(
-              busy ? "Subiendo…" : "Guardar video en mi galería",
-              () => void upload(),
-            )}
-            {error && <Text style={s.error}>{error}</Text>}
-            {button("Cancelar", () => setAsset(null), true)}
+        {uploadProgress ? (
+          <VideoUploadProgress progress={uploadProgress} embedded />
+        ) : (
+          <View style={s.overlay}>
+            <View style={s.dialog}>
+              <Text style={s.title}>Nuevo video</Text>
+              <Text style={s.muted}>No necesitas elegir una propiedad.</Text>
+              <TextInput
+                accessibilityLabel="Título del video"
+                value={title}
+                editable={!busy && !uploadAttempt}
+                onChangeText={setTitle}
+                style={s.input}
+                maxLength={160}
+              />
+              <Pressable
+                accessibilityRole="button"
+                disabled={busy}
+                onPress={() => void upload()}
+                style={s.button}
+              >
+                <Text style={s.buttonText}>
+                  {busy
+                    ? "Subiendo…"
+                    : uploadAttempt
+                      ? "Reintentar carga"
+                      : "Guardar video en mi galería"}
+                </Text>
+              </Pressable>
+              {error && <Text style={s.error}>{error}</Text>}
+              <Pressable
+                accessibilityRole="button"
+                disabled={busy}
+                onPress={closeUpload}
+                style={[s.button, s.secondary]}
+              >
+                <Text style={[s.buttonText, s.light]}>Cancelar</Text>
+              </Pressable>
+            </View>
           </View>
-        </View>
+        )}
       </Modal>
     </View>
   );

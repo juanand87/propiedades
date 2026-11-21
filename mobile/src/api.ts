@@ -1,5 +1,6 @@
 import { Platform } from "react-native";
 import { fetch } from "expo/fetch";
+import { connectionMessage, isNetworkFailure } from "./network-error";
 
 export type Property = {
   amenities?: { id: string; name: string }[];
@@ -131,6 +132,13 @@ export function setSessionRefresher(
 ) {
   sessionRefresher = handler;
 }
+export async function refreshAccessToken(token: string) {
+  if (!sessionRefresher) return null;
+  renewingSession ??= sessionRefresher(token).finally(() => {
+    renewingSession = undefined;
+  });
+  return renewingSession;
+}
 export async function api<T>(
   path: string,
   options: {
@@ -178,10 +186,7 @@ export async function api<T>(
       options.retrySession !== false &&
       sessionRefresher
     ) {
-      renewingSession ??= sessionRefresher(options.token).finally(() => {
-        renewingSession = undefined;
-      });
-      const renewed = await renewingSession;
+      const renewed = await refreshAccessToken(options.token);
       if (renewed) {
         clearTimeout(timer);
         return await api<T>(path, {
@@ -227,10 +232,10 @@ export async function api<T>(
       throw new Error(
         "La conexión se canceló o tardó demasiado. Intenta nuevamente.",
       );
-    if (e instanceof TypeError)
+    if (isNetworkFailure(e))
       throw new Error(
         production
-          ? "No hay conexión con Proppix. Revisa tu conexión e intenta nuevamente."
+          ? connectionMessage
           : "No hay conexión con la API local. Inicia npm run mobile:backend desde la raíz.",
       );
     throw e;

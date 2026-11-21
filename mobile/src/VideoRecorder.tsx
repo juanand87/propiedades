@@ -22,8 +22,13 @@ import {
 import { File } from "expo-file-system";
 import { randomUUID } from "expo-crypto";
 import { useVideoPlayer, VideoView } from "expo-video";
-import { useRouter } from "expo-router";
+import { useRouter, usePreventRemove } from "expo-router";
 import { api, ApiError, Property, Session, IS_PRODUCTION } from "./api";
+import {
+  uploadVideo,
+  type VideoUploadProgress as UploadProgress,
+} from "./video-upload";
+import { VideoUploadProgress } from "./VideoUploadProgress";
 
 type Clip = {
   uri: string;
@@ -117,6 +122,10 @@ export function VideoRecorder({
     [foreground, setForeground] = useState(AppState.currentState === "active"),
     [attempt, setAttempt] = useState<"published" | "draft" | null>(null);
   const [reload, setReload] = useState(0);
+  const [uploadProgress, setUploadProgress] = useState<UploadProgress | null>(
+    null,
+  );
+  const releaseUploadGuard = usePreventRemove(phase === "uploading");
   function stop() {
     if (!recording.current) return;
     try {
@@ -298,25 +307,34 @@ export function VideoRecorder({
     uploading.current = true;
     setAttempt(mode);
     setPhase("uploading");
+    setUploadProgress({ phase: "connecting", sent: 0, total: 0 });
     setError("");
     try {
-      const form = new FormData();
-      form.append("title", title.trim());
-      form.append("capture_seconds", String(clip.limit));
-      form.append("request_id", clip.requestId);
-      form.append("publish", String(publish));
-      form.append("file", new File(clip.uri));
-      const value = await api<{ id: string; status: string }>(
-        property
+      const value = await uploadVideo<{ id: string; status: string }>({
+        path: property
           ? `/manage/properties/${property.id}/videos`
           : "/manage/videos",
-        { method: "POST", token: session.access_token, body: form },
-      );
+        uri: clip.uri,
+        token: session.access_token,
+        parameters: {
+          title: title.trim(),
+          capture_seconds: String(clip.limit),
+          request_id: clip.requestId,
+          publish: String(publish),
+        },
+        onProgress: (progress) => {
+          if (alive.current) setUploadProgress(progress);
+        },
+      });
       if (!alive.current) return;
       if (value.status !== mode)
         throw new Error(
           "El video ya existe con otro estado. Revísalo en Mis videos.",
         );
+      setUploadProgress(null);
+      setPhase("preview");
+      uploading.current = false;
+      releaseUploadGuard();
       if (!property) {
         if (publish) onPublished();
         else onSaved();
@@ -365,6 +383,7 @@ export function VideoRecorder({
       }
     } finally {
       uploading.current = false;
+      if (alive.current) setUploadProgress(null);
     }
   }
   if (!session)
@@ -408,88 +427,93 @@ export function VideoRecorder({
     );
   if (clip)
     return (
-      <ScrollView style={styles.review} keyboardShouldPersistTaps="handled">
-        <Text style={styles.eyebrow}>REVISA Y PUBLICA</Text>
-        <Text style={styles.heading}>Tu propiedad, en movimiento</Text>
-        <Preview uri={clip.uri} active={foreground && phase === "preview"} />
-        <Text style={styles.property}>
-          {property?.title || "Video de tu perfil"}
-        </Text>
-        <Text style={styles.body}>
-          Modo {clip.limit} s · {(clip.size / 1024 / 1024).toFixed(1)} MB ·
-          {property
-            ? "Vinculado a esta propiedad"
-            : "Sin propiedad vinculada · puedes enlazarlo después"}
-        </Text>
-        <Text style={styles.label}>Título del video</Text>
-        <TextInput
-          accessibilityLabel="Título del video grabado"
-          value={title}
-          onChangeText={setTitle}
-          maxLength={160}
-          editable={phase !== "uploading" && !attempt}
-          style={styles.input}
-        />
-        {!!error && (
-          <Text accessibilityLiveRegion="polite" style={styles.error}>
-            {error}
+      <>
+        <VideoUploadProgress progress={uploadProgress} />
+        <ScrollView style={styles.review} keyboardShouldPersistTaps="handled">
+          <Text style={styles.eyebrow}>REVISA Y PUBLICA</Text>
+          <Text style={styles.heading}>Tu propiedad, en movimiento</Text>
+          <Preview uri={clip.uri} active={foreground && phase === "preview"} />
+          <Text style={styles.property}>
+            {property?.title || "Video de tu perfil"}
           </Text>
-        )}
-        {property && property.publication_status !== "published" && (
-          <Text style={styles.error}>
-            La propiedad aún no está publicada. Puedes guardar el video como
-            borrador.
+          <Text style={styles.body}>
+            Modo {clip.limit} s · {(clip.size / 1024 / 1024).toFixed(1)} MB ·
+            {property
+              ? "Vinculado a esta propiedad"
+              : "Sin propiedad vinculada · puedes enlazarlo después"}
           </Text>
-        )}
-        <Action
-          label={
-            phase === "uploading"
-              ? "Subiendo y guardando…"
-              : attempt === "published"
-                ? "Reintentar publicación"
-                : "Publicar ahora"
-          }
-          disabled={
-            phase === "uploading" ||
-            !title.trim() ||
-            (!!property && property.publication_status !== "published") ||
-            attempt === "draft"
-          }
-          onPress={() => void save(true)}
-        />
-        <Action
-          label={
-            attempt === "draft"
-              ? "Reintentar guardado"
-              : "Guardar como borrador"
-          }
-          secondary
-          disabled={
-            phase === "uploading" || !title.trim() || attempt === "published"
-          }
-          onPress={() => void save(false)}
-        />
-        <Action
-          label="Volver a grabar"
-          secondary
-          disabled={phase === "uploading"}
-          onPress={retake}
-        />
-        <Action
-          label="Volver a Mis videos"
-          secondary
-          disabled={phase === "uploading"}
-          onPress={leave}
-        />
-        <Text style={styles.hint}>
-          {IS_PRODUCTION
-            ? "El video se publicará en la propiedad seleccionada."
-            : "La publicación se realiza únicamente en la demo local."}{" "}
-          Si falla la conexión, el video permanece aquí para reintentar. Salir o
-          recargar la app descarta el editor.
-        </Text>
-        <View style={{ height: 32 }} />
-      </ScrollView>
+          <Text style={styles.label}>Título del video</Text>
+          <TextInput
+            accessibilityLabel="Título del video grabado"
+            value={title}
+            onChangeText={setTitle}
+            maxLength={160}
+            editable={phase !== "uploading" && !attempt}
+            style={styles.input}
+          />
+          {!!error && (
+            <Text accessibilityLiveRegion="polite" style={styles.error}>
+              {error}
+            </Text>
+          )}
+          {property && property.publication_status !== "published" && (
+            <Text style={styles.error}>
+              La propiedad aún no está publicada. Puedes guardar el video como
+              borrador.
+            </Text>
+          )}
+          <Action
+            label={
+              phase === "uploading"
+                ? "Subiendo y guardando…"
+                : attempt === "published"
+                  ? "Reintentar publicación"
+                  : "Publicar ahora"
+            }
+            disabled={
+              phase === "uploading" ||
+              !title.trim() ||
+              (!!property && property.publication_status !== "published") ||
+              attempt === "draft"
+            }
+            onPress={() => void save(true)}
+          />
+          <Action
+            label={
+              attempt === "draft"
+                ? "Reintentar guardado"
+                : "Guardar como borrador"
+            }
+            secondary
+            disabled={
+              phase === "uploading" || !title.trim() || attempt === "published"
+            }
+            onPress={() => void save(false)}
+          />
+          <Action
+            label="Volver a grabar"
+            secondary
+            disabled={phase === "uploading"}
+            onPress={retake}
+          />
+          <Action
+            label="Volver a Mis videos"
+            secondary
+            disabled={phase === "uploading"}
+            onPress={leave}
+          />
+          <Text style={styles.hint}>
+            {IS_PRODUCTION
+              ? property
+                ? "El video quedará asociado a esta propiedad."
+                : "El video quedará en tu perfil; vincular una propiedad es opcional."
+              : "La publicación se realiza únicamente en la demo local."}{" "}
+            Si falla la conexión, el video permanece aquí para reintentar. Salir
+            o recargar la app descarta el editor.
+          </Text>
+          <View style={{ height: 32 }} />
+        </ScrollView>
+      </>
     );
   if (!cameraPermission?.granted)
     return (
