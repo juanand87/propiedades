@@ -1,4 +1,5 @@
 export type NotificationDestination =
+  | { kind: "video_ready"; uploadId: string }
   | { kind: "test" }
   | { kind: "visit"; visitId: string }
   | { kind: "conversation"; conversationId: string }
@@ -15,6 +16,8 @@ export function notificationDestination(
 ): NotificationDestination | null {
   if (!data || typeof data !== "object" || Array.isArray(data)) return null;
   const fields = data as Record<string, unknown>;
+  if (fields.type === "video_ready" && validId(fields.uploadId))
+    return { kind: "video_ready", uploadId: fields.uploadId };
   if (fields.type === "visit" && validId(fields.visitId))
     return { kind: "visit", visitId: fields.visitId };
   if (fields.test === "true") return { kind: "test" };

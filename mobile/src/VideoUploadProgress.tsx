@@ -21,10 +21,14 @@ export function VideoUploadProgress({
       <StatusBar style="dark" />
       <View style={s.card}>
         <ActivityIndicator size="large" color="#0866f5" />
-        <Text style={s.title}>Estamos cargando el video</Text>
+        <Text style={s.title}>
+          {progress?.phase === "processing"
+            ? "Confirmando la carga"
+            : "Estamos cargando el video"}
+        </Text>
         <Text style={s.description} accessibilityLiveRegion="polite">
           {progress?.phase === "processing"
-            ? "El envío terminó. Estamos guardando y preparando tu video…"
+            ? "El envío terminó. Espera la confirmación de que tu video quedó guardado para procesarlo."
             : progress?.phase === "retrying"
               ? "Estamos intentando reconectar…"
               : progress?.phase === "connecting"

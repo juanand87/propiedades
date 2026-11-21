@@ -15,7 +15,7 @@ export async function uploadVideo<T>(options: {
   onProgress: (progress: VideoUploadProgress) => void;
 }): Promise<T> {
   if (
-    !/^\/manage\/(videos|properties\/[a-f0-9-]{36}\/videos)$/i.test(
+    !/^\/manage\/(video-uploads|videos|properties\/[a-f0-9-]{36}\/videos)$/i.test(
       options.path,
     )
   )

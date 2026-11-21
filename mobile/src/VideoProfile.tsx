@@ -446,8 +446,8 @@ export function VideoProfile({
       await run(async () => {
         setUploadAttempt(true);
         setUploadProgress({ phase: "connecting", sent: 0, total: 0 });
-        const result = await uploadVideo<{ id: string }>({
-          path: "/manage/videos",
+        const result = await uploadVideo<{ upload_id: string }>({
+          path: "/manage/video-uploads",
           uri: asset.uri,
           token: token!,
           parameters: { title, request_id: uploadId },
@@ -462,18 +462,16 @@ export function VideoProfile({
             setUploadAttempt(false);
           throw error;
         });
-        if (!result.id)
-          throw Error("No se confirmó el guardado. Puedes reintentar.");
+        if (!result.upload_id)
+          throw Error("No se confirmó la carga. Puedes reintentar.");
         setUploadProgress(null);
         releaseUploadGuard();
         setAsset(null);
         setUploadAttempt(false);
-        refreshQuota((n) => n + 1);
-        await load();
-        Alert.alert(
-          "Video guardado",
-          "Está en tu galería como borrador. Puedes publicarlo o vincularlo después a una propiedad.",
-        );
+        router.push({
+          pathname: "/carga-video/[uploadId]",
+          params: { uploadId: result.upload_id },
+        });
       });
     } finally {
       uploadLock.current = false;

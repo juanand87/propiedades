@@ -299,6 +299,36 @@ export class PushService implements OnModuleInit, OnModuleDestroy {
       message: 'Firebase aceptó el aviso de prueba para tu propia cuenta.',
     };
   }
+  async videoUploadReady(
+    userId: string,
+    videoId: string,
+    uploadId: string,
+    failed = false,
+  ) {
+    const devices = await this.db.query<{ token: string }[]>(
+      'SELECT token FROM estate_push_devices WHERE user_id=? ORDER BY updated_at DESC LIMIT 10',
+      [userId],
+    );
+    let accepted = 0;
+    for (const device of devices) {
+      if (!validFcmToken(device.token)) continue;
+      const result = await this.sendFcm(
+        { token: device.token, message_id: uploadId, conversation_id: '' },
+        false,
+        undefined,
+        undefined,
+        undefined,
+        { videoId, uploadId, failed },
+      );
+      if (result === 'sent') accepted++;
+      else if (result === 'unregistered')
+        await this.db.query(
+          'DELETE FROM estate_push_devices WHERE token=? AND user_id=?',
+          [device.token, userId],
+        );
+    }
+    return accepted > 0;
+  }
   private async sendFcm(
     row: Pick<Delivery, 'token' | 'message_id' | 'conversation_id'>,
     test = false,
@@ -309,6 +339,7 @@ export class PushService implements OnModuleInit, OnModuleDestroy {
     },
     property?: { propertyId: string; matchId: string },
     visit?: { id: string; noticeId: string; title: string },
+    upload?: { videoId: string; uploadId: string; failed: boolean },
   ) {
     const { auth, projectId } = this.credentials();
     const { token: accessToken } = await auth.getAccessToken();
@@ -325,30 +356,45 @@ export class PushService implements OnModuleInit, OnModuleDestroy {
           message: {
             token: row.token,
             notification: {
-              title: visit
-                ? visit.title
-                : property
-                  ? 'Nueva propiedad para tu búsqueda'
-                  : activity
-                    ? activity.kind === 'reply'
-                      ? 'Respondieron tu comentario'
-                      : 'Nuevo comentario en tu video'
-                    : test
-                      ? 'Prueba de Proppix'
-                      : 'Nuevo mensaje en Proppix',
-              body: visit
-                ? 'Revisa la agenda de visitas en Proppix para ver los detalles.'
-                : property
-                  ? 'Encontramos una propiedad que coincide con tus filtros. Toca para verla.'
-                  : activity
-                    ? activity.kind === 'reply'
-                      ? 'Recibiste una respuesta en un video de Proppix.'
-                      : 'Tu video recibió un comentario nuevo en Proppix.'
-                    : test
-                      ? 'Las notificaciones de tu cuenta están funcionando.'
-                      : 'Tienes un mensaje nuevo. Toca para abrir la conversación.',
+              title: upload
+                ? upload.failed
+                  ? 'Revisa la carga de tu video'
+                  : 'Tu video está listo'
+                : visit
+                  ? visit.title
+                  : property
+                    ? 'Nueva propiedad para tu búsqueda'
+                    : activity
+                      ? activity.kind === 'reply'
+                        ? 'Respondieron tu comentario'
+                        : 'Nuevo comentario en tu video'
+                      : test
+                        ? 'Prueba de Proppix'
+                        : 'Nuevo mensaje en Proppix',
+              body: upload
+                ? upload.failed
+                  ? 'No pudimos preparar tu video. Toca para revisar lo ocurrido.'
+                  : 'Terminamos de preparar tu video. Toca para verlo y continuar.'
+                : visit
+                  ? 'Revisa la agenda de visitas en Proppix para ver los detalles.'
+                  : property
+                    ? 'Encontramos una propiedad que coincide con tus filtros. Toca para verla.'
+                    : activity
+                      ? activity.kind === 'reply'
+                        ? 'Recibiste una respuesta en un video de Proppix.'
+                        : 'Tu video recibió un comentario nuevo en Proppix.'
+                      : test
+                        ? 'Las notificaciones de tu cuenta están funcionando.'
+                        : 'Tienes un mensaje nuevo. Toca para abrir la conversación.',
             },
             data: {
+              ...(upload
+                ? {
+                    type: 'video_ready',
+                    videoId: upload.videoId,
+                    uploadId: upload.uploadId,
+                  }
+                : {}),
               ...(visit
                 ? { type: 'visit', visitId: visit.id, noticeId: visit.noticeId }
                 : {}),
@@ -378,13 +424,15 @@ export class PushService implements OnModuleInit, OnModuleDestroy {
                 channel_id: 'messages',
                 sound: 'default',
                 icon: 'notification_icon',
-                tag: visit
-                  ? 'visit-' + visit.noticeId
-                  : property
-                    ? 'property-match-' + property.matchId
-                    : activity
-                      ? 'video-comment-' + activity.commentId
-                      : 'message-' + row.message_id,
+                tag: upload
+                  ? 'video-ready-' + upload.uploadId
+                  : visit
+                    ? 'visit-' + visit.noticeId
+                    : property
+                      ? 'property-match-' + property.matchId
+                      : activity
+                        ? 'video-comment-' + activity.commentId
+                        : 'message-' + row.message_id,
               },
             },
           },

@@ -83,6 +83,7 @@ import { PropertySlideshow } from "./PropertySlideshow";
 import { MessagesScreen } from "./MessagesScreen";
 import { useMessageNotifications } from "./useMessageNotifications";
 import { NotificationVideoScreen } from "./NotificationVideoScreen";
+import { VideoProcessingScreen } from "./VideoProcessingScreen";
 import { ActivityScreen } from "./ActivityScreen";
 import { ActivityBell } from "./ActivityBell";
 import { SavedSearchesScreen } from "./SavedSearchesScreen";
@@ -138,6 +139,7 @@ function AppContent() {
   const recordingRoute = pathname === "/grabar";
   const profileRoute = pathname.startsWith("/perfil/");
   const notificationVideoRoute = pathname.startsWith("/video/");
+  const uploadRoute = pathname.startsWith("/carga-video/");
   const activityRoute = pathname === "/actividad";
   const savedSearchRoute = pathname === "/busquedas";
   const profileSearchRoute = pathname === "/buscar-perfiles";
@@ -158,6 +160,7 @@ function AppContent() {
     commentId,
     savedSearchId,
     visitId,
+    uploadId,
   } = useGlobalSearchParams<{
     propertyId?: string;
     from?: Tab;
@@ -173,12 +176,13 @@ function AppContent() {
     commentId?: string;
     savedSearchId?: string;
     visitId?: string;
+    uploadId?: string;
   }>();
   const tab: Tab = propertyRoute
     ? from && from in routes
       ? from
       : "feed"
-    : recordingRoute || profileRoute || profileSearchRoute
+    : recordingRoute || profileRoute || profileSearchRoute || uploadRoute
       ? "manage"
       : pathname === "/propiedades"
         ? "catalog"
@@ -321,6 +325,7 @@ function AppContent() {
     !propertyRoute &&
     !detail &&
     !notificationVideoRoute &&
+    !uploadRoute &&
     !activityRoute &&
     !savedSearchRoute &&
     !blockedUsersRoute &&
@@ -1483,6 +1488,14 @@ function AppContent() {
   return (
     <ScreenContext.Provider
       value={{
+        videoUpload: (
+          <VideoProcessingScreen
+            key={uploadId + ":" + session?.user.id}
+            uploadId={uploadId}
+            session={session}
+            onReady={() => void loadFeed(true)}
+          />
+        ),
         feed: homePair ? null : feedScreen,
         catalog: homePair ? null : catalogScreen,
         messages: (

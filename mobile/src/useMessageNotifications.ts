@@ -127,7 +127,12 @@ export function useMessageNotifications(
       );
       if (!destination) return;
       handled.current = response.notification.request.identifier;
-      if (destination.kind === "video") {
+      if (destination.kind === "video_ready") {
+        router.push({
+          pathname: "/carga-video/[uploadId]",
+          params: { uploadId: destination.uploadId },
+        });
+      } else if (destination.kind === "video") {
         void api(`/me/activity/comments/${destination.commentId}/read`, {
           method: "POST",
           token: session.access_token,

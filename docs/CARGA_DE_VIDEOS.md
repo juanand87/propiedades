@@ -1,4 +1,26 @@
-# Carga de videos · Android 1.0.34
+# Carga y procesamiento de videos · Android 1.0.35
+
+La transferencia sigue protegida en pantalla. El 100 % significa bytes enviados; se muestra **Confirmando la carga** hasta que el backend confirme que guardó el original privado y el trabajo en SQL. Después aparece **Estamos procesando tu video** con **Esperar aquí** o **Avísame cuando esté listo**.
+
+El procesamiento continúa en el servidor aunque se cierre la app. El aviso usa Firebase directamente, sin Expo Push Service ni EAS. Al tocarlo abre `/carga-video/[uploadId]`, incluso con inicio en frío después de recuperar la sesión. El servidor exige que sea la cuenta que cargó el video. Se muestra la vista previa y se puede publicar, dejar como borrador, agregar datos de propiedad o vincular una existente.
+
+## Cola persistente
+
+- `POST /manage/video-uploads` recibe el original y conserva título, propiedad opcional, decisión de publicación e identificador idempotente. Los APK viejos siguen usando sus rutas existentes.
+- La cola procesa compresión y portada, y espera HLS. Si HLS agota sus reintentos, conserva el MP4 válido como respaldo.
+- Un reinicio retoma el original. Si el video ya se guardó, recupera el recibo en vez de duplicarlo.
+- Los fallos temporales se reintentan. Los fallos definitivos se muestran y permiten reintentar el procesamiento después de 30 segundos, sin reenviar el archivo.
+- Se elimina el original de trabajo al completar el video; los originales fallidos se conservan hasta siete días para reintentar.
+- Solo se confirma el aviso después de verificar el permiso, registrar el dispositivo y activar el aviso en SQL. También se avisa si el procesamiento falla.
+- Los errores de FCM dejan el aviso pendiente con espera creciente. La entrega es al menos una vez; un fallo entre aceptación de FCM y confirmación SQL puede repetir el sonido. El tag estable por carga evita varias tarjetas del mismo trabajo.
+
+## Activación y verificación
+
+Ejecutar `database/PROCESAMIENTO_VIDEOS.sql` en `propiedades`, desplegar backend e instalar APK 1.0.35. La migración es repetible y crea una tabla. `/api/videos/capabilities` debe indicar `background_processing: true`. Usa las configuraciones existentes de Spaces, HLS y Firebase; no necesita claves nuevas.
+
+`verify-video-processing.cjs` prueba SQL aislado, MP4 real, compresión, HLS, recuperación tras reinicio, idempotencia, privacidad, aviso diferido y reintentos. No contacta producción ni Firebase. `video-upload-push.spec.ts` verifica los mensajes FCM y sus destinos. También se ejecutan build, pruebas del backend, tipos y lint móvil, `verify-video-upload.cjs` y `verify-notification-destination.cjs`.
+
+## Histórico: comportamiento de Android 1.0.34
 
 ## Pantalla de progreso
 

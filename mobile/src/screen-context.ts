@@ -1,5 +1,6 @@
 import { createContext, ReactNode, useContext } from "react";
 type Screen =
+  | "videoUpload"
   | "feed"
   | "catalog"
   | "messages"

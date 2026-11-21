@@ -310,14 +310,13 @@ export function VideoRecorder({
     setUploadProgress({ phase: "connecting", sent: 0, total: 0 });
     setError("");
     try {
-      const value = await uploadVideo<{ id: string; status: string }>({
-        path: property
-          ? `/manage/properties/${property.id}/videos`
-          : "/manage/videos",
+      const value = await uploadVideo<{ upload_id: string }>({
+        path: "/manage/video-uploads",
         uri: clip.uri,
         token: session.access_token,
         parameters: {
           title: title.trim(),
+          ...(property ? { property_id: property.id } : {}),
           capture_seconds: String(clip.limit),
           request_id: clip.requestId,
           publish: String(publish),
@@ -327,49 +326,17 @@ export function VideoRecorder({
         },
       });
       if (!alive.current) return;
-      if (value.status !== mode)
-        throw new Error(
-          "El video ya existe con otro estado. Revísalo en Mis videos.",
-        );
+      if (!value.upload_id)
+        throw Error("No se confirmó la carga. Puedes reintentar.");
       setUploadProgress(null);
       setPhase("preview");
       uploading.current = false;
       releaseUploadGuard();
-      if (!property) {
-        if (publish) onPublished();
-        else onSaved();
-        const openProperty = (propertyMode: "new" | "link") =>
-          router.replace({
-            pathname: "/mis-videos",
-            params: { videoId: value.id, propertyMode },
-          });
-        Alert.alert(
-          publish ? "Video publicado" : "Borrador guardado",
-          "Puedes dejar el video independiente o asociarlo a una propiedad.",
-          [
-            {
-              text: "Más tarde",
-              style: "cancel",
-              onPress: () => router.replace("/mis-videos"),
-            },
-            {
-              text: "Vincular propiedad existente",
-              onPress: () => openProperty("link"),
-            },
-            {
-              text: "Agregar datos de esta propiedad",
-              onPress: () => openProperty("new"),
-            },
-          ],
-          { cancelable: false },
-        );
-      } else if (publish) {
-        onPublished();
-        router.replace("/");
-      } else {
-        onSaved();
-        router.replace("/mis-videos");
-      }
+      onSaved();
+      router.replace({
+        pathname: "/carga-video/[uploadId]",
+        params: { uploadId: value.upload_id },
+      });
     } catch (e) {
       if (alive.current) {
         setError(

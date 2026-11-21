@@ -86,8 +86,12 @@ export class PropertyVideosService {
   async capabilities() {
     try {
       this.guard();
+      const [processing] = await this.db.query<{ n: number }[]>(
+        "SELECT COUNT(*) n FROM information_schema.tables WHERE table_schema=DATABASE() AND table_name='estate_video_upload_jobs'",
+      );
       return {
         enabled: true,
+        background_processing: Number(processing.n) === 1,
         hls: await this.hls.available(),
         automatic_property_publication: this.videoPublication
           ? await this.videoPublication.available(this.db)

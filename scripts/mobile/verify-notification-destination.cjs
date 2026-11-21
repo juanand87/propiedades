@@ -24,4 +24,7 @@ assert.equal(destination({type:'property_match',propertyId:'bad',searchMatchId:'
 assert.deepEqual(destination({type:'visit',visitId:videoId}),{kind:'visit',visitId:videoId});
 assert.equal(destination({type:'visit',visitId:'../../private'}),null);
 assert.equal(destination({type:'visit',visitId:'https://other.invalid'}),null);
-console.log('PASS: 19 notification destination checks. No network or credentials.');
+assert.deepEqual(destination({type:'video_ready',uploadId:videoId}),{kind:'video_ready',uploadId:videoId});
+assert.equal(destination({type:'video_ready',uploadId:'../../private'}),null);
+assert.equal(destination({type:'video_ready',videoId}),null);
+console.log('PASS: 22 notification destination checks. No network or credentials.');
