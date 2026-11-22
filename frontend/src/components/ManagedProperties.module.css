@@ -56,6 +56,7 @@
 }
 .secondary:hover {
   background: #eef6ff;
+  color: #123e75;
 }
 .heading > .primary {
   flex-shrink: 0;
@@ -159,8 +160,9 @@
   gap: 14px;
   align-items: center;
 }
-.search {
+.root .search {
   display: flex;
+  flex-direction: row;
   align-items: center;
   gap: 10px;
   flex: 1;
@@ -185,8 +187,9 @@
   font-size: 22px;
   color: #6a809b;
 }
-.selectLabel {
+.root .selectLabel {
   display: flex;
+  flex-direction: row;
   gap: 9px;
   align-items: center;
   font-size: 12px;

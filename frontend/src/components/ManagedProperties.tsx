@@ -79,7 +79,7 @@ function Cover({ property }: { property: ManagedProperty }) {
       )}
       <span className={styles.mediaCount}>
         <ImageIcon size={14} />
-        {property.media.length} fotos
+        {property.media.length} {property.media.length === 1 ? "foto" : "fotos"}
         {property.insights?.video_count != null && (
           <>
             <Video size={14} />
