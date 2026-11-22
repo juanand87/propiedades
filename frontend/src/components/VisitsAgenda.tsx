@@ -301,7 +301,10 @@ export function VisitsAgenda() {
             ))}
           </div>
           {!loading && !items.length && (
-            <p>Aún no hay visitas agendadas desde la app.</p>
+            <p>
+              Aún no hay visitas agendadas. Puedes solicitar una desde la ficha
+              de una propiedad en la web o la app.
+            </p>
           )}
           <div className="row-actions">
             {page > 1 && (

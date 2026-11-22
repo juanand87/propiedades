@@ -1,6 +1,7 @@
 "use client";
 import { PropertyPublicVideos } from "./PropertyPublicVideos";
 import { PropertyCardGallery } from "./PropertyCardGallery";
+import { PropertyVisitRequest } from "./PropertyVisitRequest";
 import Link from "next/link";
 import { Fragment, useEffect, useRef, useState } from "react";
 import { siteDesign } from "@/lib/site-design";
@@ -1132,106 +1133,98 @@ export function Detail({
                 onClick={() => setVisit(true)}
               >
                 <CalendarDays size={16} />
-                Visita
+                Agendar visita
               </button>
             </div>
-            <Notice success={success} />
-            <form
-              onSubmit={async (e) => {
-                e.preventDefault();
-                setBusy(true);
-                setSuccess("");
-                const form = e.currentTarget,
-                  b = Object.fromEntries(new FormData(form));
-                try {
-                  const r = await send(`/properties/${p.id}/inquiries`, {
-                    ...b,
-                    consent: true,
-                    requested_at:
-                      visit && b.requested_at
-                        ? new Date(String(b.requested_at)).toISOString()
-                        : undefined,
-                  });
-                  setSuccess(r.message);
-                  form.reset();
-                } catch (e) {
-                  setSuccess("Error: " + (e as Error).message);
-                } finally {
-                  setBusy(false);
-                }
-              }}
-            >
-              <label>
-                Tu nombre
-                <input
-                  name="name"
-                  defaultValue={user?.firstName || ""}
-                  minLength={2}
-                  maxLength={120}
-                  required
-                  autoComplete="name"
-                />
-              </label>
-              <label>
-                Correo
-                <input
-                  type="email"
-                  name="email"
-                  defaultValue={user?.email || ""}
-                  required
-                  autoComplete="email"
-                />
-              </label>
-              <label>
-                Teléfono
-                <input
-                  name="phone"
-                  type="tel"
-                  maxLength={40}
-                  autoComplete="tel"
-                />
-              </label>
-              {visit && (
-                <label>
-                  Fecha y hora deseada
-                  <input name="requested_at" type="datetime-local" required />
-                  <small>
-                    Horario de tu dispositivo. El anunciante confirmará la
-                    disponibilidad.
-                  </small>
-                </label>
-              )}
-              <label>
-                Mensaje
-                <textarea
-                  name="message"
-                  required
-                  minLength={10}
-                  maxLength={5000}
-                  defaultValue={`Hola, me interesa esta propiedad (${p.code}).`}
-                />
-              </label>
-              <label className="honeypot" aria-hidden="true">
-                Sitio web
-                <input name="website" tabIndex={-1} autoComplete="off" />
-              </label>
-              <label className="check-label consent">
-                <input type="checkbox" required />
-                Acepto compartir mis datos con el anunciante para responder esta
-                solicitud. <Link href="/privacidad">Privacidad</Link>
-              </label>
-              <button
-                className="button"
-                disabled={busy || p.availability === "sold"}
-              >
-                {busy
-                  ? "Enviando…"
-                  : visit
-                    ? "Solicitar visita"
-                    : "Enviar consulta"}
-                <ArrowUpRight size={17} />
-              </button>
-            </form>
+            {visit ? (
+              <PropertyVisitRequest
+                key={`${p.id}:${user?.id || "guest"}`}
+                propertyId={p.id}
+                unavailable={!!p.is_demo || p.availability === "sold"}
+              />
+            ) : (
+              <>
+                <Notice success={success} />
+                <form
+                  onSubmit={async (e) => {
+                    e.preventDefault();
+                    setBusy(true);
+                    setSuccess("");
+                    const form = e.currentTarget,
+                      b = Object.fromEntries(new FormData(form));
+                    try {
+                      const r = await send(`/properties/${p.id}/inquiries`, {
+                        ...b,
+                        consent: true,
+                      });
+                      setSuccess(r.message);
+                      form.reset();
+                    } catch (e) {
+                      setSuccess("Error: " + (e as Error).message);
+                    } finally {
+                      setBusy(false);
+                    }
+                  }}
+                >
+                  <label>
+                    Tu nombre
+                    <input
+                      name="name"
+                      defaultValue={user?.firstName || ""}
+                      minLength={2}
+                      maxLength={120}
+                      required
+                      autoComplete="name"
+                    />
+                  </label>
+                  <label>
+                    Correo
+                    <input
+                      type="email"
+                      name="email"
+                      defaultValue={user?.email || ""}
+                      required
+                      autoComplete="email"
+                    />
+                  </label>
+                  <label>
+                    Teléfono
+                    <input
+                      name="phone"
+                      type="tel"
+                      maxLength={40}
+                      autoComplete="tel"
+                    />
+                  </label>
+                  <label>
+                    Mensaje
+                    <textarea
+                      name="message"
+                      required
+                      minLength={10}
+                      maxLength={5000}
+                      defaultValue={`Hola, me interesa esta propiedad (${p.code}).`}
+                    />
+                  </label>
+                  <label className="honeypot" aria-hidden="true">
+                    Sitio web
+                    <input name="website" tabIndex={-1} autoComplete="off" />
+                  </label>
+                  <label className="check-label consent">
+                    <input type="checkbox" required />
+                    Acepto compartir mis datos con el anunciante para responder
+                    esta solicitud. <Link href="/privacidad">Privacidad</Link>
+                  </label>
+                  <button
+                    className="button"
+                    disabled={busy || p.availability === "sold"}
+                  >
+                    {busy ? "Enviando…" : "Enviar consulta"}
+                    <ArrowUpRight size={17} />
+                  </button>
+                </form>
+              </>
+            )}
           </fieldset>
         </aside>
       </div>
