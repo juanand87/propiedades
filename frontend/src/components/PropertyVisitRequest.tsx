@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { CalendarDays } from "lucide-react";
 import { send } from "@/lib/estate-api";
 import { Notice, useEstate } from "./EstateApp";
+import styles from "./PropertyVisitRequest.module.css";
 
 export function PropertyVisitRequest({
   propertyId,
@@ -49,6 +50,7 @@ export function PropertyVisitRequest({
     );
   return (
     <form
+      className={styles.form}
       onSubmit={async (event) => {
         event.preventDefault();
         if (sending.current) return;

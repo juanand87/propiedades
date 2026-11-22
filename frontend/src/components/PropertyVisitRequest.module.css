@@ -1,0 +1,9 @@
+.form.form {
+  display: block;
+}
+.form fieldset > button {
+  width: 100%;
+}
+.form > a {
+  margin-top: 16px;
+}
