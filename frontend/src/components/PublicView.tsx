@@ -1119,7 +1119,7 @@ export function Detail({
               reciben consultas ni visitas.
             </p>
           )}
-          <fieldset className="demo-contact-fields" disabled={p.is_demo}>
+          <fieldset className="demo-contact-fields">
             <div className="contact-tabs">
               <button
                 className={!visit ? "selected" : ""}
@@ -1217,7 +1217,7 @@ export function Detail({
                   </label>
                   <button
                     className="button"
-                    disabled={busy || p.availability === "sold"}
+                    disabled={busy || !!p.is_demo || p.availability === "sold"}
                   >
                     {busy ? "Enviando…" : "Enviar consulta"}
                     <ArrowUpRight size={17} />

@@ -19,11 +19,7 @@ export function PropertyVisitRequest({
   const [sent, setSent] = useState(false);
   const receipt = useRef<{ payload: string; id: string } | null>(null);
   const sending = useRef(false);
-  if (unavailable)
-    return (
-      <p className="notice">Esta propiedad no admite solicitudes de visita.</p>
-    );
-  if (!user)
+  if (!user && !unavailable)
     return (
       <div className="notice">
         <p>
@@ -53,7 +49,7 @@ export function PropertyVisitRequest({
       className={styles.form}
       onSubmit={async (event) => {
         event.preventDefault();
-        if (sending.current) return;
+        if (sending.current || unavailable) return;
         const form = new FormData(event.currentTarget);
         const fields = {
           property_id: propertyId,
@@ -90,8 +86,15 @@ export function PropertyVisitRequest({
         Elige un horario para conocer esta propiedad. La visita dura 30 minutos
         y requiere confirmación del anunciante.
       </p>
+      {unavailable && (
+        <p className="notice" role="status">
+          Puedes ver el formulario, pero esta propiedad de ejemplo o no
+          disponible no admite solicitudes de visita. Para agendar, elige una
+          propiedad real disponible.
+        </p>
+      )}
       <Notice error={error} />
-      <fieldset disabled={busy} className="demo-contact-fields">
+      <fieldset disabled={busy || unavailable} className="demo-contact-fields">
         <label>
           Fecha (Chile · Santiago)
           <input name="date" type="date" required />
@@ -117,7 +120,7 @@ export function PropertyVisitRequest({
           Acepto compartir mi nombre y correo con el anunciante para coordinar
           esta visita. <Link href="/privacidad">Privacidad</Link>
         </label>
-        <button className="button" disabled={busy}>
+        <button className="button" disabled={busy || unavailable}>
           <CalendarDays size={17} />
           {busy ? "Solicitando visita…" : "Solicitar visita"}
         </button>
