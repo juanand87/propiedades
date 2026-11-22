@@ -1,5 +1,6 @@
 "use client";
 import { PropertyPublicVideos } from "./PropertyPublicVideos";
+import { PropertyCardGallery } from "./PropertyCardGallery";
 import Link from "next/link";
 import { Fragment, useEffect, useRef, useState } from "react";
 import { siteDesign } from "@/lib/site-design";
@@ -37,17 +38,20 @@ export function PropertyCard({
   const propertyHref = `${propertyBase}/${p.slug}`;
   return (
     <article className="property-card">
-      <Link className="property-image" href={propertyHref}>
-        <img
-          src={assetUrl(p.media?.[0]?.url)}
-          alt={p.media?.[0]?.alt_text || p.title}
-          loading="lazy"
-        />
-        <span className="image-label">
-          {p.is_demo ? "Ejemplo" : labels[p.type_id] || p.type_id}
-        </span>
-        {p.featured === 1 && <span className="featured-label">Destacada</span>}
-      </Link>
+      <PropertyCardGallery
+        key={
+          p.id +
+          ":" +
+          (p.media || [])
+            .map((image: { id?: string; url: string }) => image.id || image.url)
+            .join(",")
+        }
+        images={p.media || []}
+        title={p.title || "Nueva propiedad"}
+        href={propertyHref}
+        label={p.is_demo ? "Ejemplo" : labels[p.type_id] || p.type_id}
+        featured={p.featured === 1}
+      />
       <FavoriteButton id={p.id} />
       <div className="property-card-body">
         <span className={`availability ${p.availability}`}>
