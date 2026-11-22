@@ -1,4 +1,6 @@
 .gallery {
+  width: 100%;
+  min-width: 0;
   overflow: hidden;
   background: #eaf1f8;
 }
