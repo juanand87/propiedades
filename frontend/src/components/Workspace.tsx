@@ -24,7 +24,7 @@ import {
   ChevronDown,
   Trash2,
 } from "lucide-react";
-import { assetUrl, date, labels, price, request, send } from "@/lib/estate-api";
+import { assetUrl, date, labels, request, send } from "@/lib/estate-api";
 import { Empty, Notice, useEstate } from "./EstateApp";
 import { DemoAdmin } from "./DemoAdmin";
 import { DesignAdmin } from "./DesignAdmin";
@@ -33,6 +33,7 @@ import { PropertyVideosEditor } from "./PropertyVideosEditor";
 import { VisitsAgenda } from "./VisitsAgenda";
 import { ModerationAdmin } from "./ModerationAdmin";
 import { MailAdmin } from "./MailAdmin";
+import { ManagedProperties } from "./ManagedProperties";
 
 function useLoad(path: string) {
   const [data, setData] = useState<any>(null),
@@ -195,7 +196,7 @@ export function Workspace({ path }: { path: string[] }) {
               id={path[2] === "nueva" ? undefined : path[2]}
             />
           ) : (
-            <PropertyList root={root} />
+            <ManagedProperties root={root} />
           )
         ) : section === "perfil" ? (
           <Profile />
@@ -309,253 +310,6 @@ function Overview({ root }: { root: string }) {
           la disponibilidad; no son pagos ni reservas online.
         </p>
       </div>
-    </>
-  );
-}
-function PropertyList({ root }: { root: string }) {
-  const { user } = useEstate();
-  const [status, setStatus] = useState(""),
-    [page, setPage] = useState(1),
-    [search, setSearch] = useState(""),
-    [target, setTarget] = useState<any>(null),
-    [error, setError] = useState("");
-  const {
-    data,
-    error: loadError,
-    reload,
-  } = useLoad(
-    `/manage/properties?page=${page}&status=${status}&search=${encodeURIComponent(search)}`,
-  );
-  const action = async (id: string, b: any, endpoint = "status") => {
-    setError("");
-    try {
-      await send(
-        `/manage/properties/${id}/${endpoint}`,
-        {
-          ...b,
-          ...(endpoint === "status"
-            ? { revision: data?.items.find((p: any) => p.id === id)?.revision }
-            : {}),
-        },
-        "PATCH",
-      );
-      reload();
-      setTarget(null);
-    } catch (e) {
-      setError((e as Error).message);
-    }
-  };
-  return (
-    <>
-      <div className="section-heading">
-        <div>
-          <span className="eyebrow">TU CATÁLOGO INMOBILIARIO</span>
-          <h1>{user.role === "admin" ? "Propiedades" : "Mis propiedades"}</h1>
-        </div>
-        <Link className="button" href={`${root}/propiedades/nueva`}>
-          <Plus size={18} />
-          Nueva publicación
-        </Link>
-      </div>
-      <div className="catalog-toolbar">
-        <input
-          aria-label="Buscar publicaciones"
-          value={search}
-          onChange={(e) => {
-            setSearch(e.target.value);
-            setPage(1);
-          }}
-          placeholder="Título, comuna o código"
-        />
-        <select
-          aria-label="Estado de publicación"
-          value={status}
-          onChange={(e) => {
-            setStatus(e.target.value);
-            setPage(1);
-          }}
-        >
-          <option value="">Todos los estados</option>
-          {[
-            "draft",
-            "pending_review",
-            "published",
-            "paused",
-            "rejected",
-            "archived",
-          ].map((s) => (
-            <option key={s} value={s}>
-              {labels[s]}
-            </option>
-          ))}
-        </select>
-      </div>
-      <Notice error={error || loadError} />
-      {data?.items.length ? (
-        <div className="listing-table">
-          {data.items.map((p: any) => (
-            <article key={p.id} className="manage-property">
-              <img
-                src={assetUrl(p.media[0]?.url)}
-                alt={p.title || "Borrador"}
-              />
-              <div>
-                <span className={`status-tag ${p.publication_status}`}>
-                  {labels[p.publication_status]}
-                </span>
-                <h3>{p.title || "Borrador sin título"}</h3>
-                <p>
-                  {p.code} · {p.commune_name || "Ubicación pendiente"} ·{" "}
-                  {p.advertiser.name}
-                </p>
-                <strong>{price(p.price_amount, p.price_unit)}</strong>
-                {p.moderation_reason && (
-                  <p className="review-reason">
-                    Revisión: {p.moderation_reason}
-                  </p>
-                )}
-              </div>
-              <div className="manage-actions">
-                <Link
-                  className="button outline small"
-                  href={`${root}/propiedades/${p.id}/editar`}
-                >
-                  Editar
-                </Link>
-                {p.publication_status === "published" && (
-                  <Link
-                    className="text-link"
-                    target="_blank"
-                    href={`/propiedades/${p.slug}`}
-                  >
-                    Ver ficha <ArrowUpRight size={15} />
-                  </Link>
-                )}
-                {["draft", "rejected", "paused"].includes(
-                  p.publication_status,
-                ) && (
-                  <button
-                    className="button small"
-                    onClick={() => action(p.id, { status: "pending_review" })}
-                  >
-                    Enviar a revisión
-                  </button>
-                )}
-                {user.role === "admin" &&
-                  p.publication_status === "pending_review" && (
-                    <>
-                      <button
-                        className="button small"
-                        onClick={() => action(p.id, { status: "published" })}
-                      >
-                        Aprobar y publicar
-                      </button>
-                      <button
-                        className="text-button danger"
-                        onClick={() => setTarget(p)}
-                      >
-                        Rechazar
-                      </button>
-                    </>
-                  )}
-                {p.publication_status === "published" && (
-                  <button
-                    className="text-button"
-                    onClick={() => action(p.id, { status: "paused" })}
-                  >
-                    Pausar
-                  </button>
-                )}
-                {p.publication_status !== "archived" ? (
-                  <button
-                    className="text-button"
-                    onClick={() => action(p.id, { status: "archived" })}
-                  >
-                    Archivar
-                  </button>
-                ) : (
-                  <button
-                    className="text-button"
-                    onClick={() => action(p.id, { status: "draft" })}
-                  >
-                    Recuperar borrador
-                  </button>
-                )}
-                <select
-                  aria-label={`Disponibilidad de ${p.title}`}
-                  value={p.availability}
-                  onChange={(e) =>
-                    action(
-                      p.id,
-                      { availability: e.target.value },
-                      "availability",
-                    )
-                  }
-                >
-                  {["available", "reserved", "sold"].map((s) => (
-                    <option key={s} value={s}>
-                      {labels[s]}
-                    </option>
-                  ))}
-                </select>
-                {user.role === "admin" && (
-                  <label className="check-label">
-                    <input
-                      type="checkbox"
-                      checked={!!p.featured}
-                      onChange={(e) =>
-                        action(p.id, { featured: e.target.checked }, "featured")
-                      }
-                    />
-                    Destacada
-                  </label>
-                )}
-              </div>
-            </article>
-          ))}
-        </div>
-      ) : (
-        <Empty title="No hay publicaciones en esta vista">
-          Crea una propiedad o cambia los filtros.
-        </Empty>
-      )}
-      {data?.pages > 1 && (
-        <div className="pagination">
-          <button disabled={page === 1} onClick={() => setPage(page - 1)}>
-            Anterior
-          </button>
-          <span>
-            {page} / {data.pages}
-          </span>
-          <button
-            disabled={page >= data.pages}
-            onClick={() => setPage(page + 1)}
-          >
-            Siguiente
-          </button>
-        </div>
-      )}
-      {target && (
-        <Modal title="Motivo del rechazo" onClose={() => setTarget(null)}>
-          <Notice error={error} />
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              action(target.id, {
-                status: "rejected",
-                reason: new FormData(e.currentTarget).get("reason"),
-              });
-            }}
-          >
-            <p>{target.title}</p>
-            <label>
-              Qué debe corregir el anunciante
-              <textarea name="reason" required maxLength={1000} autoFocus />
-            </label>
-            <button className="button">Guardar revisión</button>
-          </form>
-        </Modal>
-      )}
     </>
   );
 }

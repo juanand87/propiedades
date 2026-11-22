@@ -853,6 +853,36 @@ export class EstateService {
       [...params, limit, (page - 1) * limit],
     );
     const items = await Promise.all(rows.map((r) => this.hydrate(r, u)));
+    // Workspace insights are private and bounded to this already-authorized page.
+    if (u && q.insights === '1' && items.length) {
+      const ids = items.map((item) => item.id);
+      const [videoTable] = await this.db.query<{ n: number }[]>(
+        "SELECT COUNT(*) n FROM information_schema.tables WHERE table_schema=DATABASE() AND table_name='property_videos'",
+      );
+      const hasVideos = Number(videoTable.n) === 1;
+      const metrics = await this.db.query<{
+        id: string; favorites: number; inquiries: number; new_inquiries: number;
+        video_count: number | null; published_videos: number | null;
+      }[]>(
+        `SELECT p.id,
+        (SELECT COUNT(*) FROM property_favorites f WHERE f.property_id=p.id) favorites,
+        (SELECT COUNT(*) FROM property_inquiries i WHERE i.property_id=p.id) inquiries,
+        (SELECT COUNT(*) FROM property_inquiries i WHERE i.property_id=p.id AND i.status='new') new_inquiries,
+        ${hasVideos ? "(SELECT COUNT(*) FROM property_videos v WHERE v.property_id=p.id AND v.status<>'archived')" : 'NULL'} video_count,
+        ${hasVideos ? "(SELECT COUNT(*) FROM property_videos v WHERE v.property_id=p.id AND v.status='published')" : 'NULL'} published_videos
+        FROM properties p WHERE p.id IN (${ids.map(() => '?').join(',')})`, ids,
+      );
+      const byId = new Map(metrics.map((metric) => [metric.id, metric]));
+      for (const item of items) {
+        const metric = byId.get(item.id);
+        item.insights = metric ? {
+          views: Number(item.view_count || 0), favorites: Number(metric.favorites),
+          inquiries: Number(metric.inquiries), new_inquiries: Number(metric.new_inquiries),
+          video_count: hasVideos ? Number(metric.video_count) : null,
+          published_videos: hasVideos ? Number(metric.published_videos) : null,
+        } : null;
+      }
+    }
     return {
       items,
       total: Number(count.total),
@@ -1712,11 +1742,11 @@ export class EstateService {
     const clause = isAdmin(u) ? '' : ' WHERE advertiser_id=?',
       params = isAdmin(u) ? [] : [u.advertiser_id || ''];
     const [row] = await this.db.query(
-      `SELECT COUNT(*) total,COALESCE(SUM(publication_status='published'),0) published,COALESCE(SUM(publication_status='pending_review'),0) pending,COALESCE(SUM(publication_status='draft'),0) drafts,COALESCE(SUM(view_count),0) views,COALESCE(SUM(availability='sold'),0) sold FROM properties${clause}`,
+      `SELECT COUNT(*) total,COALESCE(SUM(publication_status='published'),0) published,COALESCE(SUM(publication_status='pending_review'),0) pending,COALESCE(SUM(publication_status='draft'),0) drafts,COALESCE(SUM(publication_status='rejected'),0) rejected,COALESCE(SUM(publication_status='paused'),0) paused,COALESCE(SUM(publication_status='archived'),0) archived,COALESCE(SUM(view_count),0) views,COALESCE(SUM(availability='sold'),0) sold FROM properties${clause}`,
       params,
     );
     const [leads] = await this.db.query(
-      'SELECT COUNT(*) total FROM property_inquiries i JOIN properties p ON p.id=i.property_id' +
+      "SELECT COUNT(*) total,COALESCE(SUM(i.status='new'),0) new_inquiries FROM property_inquiries i JOIN properties p ON p.id=i.property_id" +
         (isAdmin(u) ? '' : ' WHERE p.advertiser_id=?'),
       params,
     );
@@ -1725,7 +1755,7 @@ export class EstateService {
         (isAdmin(u) ? '' : ' WHERE p.advertiser_id=?'),
       params,
     );
-    return { ...row, inquiries: leads.total, likes: Number(likes.total) };
+    return { ...row, inquiries: leads.total, new_inquiries: Number(leads.new_inquiries), likes: Number(likes.total) };
   }
   async users(u: Actor) {
     admin(u);
