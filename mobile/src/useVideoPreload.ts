@@ -43,19 +43,23 @@ export function useVideoPreload(
   const owned = useRef(new Map<string, PreparedVideo>());
   const [prepared, setPrepared] = useState(new Map<string, PreparedVideo>());
   const [generation, setGeneration] = useState(0);
+  const prefetchedImages = useRef(new Set<string>());
   useEffect(() => {
     if (!enabled) return;
-    for (const video of videos.slice(Math.max(0, active - 1), active + 11)) {
-      if (video.thumbnail_url)
-        void Image.prefetch(mediaUrl(video.thumbnail_url)).catch(() => {});
-      if (video.creator?.avatar_thumbnail_url || video.creator?.avatar_url)
-        void Image.prefetch(
-          mediaUrl(
-            video.creator.avatar_thumbnail_url || video.creator.avatar_url!,
-          ),
-        ).catch(() => {});
+    const prefetch = (url?: string | null) => {
+      if (!url || prefetchedImages.current.has(url)) return;
+      const seen = prefetchedImages.current;
+      seen.add(url);
+      if (seen.size > 128) seen.delete(seen.values().next().value!);
+      void Image.prefetch(mediaUrl(url)).catch(() => seen.delete(url));
+    };
+    // Covers nearby are urgent; distant avatars must not delay the first video.
+    const ahead = aheadPermission.current.count >= 3 ? 10 : 2;
+    for (const video of videos.slice(Math.max(0, active - 1), active + ahead + 1)) {
+      prefetch(video.thumbnail_url);
+      prefetch(video.creator?.avatar_thumbnail_url || video.creator?.avatar_url);
     }
-  }, [videos, active, enabled]);
+  }, [videos, active, enabled, generation]);
   const aheadPermission = useRef({ id: "", count: 0, filled: "" });
   useEffect(() => {
     const inspect = () => {
