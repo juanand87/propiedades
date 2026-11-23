@@ -276,11 +276,18 @@ export function hlsMaster(metadata: HlsMetadata, query: string) {
       .join('')
   );
 }
-export function hlsVariant(r: HlsRendition, query: string) {
+export function hlsVariant(
+  r: HlsRendition,
+  query: string,
+  segmentUrl?: (name: string) => string,
+) {
   return (
     `#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-TARGETDURATION:${Math.ceil(Math.max(...r.segments.map((s) => s.duration)))}\n#EXT-X-MEDIA-SEQUENCE:0\n#EXT-X-PLAYLIST-TYPE:VOD\n#EXT-X-INDEPENDENT-SEGMENTS\n` +
     r.segments
-      .map((s) => `#EXTINF:${s.duration.toFixed(6)},\n${s.name}${query}\n`)
+      .map(
+        (s) =>
+          `#EXTINF:${s.duration.toFixed(6)},\n${segmentUrl ? segmentUrl(s.name) : s.name + query}\n`,
+      )
       .join('') +
     '#EXT-X-ENDLIST\n'
   );

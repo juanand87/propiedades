@@ -1,4 +1,23 @@
 import type { VideoPlayer } from "expo-video";
+export const PRELOAD_VIDEO_COUNT = 5;
+export const PRELOAD_CONCURRENT_LOADS = 2;
+export const PRELOAD_SECONDS = 8;
+export function preloadBufferReady(
+  status: string,
+  buffered: number,
+  current: number,
+  duration: number,
+) {
+  const target =
+    duration > 0
+      ? Math.min(PRELOAD_SECONDS, Math.max(0, duration - current))
+      : PRELOAD_SECONDS;
+  return (
+    status === "readyToPlay" &&
+    buffered >= 0 &&
+    buffered - current >= target - 0.25
+  );
+}
 // Keep background downloads behind the visible video, with hysteresis to avoid churn.
 export function canPreloadAhead(
   status: string,
@@ -41,8 +60,9 @@ export function preloadAheadCount(
   if (status !== "readyToPlay" || buffered < 0) return 0;
   const ahead = Math.max(0, buffered - current),
     remaining = Math.max(0, duration - current);
-  if (duration > 0 && ahead >= remaining - 0.25) return 2;
-  if (ahead >= (previous === 2 ? 2 : 4)) return 2;
+  if (duration > 0 && ahead >= remaining - 0.25) return PRELOAD_VIDEO_COUNT;
+  if (ahead >= (previous >= 5 ? 5 : 8)) return 5;
+  if (ahead >= (previous >= 3 ? 3 : 5)) return 3;
   return ahead >= (previous >= 1 ? 0.75 : 1.25) ? 1 : 0;
 }
 export function attachPreparedVideo(
@@ -62,8 +82,8 @@ export function attachPreparedVideo(
 export function playbackBuffer(active: boolean) {
   return {
     minBufferForPlayback: 0.15,
-    preferredForwardBufferDuration: active ? 12 : 2,
-    maxBufferBytes: (active ? 8 : 1) * 1024 * 1024,
+    preferredForwardBufferDuration: active ? 20 : PRELOAD_SECONDS,
+    maxBufferBytes: (active ? 12 : 4) * 1024 * 1024,
     prioritizeTimeOverSizeThreshold: false,
   };
 }

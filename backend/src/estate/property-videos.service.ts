@@ -93,6 +93,7 @@ export class PropertyVideosService {
         enabled: true,
         background_processing: Number(processing.n) === 1,
         hls: await this.hls.available(),
+        hls_direct_segments: this.storage.enabled && this.hls.enabled,
         automatic_property_publication: this.videoPublication
           ? await this.videoPublication.available(this.db)
           : false,

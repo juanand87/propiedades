@@ -118,6 +118,23 @@ export class VideoStorageService implements OnModuleDestroy {
       );
     }
   }
+  async signedHlsSegment(key: string) {
+    const { client, config } = this.ready(key);
+    if (!key.endsWith('.ts')) throw new Error('Se esperaba un fragmento HLS.');
+    // Stable for a minute so adjacent playlists reuse the native disk cache.
+    // A 15-minute capability accommodates the expanded preload window.
+    const signingDate = new Date(Math.floor(Date.now() / 60000) * 60000);
+    return getSignedUrl(
+      client,
+      new GetObjectCommand({
+        Bucket: config.bucket,
+        Key: key,
+        ResponseContentType: 'video/mp2t',
+        ResponseCacheControl: 'private,max-age=600',
+      }),
+      { expiresIn: 900, signingDate },
+    );
+  }
   async readOriginal(key: string) {
     const { client, config } = this.ready(key);
     const object = await client.send(

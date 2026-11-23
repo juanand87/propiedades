@@ -175,10 +175,36 @@ export class VideoHlsService implements OnModuleInit, OnModuleDestroy {
         .send(hlsMaster(metadata, '?' + query.toString()));
     const rendition = metadata.renditions.find((r) => r.quality === quality);
     if (!rendition) throw new NotFoundException();
-    if (file === 'index.m3u8')
+    if (file === 'index.m3u8') {
+      // Authorize the playlist above, then let Spaces serve the unchanged bytes
+      // directly. Avoid a backend + database + redirect trip for every segment.
+      const direct = new Map<string, string>();
+      if (this.storage.enabled)
+        await Promise.all(
+          rendition.segments.map(async (segment) => {
+            direct.set(
+              segment.name,
+              await this.storage.signedHlsSegment(
+                this.key(
+                  id,
+                  row.generation_id!,
+                  rendition.quality,
+                  segment.name,
+                ),
+              ),
+            );
+          }),
+        );
       return res
         .type('application/vnd.apple.mpegurl')
-        .send(hlsVariant(rendition, '?' + query.toString()));
+        .send(
+          hlsVariant(
+            rendition,
+            '?' + query.toString(),
+            this.storage.enabled ? (name) => direct.get(name)! : undefined,
+          ),
+        );
+    }
     if (
       !validHlsSegment(file) ||
       !rendition.segments.some((s) => s.name === file)

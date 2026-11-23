@@ -3,6 +3,9 @@ import {
   preloadAheadCount,
   hlsUnavailable,
   playbackBuffer,
+  PRELOAD_VIDEO_COUNT,
+  PRELOAD_CONCURRENT_LOADS,
+  preloadBufferReady,
 } from "./video-playback-policy";
 import { useEffect, useRef, useState } from "react";
 import { Image, Platform } from "react-native";
@@ -26,7 +29,7 @@ function configureBuffer(player: VideoPlayer, active: boolean) {
 let cacheSetup: Promise<void> | undefined;
 export function prepareVideoCache() {
   if (Platform.OS === "web") return Promise.resolve();
-  cacheSetup ??= setVideoCacheSizeAsync(256 * 1024 * 1024).catch(() => {});
+  cacheSetup ??= setVideoCacheSizeAsync(512 * 1024 * 1024).catch(() => {});
   return cacheSetup;
 }
 
@@ -42,7 +45,7 @@ export function useVideoPreload(
   const [generation, setGeneration] = useState(0);
   useEffect(() => {
     if (!enabled) return;
-    for (const video of videos.slice(Math.max(0, active - 1), active + 5)) {
+    for (const video of videos.slice(Math.max(0, active - 1), active + 11)) {
       if (video.thumbnail_url)
         void Image.prefetch(mediaUrl(video.thumbnail_url)).catch(() => {});
       if (video.creator?.avatar_thumbnail_url || video.creator?.avatar_url)
@@ -53,7 +56,7 @@ export function useVideoPreload(
         ).catch(() => {});
     }
   }, [videos, active, enabled]);
-  const aheadPermission = useRef({ id: "", count: 0 });
+  const aheadPermission = useRef({ id: "", count: 0, filled: "" });
   useEffect(() => {
     const inspect = () => {
       const id = videos[active]?.id;
@@ -70,11 +73,23 @@ export function useVideoPreload(
                 : 0,
             )
           : 0;
+      const filled = [...owned.current.entries()]
+        .filter(([, entry]) =>
+          preloadBufferReady(
+            entry.player.status,
+            entry.player.bufferedPosition,
+            entry.player.currentTime,
+            entry.player.duration,
+          ),
+        )
+        .map(([key]) => key)
+        .join(":");
       if (
         aheadPermission.current.id !== id ||
-        aheadPermission.current.count !== count
+        aheadPermission.current.count !== count ||
+        aheadPermission.current.filled !== filled
       ) {
-        aheadPermission.current = { id: id || "", count };
+        aheadPermission.current = { id: id || "", count, filled };
         setGeneration((value) => value + 1);
       }
     };
@@ -88,7 +103,7 @@ export function useVideoPreload(
         ? aheadPermission.current.count
         : 0;
     const wanted = enabled
-      ? videos.slice(Math.max(0, active - 1), active + 3)
+      ? videos.slice(Math.max(0, active - 1), active + PRELOAD_VIDEO_COUNT + 1)
       : [];
     let changed = false;
     for (const [id, entry] of entries) {
@@ -110,19 +125,28 @@ export function useVideoPreload(
       }
     }
     if (enabled) {
-      // Only prepare the next source after the visible source is ready.
+      // Prepare nearest neighbors first; at most two sources start loading at
+      // once. Never consume the visible video's bandwidth before it is ready.
+      let loadingAhead = [...entries.entries()].filter(
+        ([id, entry]) =>
+          id !== videos[active]?.id &&
+          entry.player.status !== "error" &&
+          !preloadBufferReady(
+            entry.player.status,
+            entry.player.bufferedPosition,
+            entry.player.currentTime,
+            entry.player.duration,
+          ),
+      ).length;
       for (
         let index = active;
         canPrepare && index < Math.min(videos.length, active + ahead + 1);
         index++
       ) {
         const video = videos[index];
-        if (
-          index > active &&
-          entries.get(videos[index - 1].id)?.player.status !== "readyToPlay"
-        )
-          break;
         if (!entries.has(video.id)) {
+          if (index > active && loadingAhead >= PRELOAD_CONCURRENT_LOADS) break;
+          if (index > active) loadingAhead++;
           const player = createVideoPlayer(null);
           beginVideoLoad(player);
           let fallback = false;

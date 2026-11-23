@@ -11,6 +11,27 @@ const env = {
 };
 const id = '00000000-0000-4000-8000-000000000001';
 describe('private video storage', () => {
+  it('signs direct HLS segments with stable bounded private URLs', async () => {
+    const clock = jest.spyOn(Date, 'now').mockReturnValue(1800000000000);
+    const storage = new VideoStorageService(new ConfigService(env));
+    try {
+      const key = `propiedades/pruebas/videos/hls/${id}/${id}/q720/seg00000.ts`;
+      const first = await storage.signedHlsSegment(key);
+      clock.mockReturnValue(1800000000001);
+      expect(await storage.signedHlsSegment(key)).toBe(first);
+      const url = new URL(first);
+      expect(url.searchParams.get('X-Amz-Expires')).toBe('900');
+      expect(url.searchParams.get('response-cache-control')).toBe(
+        'private,max-age=600',
+      );
+      await expect(
+        storage.signedHlsSegment(storage.objectKey(id)),
+      ).rejects.toThrow();
+    } finally {
+      clock.mockRestore();
+      storage.onModuleDestroy();
+    }
+  });
   it('keeps HLS segments private and signs them with their video transport type', async () => {
     const storage = new VideoStorageService(new ConfigService(env));
     const send = jest.fn().mockResolvedValue({});
