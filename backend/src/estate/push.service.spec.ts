@@ -19,15 +19,17 @@ describe('message push delivery', () => {
       user_low_id: 'recipient',
       ...overrides,
     };
-    const query = jest.fn((sql: string) => {
-      if (sql.includes('information_schema'))
-        return Promise.resolve([{ n: 2 }]);
-      if (sql.includes('SELECT CAST(d.message_id'))
-        return Promise.resolve([row]);
-      if (sql.startsWith('SELECT user_id'))
-        return Promise.resolve(device ? [{ user_id: 'recipient' }] : []);
-      return Promise.resolve([]);
-    });
+    const query: jest.Mock<Promise<any[]>, [string]> = jest.fn(
+      (sql: string) => {
+        if (sql.includes('information_schema'))
+          return Promise.resolve([{ n: 2 }]);
+        if (sql.includes('SELECT CAST(d.message_id'))
+          return Promise.resolve([row]);
+        if (sql.startsWith('SELECT user_id'))
+          return Promise.resolve(device ? [{ user_id: 'recipient' }] : []);
+        return Promise.resolve([]);
+      },
+    );
     const runner = {
       connect: jest.fn(),
       release: jest.fn(),
@@ -63,7 +65,7 @@ describe('message push delivery', () => {
   beforeEach(() => {
     jest
       .spyOn(JWT.prototype, 'getAccessToken')
-      .mockResolvedValue({ token: 'test-access-token' });
+      .mockResolvedValue({ token: 'test-access-token' } as never);
   });
   afterEach(() => jest.restoreAllMocks());
   it.each(['sent', 'offline', 'obsolete', 'unregistered'] as const)(
@@ -418,12 +420,19 @@ describe('message push delivery', () => {
     },
   );
   it.each([{ low_read_id: '5' }, { low_read_id: '9' }])(
-    'skips messages already read: %o',
+    'delivers even when polling already marked the message read: %o',
     async (read) => {
       const { service } = setup(read);
-      const network = jest.spyOn(global, 'fetch');
+      const network = jest
+        .spyOn(global, 'fetch')
+        .mockResolvedValue({
+          ok: true,
+          json: async () => ({
+            name: 'projects/proppix-test/messages/read-race',
+          }),
+        } as Response);
       await service.flush();
-      expect(network).not.toHaveBeenCalled();
+      expect(network).toHaveBeenCalledTimes(1);
     },
   );
   it('does not send to a logged-out or reassigned device', async () => {

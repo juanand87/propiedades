@@ -3,6 +3,7 @@ import { notHidden, notBlocked } from './moderation-rules';
 import {
   BadRequestException,
   Injectable,
+  Logger,
   OnModuleDestroy,
   OnModuleInit,
   ServiceUnavailableException,
@@ -43,6 +44,7 @@ export const validFcmToken = (value: unknown): value is string =>
 
 @Injectable()
 export class PushService implements OnModuleInit, OnModuleDestroy {
+  private readonly logger = new Logger(PushService.name);
   private timer?: ReturnType<typeof setInterval>;
   private busy = false;
   private auth?: JWT;
@@ -66,6 +68,12 @@ export class PushService implements OnModuleInit, OnModuleDestroy {
       "SELECT COUNT(*) n FROM information_schema.tables WHERE table_schema=DATABASE() AND table_name IN ('estate_push_devices','estate_push_deliveries')",
     );
     return Number(row.n) === 2;
+  }
+  workerEnabled() {
+    return (
+      this.config.get('NODE_ENV') === 'production' &&
+      this.config.get('PUSH_NOTIFICATIONS_ENABLED') !== 'false'
+    );
   }
   async register(actor: Actor, token: unknown) {
     if (!validFcmToken(token))
@@ -138,13 +146,15 @@ export class PushService implements OnModuleInit, OnModuleDestroy {
     }
   }
   onModuleInit() {
-    if (
-      this.config.get('NODE_ENV') !== 'production' ||
-      this.config.get('PUSH_NOTIFICATIONS_ENABLED') === 'false'
-    )
-      return;
+    if (!this.workerEnabled()) return;
     this.timer = setInterval(() => {
-      void this.flush().catch(() => {});
+      void this.flush().catch((error: unknown) => {
+        const code = (error as { code?: string })?.code;
+        this.logger.error(
+          'No se pudo procesar la cola de notificaciones' +
+            (code && /^[A-Z0-9_]+$/.test(code) ? ': ' + code : '.'),
+        );
+      });
     }, 10000);
     this.timer.unref();
   }
@@ -672,15 +682,12 @@ export class PushService implements OnModuleInit, OnModuleDestroy {
         WHERE d.status IN ('pending','receipt') AND d.due_at<=UTC_TIMESTAMP(3) ORDER BY d.due_at LIMIT 25`);
       for (const row of rows) {
         const [device] = await this.db.query<{ user_id: string }[]>(
-          `SELECT user_id FROM estate_push_devices WHERE token=? AND user_id=? AND EXISTS(SELECT 1 FROM users WHERE id=estate_push_devices.user_id AND isActive=1) AND NOT EXISTS(SELECT 1 FROM estate_direct_messages message JOIN estate_user_blocks blocked ON (blocked.blocker_id=message.sender_id AND blocked.blocked_id=estate_push_devices.user_id) OR (blocked.blocked_id=message.sender_id AND blocked.blocker_id=estate_push_devices.user_id) WHERE message.id=?)`,
+          `SELECT user_id FROM estate_push_devices WHERE token=? AND user_id=? AND EXISTS(SELECT 1 FROM users WHERE CONVERT(id USING utf8mb4) COLLATE utf8mb4_unicode_ci=estate_push_devices.user_id AND isActive=1) AND NOT EXISTS(SELECT 1 FROM estate_direct_messages message JOIN estate_user_blocks blocked ON (blocked.blocker_id=message.sender_id AND blocked.blocked_id=estate_push_devices.user_id) OR (blocked.blocked_id=message.sender_id AND blocked.blocker_id=estate_push_devices.user_id) WHERE message.id=?)`,
           [row.token, row.user_id, row.message_id],
         );
-        const read =
-          row.user_low_id === row.user_id ? row.low_read_id : row.high_read_id;
-        if (
-          !device ||
-          (row.status === 'pending' && BigInt(read) >= BigInt(row.message_id))
-        ) {
+        // Polling can mark a message read before this worker runs. A committed
+        // message still has a delivery to perform; read cursors are not receipts.
+        if (!device) {
           await this.update(row, 'done');
           continue;
         }

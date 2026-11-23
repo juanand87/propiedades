@@ -18,7 +18,11 @@ import { DEMO_ADVERTISER_ID } from './demo-properties';
 import { PushService } from './push.service';
 
 export type NewConversation = { recipient_id?: unknown; property_id?: unknown };
-export type NewMessage = { client_id?: unknown; body?: unknown };
+export type NewMessage = {
+  client_id?: unknown;
+  body?: unknown;
+  image_id?: unknown;
+};
 export type HistoryQuery = { after?: unknown; before?: unknown };
 type ConversationRow = {
   id: string;
@@ -77,7 +81,9 @@ export class MessagingService {
     );
     return {
       enabled: Number(row.n) === 3,
+      images: await this.imagesAvailable(),
       push_tables_ready: await this.push.available(),
+      push_worker_enabled: this.push.workerEnabled(),
       push: await this.push.health(),
       video_comment_notifications: await this.push.videoCommentsAvailable(),
       self_comment_notifications: this.push.selfActivityEnabled(),
@@ -89,6 +95,41 @@ export class MessagingService {
       throw new ServiceUnavailableException(
         'Los mensajes están temporalmente fuera de servicio. Intenta más tarde.',
       );
+  }
+
+  private async imagesAvailable(
+    db: Pick<DataSource, 'query'> | EntityManager = this.db,
+  ) {
+    const [row] = await db.query<CountRow[]>(
+      "SELECT COUNT(*) n FROM information_schema.tables WHERE table_schema=DATABASE() AND table_name='estate_message_images'",
+    );
+    return Number(row.n) === 1;
+  }
+
+  private async withImages<T extends MessageRow>(items: T[]) {
+    if (!items.length || !(await this.imagesAvailable())) return items;
+    const links = await this.db.query<
+      { message_id: string; media_id: string }[]
+    >(
+      `SELECT CAST(message_id AS CHAR) message_id,media_id FROM estate_message_images WHERE message_id IN (${items.map(() => '?').join(',')})`,
+      items.map((m) => m.id),
+    );
+    const images = new Map(
+      links.map((l) => [String(l.message_id), l.media_id]),
+    );
+    return items.map((m) => ({
+      ...m,
+      ...(images.has(String(m.id))
+        ? {
+            image: {
+              id: images.get(String(m.id)),
+              url: this.estate.mediaUrl(images.get(String(m.id))!, {
+                id: m.sender_id,
+              } as Actor),
+            },
+          }
+        : {}),
+    }));
   }
 
   private async conversation(
@@ -177,7 +218,7 @@ export class MessagingService {
         rows.slice(0, 24).map(async (row) => ({
           id: row.id,
           last_message_id: String(row.last_message_id),
-          last_message: row.last_message,
+          last_message: row.last_message || '📷 Imagen',
           from_me: row.sender_id.toLowerCase() === actor.id.toLowerCase(),
           updated_at: row.updated_at,
           unread: Number(row.unread),
@@ -238,7 +279,7 @@ export class MessagingService {
           : conversation.user_low_id,
         actor.id,
       ),
-      items,
+      items: await this.withImages(items),
       has_more: rows.length > 50,
       last_message_id: String(conversation.last_message_id),
     };
@@ -248,11 +289,16 @@ export class MessagingService {
     await this.ensureAvailable();
     const clientId = uuid(body?.client_id);
     const message = typeof body?.body === 'string' ? body.body.trim() : '';
-    if (!message || message.length > 4000)
+    const imageId = body?.image_id == null ? null : uuid(body.image_id);
+    if ((!message && !imageId) || message.length > 4000)
       throw new BadRequestException(
         'Escribe un mensaje de hasta 4000 caracteres.',
       );
-    return this.db.transaction(async (tx) => {
+    if (imageId && !(await this.imagesAvailable()))
+      throw new ServiceUnavailableException(
+        'El envío de imágenes está pendiente de habilitar.',
+      );
+    const result = await this.db.transaction(async (tx) => {
       // Serialize sends from an account so retries and the rate limit stay consistent.
       await tx.query('SELECT id FROM users WHERE id=? FOR UPDATE', [actor.id]);
       const conversation = await this.conversation(actor, id, tx, true);
@@ -266,14 +312,38 @@ export class MessagingService {
         [actor.id, clientId],
       );
       if (existing) {
+        const [attachment] =
+          imageId || (await this.imagesAvailable(tx))
+            ? await tx.query<{ media_id: string }[]>(
+                'SELECT media_id FROM estate_message_images WHERE message_id=?',
+                [existing.id],
+              )
+            : [];
         if (
           existing.conversation_id.toLowerCase() !== id.toLowerCase() ||
-          existing.body !== message
+          existing.body !== message ||
+          (attachment?.media_id || null) !== imageId
         )
           throw new ConflictException(
             'Este envío ya se utilizó para otro mensaje.',
           );
         return existing;
+      }
+      if (imageId) {
+        const [media] = await tx.query<{ owner_id: string }[]>(
+          'SELECT owner_id FROM estate_media WHERE id=? FOR UPDATE',
+          [imageId],
+        );
+        if (!media || media.owner_id.toLowerCase() !== actor.id.toLowerCase())
+          throw new ForbiddenException('La imagen no pertenece a tu cuenta.');
+        const [used] = await tx.query<{ message_id: string }[]>(
+          'SELECT message_id FROM estate_message_images WHERE media_id=?',
+          [imageId],
+        );
+        if (used)
+          throw new ConflictException(
+            'Esta imagen ya se envió. Selecciona otra imagen.',
+          );
       }
       const recipient =
         conversation.user_low_id === actor.id.toLowerCase()
@@ -306,9 +376,15 @@ export class MessagingService {
         'UPDATE estate_conversations SET last_message_id=?,updated_at=UTC_TIMESTAMP(3) WHERE id=?',
         [created.id, id],
       );
+      if (imageId)
+        await tx.query(
+          'INSERT INTO estate_message_images(message_id,media_id) VALUES (?,?)',
+          [created.id, imageId],
+        );
       await this.push.enqueue(tx, created.id, recipient);
       return created;
     });
+    return (await this.withImages([result]))[0];
   }
 
   async markRead(actor: Actor, id: string, rawCursor: unknown) {

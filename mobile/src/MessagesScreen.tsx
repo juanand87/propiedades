@@ -7,6 +7,7 @@ import {
   BackHandler,
   FlatList,
   Image,
+  Modal,
   Pressable,
   StyleSheet,
   Text,
@@ -15,6 +16,8 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { randomUUID } from "expo-crypto";
+import * as ImagePicker from "expo-image-picker";
+import { File } from "expo-file-system";
 import { api, ApiError, mediaUrl, Session } from "./api";
 import { ProppixIcon } from "./ProppixIcon";
 import { lightColors as videoColors } from "./video-colors";
@@ -27,6 +30,7 @@ type Person = {
   available: boolean;
 };
 type Message = {
+  image?: { id: string; url: string };
   visit_id?: string;
   id: string;
   sender_id: string;
@@ -117,6 +121,26 @@ export function MessagesScreen({
     [sending, setSending] = useState(false),
     [older, setOlder] = useState(false);
   const [retry, setRetry] = useState(0);
+  const [attachment, setAttachment] = useState<{
+    uri: string;
+    name: string;
+    id?: string;
+  } | null>(null);
+  const [viewImage, setViewImage] = useState<string | null>(null);
+  const [pickingImage, setPickingImage] = useState(false);
+  const [imagesEnabled, setImagesEnabled] = useState(false);
+  useEffect(() => {
+    if (!token) return;
+    let live = true;
+    void api<{ images?: boolean }>("/messages/capabilities", { token })
+      .then((r) => {
+        if (live) setImagesEnabled(r.images === true);
+      })
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [token, retry]);
   const [testingPush, setTestingPush] = useState(false);
   async function testNotification() {
     if (!token || testingPush) return;
@@ -143,6 +167,7 @@ export function MessagesScreen({
   const pending = useRef<{
     conversation: string;
     body: string;
+    image_id?: string;
     client_id: string;
   } | null>(null);
   const sendController = useRef<AbortController | null>(null);
@@ -154,6 +179,7 @@ export function MessagesScreen({
     sendBusy.current = false;
     setSending(false);
     setText("");
+    setAttachment(null);
     setMessages([]);
     setSelected(id);
     setOlder(false);
@@ -347,32 +373,63 @@ export function MessagesScreen({
   }
   async function send() {
     const body = text.trim();
-    if (!selected || !token || !body || sendBusy.current) return;
+    if (
+      !selected ||
+      !token ||
+      (!body && !attachment) ||
+      sendBusy.current ||
+      pickingImage
+    )
+      return;
     sendBusy.current = true;
     setSending(true);
     setError("");
-    if (
-      pending.current?.body !== body ||
-      pending.current.conversation !== selected
-    )
-      pending.current = {
-        conversation: selected,
-        body,
-        client_id: randomUUID(),
-      };
     const controller = new AbortController();
     sendController.current = controller;
     try {
+      let imageId = attachment?.id;
+      if (attachment && !imageId) {
+        const fd = new FormData();
+        fd.append("file", new File(attachment.uri), attachment.name);
+        const uploaded = await api<{ id: string }>("/manage/media", {
+          method: "POST",
+          token,
+          body: fd,
+          signal: controller.signal,
+        });
+        if (controller.signal.aborted || selectedRef.current !== selected)
+          return;
+        imageId = uploaded.id;
+        setAttachment((a) =>
+          a?.uri === attachment.uri ? { ...a, id: imageId } : a,
+        );
+      }
+      if (
+        pending.current?.body !== body ||
+        pending.current.conversation !== selected ||
+        pending.current.image_id !== imageId
+      )
+        pending.current = {
+          conversation: selected,
+          body,
+          client_id: randomUUID(),
+          image_id: imageId,
+        };
       const data = await api<Message>(`/messages/conversations/${selected}`, {
         method: "POST",
         token,
-        body: { body, client_id: pending.current.client_id },
+        body: {
+          body,
+          client_id: pending.current.client_id,
+          ...(imageId ? { image_id: imageId } : {}),
+        },
         signal: controller.signal,
       });
       if (controller.signal.aborted || selectedRef.current !== selected) return;
       setMessages((previous) => combine(previous, [data]));
       setText((value) => (value.trim() === body ? "" : value));
       pending.current = null;
+      setAttachment(null);
     } catch (e) {
       if (!controller.signal.aborted) setError(messageError(e));
     } finally {
@@ -380,6 +437,27 @@ export function MessagesScreen({
         sendBusy.current = false;
         if (!controller.signal.aborted) setSending(false);
       }
+    }
+  }
+  async function chooseImage() {
+    if (sending || pickingImage) return;
+    const chat = selectedRef.current;
+    setPickingImage(true);
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ["images"],
+        quality: 0.85,
+        allowsMultipleSelection: false,
+      });
+      if (result.canceled || selectedRef.current !== chat) return;
+      const asset = result.assets[0];
+      if ((asset.fileSize || new File(asset.uri).size) > 8 * 1024 * 1024)
+        throw Error("Selecciona una imagen de hasta 8 MB.");
+      setAttachment({ uri: asset.uri, name: asset.fileName || "mensaje.jpg" });
+    } catch (e) {
+      setError(messageError(e));
+    } finally {
+      setPickingImage(false);
     }
   }
   if (!session)
@@ -401,6 +479,37 @@ export function MessagesScreen({
     );
   return (
     <KeyboardSafeView style={s.root}>
+      <Modal
+        visible={!!viewImage}
+        transparent
+        onRequestClose={() => setViewImage(null)}
+      >
+        <View
+          style={{ flex: 1, backgroundColor: "#000", justifyContent: "center" }}
+        >
+          <Pressable
+            accessibilityLabel="Cerrar imagen"
+            accessibilityRole="button"
+            onPress={() => setViewImage(null)}
+            style={{
+              position: "absolute",
+              top: 48,
+              right: 20,
+              zIndex: 1,
+              padding: 16,
+            }}
+          >
+            <ProppixIcon name="close" color="#fff" size={30} />
+          </Pressable>
+          {viewImage && (
+            <Image
+              source={{ uri: mediaUrl(viewImage) }}
+              resizeMode="contain"
+              style={{ width: "100%", height: "80%" }}
+            />
+          )}
+        </View>
+      </Modal>
       <View style={s.heading}>
         {selected && (
           <Pressable
@@ -530,9 +639,30 @@ export function MessagesScreen({
               const mine = item.sender_id === session.user.id;
               return (
                 <View style={[s.bubble, mine ? s.mine : s.theirs]}>
-                  <Text style={[s.body, mine && { color: "#fff" }]}>
-                    {item.body}
-                  </Text>
+                  {item.image && (
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel="Abrir imagen del mensaje"
+                      onPress={() => setViewImage(item.image!.url)}
+                    >
+                      <Image
+                        fadeDuration={0}
+                        source={{ uri: mediaUrl(item.image.url) }}
+                        resizeMode="contain"
+                        style={{
+                          width: 210,
+                          height: 210,
+                          borderRadius: 10,
+                          backgroundColor: "#edf6ff",
+                        }}
+                      />
+                    </Pressable>
+                  )}
+                  {!!item.body && (
+                    <Text style={[s.body, mine && { color: "#fff" }]}>
+                      {item.body}
+                    </Text>
+                  )}
                   <Text style={[s.time, mine && { color: "#d8eaff" }]}>
                     {new Date(item.created_at).toLocaleTimeString("es-CL", {
                       hour: "2-digit",
@@ -569,37 +699,84 @@ export function MessagesScreen({
               Esta cuenta no está disponible.
             </Text>
           ) : (
-            <View style={s.composer}>
-              <TextInput
-                ref={messageInput}
-                accessibilityLabel="Escribir mensaje"
-                blurOnSubmit={false}
-                submitBehavior="newline"
-                value={text}
-                onChangeText={setText}
-                style={s.input}
-                multiline
-                textAlignVertical="top"
-                maxLength={4000}
-                placeholder="Escribe un mensaje…"
-                placeholderTextColor={videoColors.muted}
-              />
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={
-                  sending ? "Enviando mensaje" : "Enviar mensaje"
-                }
-                disabled={sending || !text.trim()}
-                onPressIn={() => messageInput.current?.focus()}
-                onPress={() => void send()}
-                style={[s.send, (sending || !text.trim()) && { opacity: 0.45 }]}
-              >
-                {sending ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
-                  <ProppixIcon name="send" size={23} />
+            <View>
+              {attachment && (
+                <View
+                  style={{
+                    padding: 10,
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: 12,
+                  }}
+                >
+                  <Image
+                    source={{ uri: attachment.uri }}
+                    style={{ width: 72, height: 72, borderRadius: 8 }}
+                  />
+                  <Text style={{ flex: 1, color: videoColors.text }}>
+                    {sending ? "Enviando imagen…" : "Imagen lista para enviar"}
+                  </Text>
+                  <Pressable
+                    accessibilityLabel="Quitar imagen"
+                    accessibilityRole="button"
+                    disabled={sending}
+                    onPress={() => setAttachment(null)}
+                    style={{ padding: 12 }}
+                  >
+                    <ProppixIcon name="close" color={videoColors.text} />
+                  </Pressable>
+                </View>
+              )}
+              <View style={s.composer}>
+                {imagesEnabled && (
+                  <Pressable
+                    accessibilityLabel="Adjuntar imagen"
+                    accessibilityRole="button"
+                    disabled={sending || pickingImage}
+                    onPress={() => void chooseImage()}
+                    style={s.iconButton}
+                  >
+                    <ProppixIcon name="image" color={videoColors.cyan} />
+                  </Pressable>
                 )}
-              </Pressable>
+                <TextInput
+                  ref={messageInput}
+                  accessibilityLabel="Escribir mensaje"
+                  blurOnSubmit={false}
+                  submitBehavior="newline"
+                  value={text}
+                  onChangeText={setText}
+                  style={s.input}
+                  multiline
+                  textAlignVertical="top"
+                  maxLength={4000}
+                  placeholder="Escribe un mensaje…"
+                  placeholderTextColor={videoColors.muted}
+                />
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={
+                    sending ? "Enviando mensaje" : "Enviar mensaje"
+                  }
+                  disabled={
+                    sending || pickingImage || (!text.trim() && !attachment)
+                  }
+                  onPressIn={() => messageInput.current?.focus()}
+                  onPress={() => void send()}
+                  style={[
+                    s.send,
+                    (sending ||
+                      pickingImage ||
+                      (!text.trim() && !attachment)) && { opacity: 0.45 },
+                  ]}
+                >
+                  {sending ? (
+                    <ActivityIndicator color="#fff" />
+                  ) : (
+                    <ProppixIcon name="send" size={23} />
+                  )}
+                </Pressable>
+              </View>
             </View>
           )}
         </>

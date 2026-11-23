@@ -2,20 +2,16 @@ import { useEffect, useRef, useState } from "react";
 import { AppState, Platform } from "react-native";
 import * as Notifications from "expo-notifications";
 import { AndroidImportance } from "expo-notifications";
-import { useGlobalSearchParams, usePathname, useRouter } from "expo-router";
+import { useRouter } from "expo-router";
 import { api, Session } from "./api";
 import { notificationDestination } from "./notification-destination";
 
-let visibleConversation: string | undefined;
 Notifications.setNotificationHandler({
-  handleNotification: async (notification) => {
-    const sameChat =
-      !!visibleConversation &&
-      notification.request.content.data?.conversationId === visibleConversation;
+  handleNotification: async () => {
     return {
-      shouldShowBanner: !sameChat,
-      shouldShowList: !sameChat,
-      shouldPlaySound: !sameChat,
+      shouldShowBanner: true,
+      shouldShowList: true,
+      shouldPlaySound: true,
       shouldSetBadge: false,
     };
   },
@@ -26,21 +22,16 @@ export function useMessageNotifications(
   navigationReady = true,
 ) {
   const router = useRouter();
-  const pathname = usePathname();
-  const params = useGlobalSearchParams<{ conversationId?: string }>();
   const [status, setStatus] = useState("");
   const [retry, setRetry] = useState(0);
   const handled = useRef<string | null>(null);
   const registered = useRef<{ token: string; auth: string } | null>(null);
   const pendingRegistration = useRef<Promise<void> | null>(null);
   const stopping = useRef(false);
+  const currentUserId = useRef(session?.user.id);
   useEffect(() => {
-    visibleConversation =
-      pathname === "/mensajes" ? params.conversationId : undefined;
-    return () => {
-      visibleConversation = undefined;
-    };
-  }, [pathname, params.conversationId]);
+    currentUserId.current = session?.user.id;
+  }, [session?.user.id]);
   useEffect(() => {
     if (!session || !navigationReady || Platform.OS === "web") return;
     stopping.current = false;
@@ -80,6 +71,12 @@ export function useMessageNotifications(
           body: { token: data },
         });
         if (!live) {
+          // A refreshed session can replace this effect while the same account
+          // is registering. Do not delete its newly registered device token.
+          if (currentUserId.current === session!.user.id) {
+            registered.current = { token: data, auth: session!.access_token };
+            return;
+          }
           await api("/messages/devices", {
             method: "POST",
             token: session!.access_token,

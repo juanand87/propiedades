@@ -1567,6 +1567,19 @@ export class EstateService {
         (await this.brokerMediaUsage(id, false, tx))
       )
         throw new ConflictException('La imagen está en uso.');
+      const [chatSchema] = await tx.query(
+        "SELECT COUNT(*) n FROM information_schema.tables WHERE table_schema=DATABASE() AND table_name='estate_message_images'",
+      );
+      if (Number(chatSchema.n)) {
+        const [chatImage] = await tx.query(
+          'SELECT message_id FROM estate_message_images WHERE media_id=? LIMIT 1',
+          [id],
+        );
+        if (chatImage)
+          throw new ConflictException(
+            'La imagen pertenece a una conversación y no se puede eliminar de la biblioteca.',
+          );
+      }
       if (Number(m.stored_bytes) === 0) {
         const [object] = await tx.query(
           "SELECT object_key,bucket FROM estate_media_objects WHERE media_id=? AND status='ready' FOR UPDATE",
