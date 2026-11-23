@@ -7,6 +7,33 @@ import {
 } from './video-hls';
 import { assertVideoObjectKey } from '../config/video-spaces';
 describe('adaptive private video renditions', () => {
+  it('supports longer recordings without truncating the HLS playlist', () => {
+    const playlist =
+      '#EXTM3U\n' +
+      Array.from(
+        { length: 90 },
+        (_, i) => `#EXTINF:2,\nseg${String(i).padStart(5, '0')}.ts\n`,
+      ).join('') +
+      '#EXT-X-ENDLIST';
+    const segments = parseHlsPlaylist(playlist).map((s) => ({
+      ...s,
+      bytes: 100,
+    }));
+    const metadata = validateHlsMetadata({
+      audio: true,
+      renditions: [
+        {
+          quality: 'q360',
+          width: 360,
+          height: 640,
+          bandwidth: 900000,
+          segments,
+        },
+      ],
+    });
+    expect(metadata.renditions[0].segments).toHaveLength(90);
+    expect(hlsVariant(metadata.renditions[0], '')).toContain('seg00089.ts');
+  });
   it('preserves portrait aspect and supplies three distinct sizes', () => {
     const plans = hlsPlan({
       streams: [{ codec_type: 'video', width: 1080, height: 1920 }],

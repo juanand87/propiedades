@@ -43,7 +43,7 @@ const s = StyleSheet.create({
     marginTop: 14,
     textAlign: "center",
   },
-  status: { color: "#657791", fontSize: 13, marginTop: 14 },
+  status: { color: "#31517a", fontSize: 13, marginTop: 14 },
   footer: {
     position: "absolute",
     bottom: 38,

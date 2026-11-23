@@ -4,7 +4,6 @@ import {
   Image,
   Modal,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -48,6 +47,50 @@ export function PropertySlideshow({ media }: { media: Property["media"] }) {
             )}
           />
         )}
+        {media.length > 1 &&
+          ([-1, 1] as const).map((direction) => (
+            <Pressable
+              key={direction}
+              accessibilityRole="button"
+              accessibilityLabel={
+                direction === -1 ? "Foto anterior" : "Foto siguiente"
+              }
+              disabled={
+                direction === -1 ? index === 0 : index === media.length - 1
+              }
+              onPress={() => {
+                const next = Math.max(
+                  0,
+                  Math.min(media.length - 1, index + direction),
+                );
+                setIndex(next);
+                list.current?.scrollToOffset({
+                  offset: next * width,
+                  animated: true,
+                });
+              }}
+              style={{
+                position: "absolute",
+                top: 108,
+                ...(direction === -1 ? { left: 10 } : { right: 10 }),
+                backgroundColor: "#0008",
+                borderRadius: 22,
+                width: 42,
+                height: 42,
+                alignItems: "center",
+                justifyContent: "center",
+                opacity: (
+                  direction === -1 ? index === 0 : index === media.length - 1
+                )
+                  ? 0.3
+                  : 1,
+              }}
+            >
+              <Text style={{ color: "#fff", fontSize: 30 }}>
+                {direction === -1 ? "‹" : "›"}
+              </Text>
+            </Pressable>
+          ))}
         <Text style={s.counter}>
           {Math.min(index + 1, media.length)} / {media.length}
         </Text>
@@ -66,41 +109,7 @@ export function PropertySlideshow({ media }: { media: Property["media"] }) {
           <Text style={{ color: "#fff" }}>⛶</Text>
         </Pressable>
       </View>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{
-          gap: 7,
-          paddingHorizontal: 12,
-          paddingBottom: 15,
-        }}
-      >
-        {media.map((item, i) => (
-          <Pressable
-            key={item.id}
-            accessibilityLabel={`Ver foto ${i + 1}`}
-            accessibilityState={{ selected: index === i }}
-            onPress={() => {
-              setIndex(i);
-              list.current?.scrollToOffset({
-                offset: i * width,
-                animated: true,
-              });
-            }}
-          >
-            <Image
-              source={{ uri: mediaUrl(item.url) }}
-              style={{
-                width: 70,
-                height: 58,
-                borderRadius: 9,
-                borderWidth: 2,
-                borderColor: index === i ? "#0866f5" : "transparent",
-              }}
-            />
-          </Pressable>
-        ))}
-      </ScrollView>
+
       <Modal
         visible={fullscreen}
         transparent

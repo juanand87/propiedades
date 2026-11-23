@@ -87,7 +87,7 @@ export function parseHlsPlaylist(text: string) {
       duration = Number(line.slice(8).split(',')[0]);
       if (!(duration > 0 && duration <= 5)) throw Error('Invalid HLS duration');
     } else if (line && !line.startsWith('#')) {
-      if (!validHlsSegment(line) || !duration || segments.length >= 30)
+      if (!validHlsSegment(line) || !duration || segments.length >= 3000)
         throw Error('Invalid HLS segment');
       segments.push({ name: line, duration, bytes: 0 });
       duration = 0;
@@ -121,7 +121,7 @@ export function validateHlsMetadata(input: unknown): HlsMetadata {
       r.bandwidth < 1 ||
       !Array.isArray(r.segments) ||
       !r.segments.length ||
-      r.segments.length > 30
+      r.segments.length > 3000
     )
       throw Error('Invalid HLS rendition');
     qualities.add(r.quality);
@@ -164,7 +164,7 @@ export async function encodeHls(
   );
   const probe = JSON.parse(stdout) as Probe;
   const duration = Number(probe.format?.duration);
-  if (!(duration >= 1 && duration <= 45.75))
+  if (!(Number.isFinite(duration) && duration >= 1))
     throw Error('Unsupported HLS duration');
   if (!ffmpeg) throw Error('FFmpeg unavailable');
   const video = probe.streams?.find((s) => s.codec_type === 'video');

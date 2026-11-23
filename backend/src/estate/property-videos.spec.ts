@@ -24,15 +24,11 @@ describe('local property videos', () => {
     expect(recordingLimit(undefined)).toBeNull();
     for (const bad of [0, 10, 60, '', 'abc'])
       expect(() => recordingLimit(bad)).toThrow();
-    for (const invalid of [
-      probe(0.2),
-      probe(46),
-      probe(15, 'hevc'),
-      {},
-      probe(Infinity),
-    ])
+    for (const invalid of [probe(0.2), probe(15, 'hevc'), {}, probe(Infinity)])
       expect(() => validateVideoProbe(invalid, null)).toThrow();
     expect(validateVideoProbe(probe(15.1), 15)).toBe(15100);
+    expect(validateVideoProbe(probe(180), null)).toBe(180000);
+    expect(() => validateVideoProbe(probe(180), 30)).toThrow();
   });
   const local = {
     NODE_ENV: 'test',

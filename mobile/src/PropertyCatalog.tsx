@@ -12,6 +12,8 @@ import {
 import { ComponentRef, useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Animated,
+  AccessibilityInfo,
   Alert,
   Image,
   Modal,
@@ -43,7 +45,7 @@ const categories: {
 }[] = [
   { label: "Casas", icon: "house", type: "house" },
   { label: "Departamentos", icon: "building", type: "apartment" },
-  { label: "Terrenos", icon: "land", type: "land" },
+  { label: "Terrenos", icon: "land", type: "plot" },
   { label: "Otros", icon: "filters", options: true },
 ];
 
@@ -65,6 +67,24 @@ export function PropertyCatalog({
   onOpen: (property: Property) => void;
 }) {
   const s = useNightStyles(baseStyles);
+  const [reveal] = useState(() => new Animated.Value(1));
+  const reduceMotion = useRef(false);
+  useEffect(() => {
+    let live = true;
+    void AccessibilityInfo.isReduceMotionEnabled().then((value) => {
+      if (live) reduceMotion.current = value;
+    });
+    const listener = AccessibilityInfo.addEventListener(
+      "reduceMotionChanged",
+      (value) => {
+        reduceMotion.current = value;
+      },
+    );
+    return () => {
+      live = false;
+      listener.remove();
+    };
+  }, []);
   const router = useRouter();
   const [saveOpen, setSaveOpen] = useState(false);
   const [saveName, setSaveName] = useState("");
@@ -118,6 +138,14 @@ export function PropertyCatalog({
                 ),
               ],
         );
+        if (reset && !reduceMotion.current) {
+          reveal.setValue(0);
+          Animated.timing(reveal, {
+            toValue: 1,
+            duration: 260,
+            useNativeDriver: true,
+          }).start();
+        }
         page.current = data.page;
         pages.current = data.pages;
         setHasMore(data.page < data.pages);
@@ -136,7 +164,7 @@ export function PropertyCatalog({
         }
       }
     },
-    [filters],
+    [filters, reveal],
   );
   useEffect(() => {
     const timer = setTimeout(() => void load(true), 0);
@@ -479,108 +507,122 @@ export function PropertyCatalog({
               </Pressable>
             </View>
           )}
-          {items.map((property) => (
-            <View key={property.id} style={s.card}>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={`Ver ${property.title}`}
-                onPress={() => onOpen(property)}
-                style={StyleSheet.absoluteFill}
-              >
-                {property.media[0] ? (
-                  <Image
-                    source={{ uri: mediaUrl(property.media[0].url) }}
-                    resizeMode="cover"
+          <Animated.View
+            style={{
+              opacity: reveal,
+              transform: [
+                {
+                  translateY: reveal.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [12, 0],
+                  }),
+                },
+              ],
+            }}
+          >
+            {items.map((property) => (
+              <View key={property.id} style={s.card}>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`Ver ${property.title}`}
+                  onPress={() => onOpen(property)}
+                  style={StyleSheet.absoluteFill}
+                >
+                  {property.media[0] ? (
+                    <Image
+                      source={{ uri: mediaUrl(property.media[0].url) }}
+                      resizeMode="cover"
+                      style={StyleSheet.absoluteFill}
+                    />
+                  ) : (
+                    <View style={s.missingPhoto}>
+                      <ProppixIcon name="house" size={56} />
+                      <Text style={s.white}>Fotografías próximamente</Text>
+                    </View>
+                  )}
+                  <LinearGradient
+                    colors={[
+                      "transparent",
+                      "rgba(0,9,19,.1)",
+                      "rgba(0,12,18,.94)",
+                    ]}
+                    locations={[0, 0.35, 1]}
                     style={StyleSheet.absoluteFill}
                   />
-                ) : (
-                  <View style={s.missingPhoto}>
-                    <ProppixIcon name="house" size={56} />
-                    <Text style={s.white}>Fotografías próximamente</Text>
-                  </View>
-                )}
-                <LinearGradient
-                  colors={[
-                    "transparent",
-                    "rgba(0,9,19,.1)",
-                    "rgba(0,12,18,.94)",
-                  ]}
-                  locations={[0, 0.35, 1]}
-                  style={StyleSheet.absoluteFill}
-                />
-                <View style={s.operation}>
-                  <Text style={s.operationText}>
-                    {property.operation_type === "rent"
-                      ? "En Arriendo"
-                      : "En Venta"}
-                  </Text>
-                </View>
-                <View style={s.cardCopy}>
-                  <View style={s.location}>
-                    <ProppixIcon name="pin" size={15} />
-                    <Text style={s.locationText} numberOfLines={1}>
-                      {property.commune_name || property.region_name}
+                  <View style={s.operation}>
+                    <Text style={s.operationText}>
+                      {property.operation_type === "rent"
+                        ? "En Arriendo"
+                        : "En Venta"}
                     </Text>
-                    {property.is_demo && <Text style={s.demo}>EJEMPLO</Text>}
                   </View>
-                  <Text style={s.cardTitle} numberOfLines={2}>
-                    {property.title}
-                  </Text>
-                  <View style={s.cardBottom}>
-                    <View style={s.specs}>
-                      {property.bedrooms != null && (
-                        <View style={s.spec}>
-                          <ProppixIcon name="bed" size={19} />
-                          <Text style={s.specText}>{property.bedrooms}</Text>
-                        </View>
-                      )}
-                      {property.bathrooms != null && (
-                        <View style={s.spec}>
-                          <ProppixIcon name="bath" size={19} />
-                          <Text style={s.specText}>{property.bathrooms}</Text>
-                        </View>
-                      )}
-                      {(property.built_area || property.land_area) && (
-                        <View style={s.spec}>
-                          <ProppixIcon name="area" size={18} />
-                          <Text style={s.specText}>
-                            {Number(
-                              property.built_area || property.land_area,
-                            ).toLocaleString("es-CL")}{" "}
-                            m²
-                          </Text>
-                        </View>
-                      )}
+                  <View style={s.cardCopy}>
+                    <View style={s.location}>
+                      <ProppixIcon name="pin" size={15} />
+                      <Text style={s.locationText} numberOfLines={1}>
+                        {property.commune_name || property.region_name}
+                      </Text>
+                      {property.is_demo && <Text style={s.demo}>EJEMPLO</Text>}
                     </View>
-                    <View style={s.cardArrow}>
-                      <ProppixIcon name="arrow" color="#fff" size={22} />
+                    <Text style={s.cardTitle} numberOfLines={2}>
+                      {property.title}
+                    </Text>
+                    <View style={s.cardBottom}>
+                      <View style={s.specs}>
+                        {property.bedrooms != null && (
+                          <View style={s.spec}>
+                            <ProppixIcon name="bed" size={19} />
+                            <Text style={s.specText}>{property.bedrooms}</Text>
+                          </View>
+                        )}
+                        {property.bathrooms != null && (
+                          <View style={s.spec}>
+                            <ProppixIcon name="bath" size={19} />
+                            <Text style={s.specText}>{property.bathrooms}</Text>
+                          </View>
+                        )}
+                        {(property.built_area || property.land_area) && (
+                          <View style={s.spec}>
+                            <ProppixIcon name="area" size={18} />
+                            <Text style={s.specText}>
+                              {Number(
+                                property.built_area || property.land_area,
+                              ).toLocaleString("es-CL")}{" "}
+                              m²
+                            </Text>
+                          </View>
+                        )}
+                      </View>
+                      <View style={s.cardArrow}>
+                        <ProppixIcon name="arrow" color="#fff" size={22} />
+                      </View>
                     </View>
                   </View>
-                </View>
-              </Pressable>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={
-                  favorites.includes(property.id)
-                    ? "Quitar propiedad de favoritos"
-                    : "Guardar propiedad en favoritos"
-                }
-                accessibilityState={{
-                  selected: favorites.includes(property.id),
-                }}
-                hitSlop={8}
-                style={s.favorite}
-                onPress={() => onFavorite(property.id)}
-              >
-                <ProppixIcon
-                  name="heart"
-                  size={28}
-                  filled={favorites.includes(property.id)}
-                  color={favorites.includes(property.id) ? "#2bc8f1" : "#fff"}
-                />
-              </Pressable>
-            </View>
-          ))}
+                </Pressable>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={
+                    favorites.includes(property.id)
+                      ? "Quitar propiedad de favoritos"
+                      : "Guardar propiedad en favoritos"
+                  }
+                  accessibilityState={{
+                    selected: favorites.includes(property.id),
+                  }}
+                  hitSlop={8}
+                  style={s.favorite}
+                  onPress={() => onFavorite(property.id)}
+                >
+                  <ProppixIcon
+                    name="heart"
+                    size={28}
+                    filled={favorites.includes(property.id)}
+                    color={favorites.includes(property.id) ? "#2bc8f1" : "#fff"}
+                  />
+                </Pressable>
+              </View>
+            ))}
+          </Animated.View>
           {hasMore && (
             <Pressable
               accessibilityRole="button"
@@ -934,7 +976,7 @@ const baseStyles = StyleSheet.create({
     gap: 5,
   },
   categorySelected: { backgroundColor: "#0866f5", borderColor: "#79d8ff" },
-  categoryLabel: { color: "#304a70", fontSize: 10, letterSpacing: -0.25 },
+  categoryLabel: { color: "#31517a", fontSize: 10, letterSpacing: -0.25 },
   card: {
     width: "100%",
     aspectRatio: 1.7,
@@ -1021,7 +1063,7 @@ const baseStyles = StyleSheet.create({
   notice: {
     padding: 20,
     gap: 14,
-    backgroundColor: "#002759cc",
+    backgroundColor: "#31517a",
     borderRadius: 18,
     marginVertical: 10,
   },

@@ -665,9 +665,9 @@ export function SellerPanel({
                   {publicationLabels[p.publication_status || "draft"]}
                 </Text>
                 <View style={s.ownerRow}>
-                  <ProppixIcon name="eye" size={17} color="#315a87" />
+                  <ProppixIcon name="eye" size={17} color="#31517a" />
                   <Text style={s.statLabel}>{p.view_count ?? 0}</Text>
-                  <ProppixIcon name="heart" size={17} color="#315a87" />
+                  <ProppixIcon name="heart" size={17} color="#31517a" />
                   <Text style={s.statLabel}>{p.favorite_count ?? 0}</Text>
                   <Pressable
                     accessibilityLabel={"Opciones de " + p.title}
@@ -1097,7 +1097,7 @@ const s = StyleSheet.create({
   },
   stat: { flex: 1, alignItems: "center", gap: 5 },
   statNumber: { fontSize: 24, fontWeight: "800", color: "#10376b" },
-  statLabel: { fontSize: 11, color: "#315a87" },
+  statLabel: { fontSize: 11, color: "#31517a" },
   pageTitle: { fontSize: 26, fontWeight: "800", color: "#10376b" },
   kicker: {
     fontSize: 11,
@@ -1201,7 +1201,7 @@ const s = StyleSheet.create({
     borderRadius: 14,
   },
   voiceSecondaryText: { fontWeight: "800", color: "#0755ad" },
-  voiceHint: { color: "#315a87", fontSize: 12, lineHeight: 19 },
+  voiceHint: { color: "#31517a", fontSize: 12, lineHeight: 19 },
   card: {
     padding: 14,
     gap: 12,

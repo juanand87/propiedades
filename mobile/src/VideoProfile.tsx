@@ -578,20 +578,32 @@ export function VideoProfile({
             </Text>
           </Pressable>
           {own && (
-            <Pressable
-              accessibilityLabel="Editar perfil"
-              onPress={() => {
-                setIdentity({
-                  profile_kind: profile?.profile_kind || null,
-                  username: profile?.username || "",
-                  display_name: profile?.display_name || "",
-                });
-                setEditProfile(true);
-              }}
-              style={s.editButton}
+            <View
+              style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
             >
-              <Text style={s.light}>Editar perfil</Text>
-            </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Abrir agenda de visitas"
+                onPress={() => router.push("/visitas")}
+                style={s.editButton}
+              >
+                <ProppixIcon name="calendar" color={s.light.color} size={22} />
+              </Pressable>
+              <Pressable
+                accessibilityLabel="Editar perfil"
+                onPress={() => {
+                  setIdentity({
+                    profile_kind: profile?.profile_kind || null,
+                    username: profile?.username || "",
+                    display_name: profile?.display_name || "",
+                  });
+                  setEditProfile(true);
+                }}
+                style={s.editButton}
+              >
+                <Text style={s.light}>Editar perfil</Text>
+              </Pressable>
+            </View>
           )}
         </View>
         <View style={s.topline}>
@@ -731,12 +743,7 @@ export function VideoProfile({
             </View>
           </View>
         )}
-        {own && (
-          <Text style={s.explainer}>
-            Encuentra el hogar que buscas. Compra, vende o arrienda con
-            confianza.
-          </Text>
-        )}
+
         {!own && target && (
           <ModerationActions
             kind="user"
@@ -795,7 +802,7 @@ export function VideoProfile({
               style={[s.input, { flex: 1 }]}
               accessibilityLabel="Buscar usuario"
               placeholder="Buscar usuario"
-              placeholderTextColor="#49658b"
+              placeholderTextColor="#31517a"
               value={relationSearch}
               onChangeText={setRelationSearch}
               onSubmitEditing={() => void showFollowers()}
@@ -1313,9 +1320,9 @@ const baseStyles = StyleSheet.create({
     borderColor: "#e0e8f2",
   },
   counterNumber: { color: "#10376b", fontSize: 23, fontWeight: "800" },
-  muted: { color: "#49658b", fontSize: 13 },
+  muted: { color: "#31517a", fontSize: 13 },
   explainer: {
-    color: "#315a87",
+    color: "#31517a",
     fontSize: 13,
     lineHeight: 21,
     padding: 14,

@@ -144,10 +144,16 @@ export function PropertyDetail({
           </Text>
         </View>
         <View>
-          <Text style={{ color: text, fontSize: 27, fontWeight: "800" }}>
+          <Text style={{ color: text, fontSize: 23, fontWeight: "800" }}>
             {p.title}
           </Text>
-          <Text style={{ color: accent, fontSize: 30, fontWeight: "800" }}>
+          <Text
+            style={{
+              color: accent,
+              fontSize: p.price_unit === "UF" ? 25 : 28,
+              fontWeight: "800",
+            }}
+          >
             {price(p)}
           </Text>
         </View>

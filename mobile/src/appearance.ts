@@ -1,5 +1,6 @@
 import { useColorScheme } from "react-native";
 const night: Record<string, string> = {
+  "#31517a": "#b5c8e3",
   "#fff": "#06132e",
   "#ffffff": "#06132e",
   "#fbfcff": "#06132e",

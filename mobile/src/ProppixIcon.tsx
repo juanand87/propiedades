@@ -1,6 +1,7 @@
 import Svg, { Path, Circle, Rect } from "react-native-svg";
 
 export type ProppixIconName =
+  | "calendar"
   | "image"
   | "microphone"
   | "video"
@@ -37,6 +38,7 @@ export type ProppixIconName =
   | "send";
 
 const paths: Partial<Record<ProppixIconName, string>> = {
+  calendar: "M4 5h16v17H4ZM4 10h16M8 2v6m8-6v6M8 14h2m4 0h2m-8 4h2",
   image: "M3 3h18v18H3ZM3 17l6-6 4 4 3-3 5 5M8 7h.01",
   microphone:
     "M9 5a3 3 0 0 1 6 0v7a3 3 0 0 1-6 0ZM6 10v2a6 6 0 0 0 12 0v-2M12 18v4M8 22h8",

@@ -34,7 +34,7 @@ type Clip = {
   uri: string;
   size: number;
   requestId: string;
-  limit: 15 | 30 | 45;
+  limit: 15 | 30 | 0;
 };
 type Phase = "camera" | "recording" | "stopping" | "preview" | "uploading";
 const errorMessage = (e: unknown) =>
@@ -110,7 +110,7 @@ export function VideoRecorder({
   const [property, setProperty] = useState<Property | null>(null),
     [loadError, setLoadError] = useState(""),
     [phase, setPhase] = useState<Phase>("camera"),
-    [limit, setLimit] = useState<15 | 30 | 45>(15),
+    [limit, setLimit] = useState<15 | 30 | 0>(15),
     [elapsed, setElapsed] = useState(0),
     [facing, setFacing] = useState<CameraType>("back"),
     [silent, setSilent] = useState(false),
@@ -234,15 +234,16 @@ export function VideoRecorder({
     setError("");
     setElapsed(0);
     setPhase("recording");
-    watchdog.current = setTimeout(
-      () => {
-        if (recording.current) camera.current?.stopRecording();
-      },
-      (limit + 2) * 1000,
-    );
+    if (limit)
+      watchdog.current = setTimeout(
+        () => {
+          if (recording.current) camera.current?.stopRecording();
+        },
+        (limit + 2) * 1000,
+      );
     try {
       const result = await camera.current.recordAsync({
-        maxDuration: limit,
+        ...(limit ? { maxDuration: limit } : {}),
         maxFileSize: 48 * 1024 * 1024,
         codec: "avc1",
         progressUpdateInterval: 0.1,
@@ -317,7 +318,7 @@ export function VideoRecorder({
         parameters: {
           title: title.trim(),
           ...(property ? { property_id: property.id } : {}),
-          capture_seconds: String(clip.limit),
+          ...(clip.limit ? { capture_seconds: String(clip.limit) } : {}),
           request_id: clip.requestId,
           publish: String(publish),
         },
@@ -404,7 +405,8 @@ export function VideoRecorder({
             {property?.title || "Video de tu perfil"}
           </Text>
           <Text style={styles.body}>
-            Modo {clip.limit} s · {(clip.size / 1024 / 1024).toFixed(1)} MB ·
+            Modo {clip.limit ? `${clip.limit} s` : "Sin límite de tiempo"} ·{" "}
+            {(clip.size / 1024 / 1024).toFixed(1)} MB ·
             {property
               ? "Vinculado a esta propiedad"
               : "Sin propiedad vinculada · puedes enlazarlo después"}
@@ -485,7 +487,7 @@ export function VideoRecorder({
   if (!cameraPermission?.granted)
     return (
       <View style={styles.panel}>
-        <Text style={styles.eyebrow}>15 · 30 · 45 SEGUNDOS</Text>
+        <Text style={styles.eyebrow}>15 · 30 SEGUNDOS · SIN LÍMITE</Text>
         <Text style={styles.heading}>Dale vida a tu propiedad</Text>
         <Text style={styles.body}>
           Permite la cámara para grabar. El micrófono es opcional; puedes
@@ -532,7 +534,7 @@ export function VideoRecorder({
             setCameraReady(false);
           }}
           onRecordingProgress={(e) => {
-            setElapsed(Math.min(e.duration, limit));
+            setElapsed(limit ? Math.min(e.duration, limit) : e.duration);
           }}
         />
       )}
@@ -571,12 +573,13 @@ export function VideoRecorder({
           <View
             style={[
               styles.progressFill,
-              { width: `${(elapsed / limit) * 100}%` },
+              { width: `${limit ? (elapsed / limit) * 100 : 100}%` },
             ]}
           />
         </View>
         <Text style={styles.counter}>
-          {elapsed.toFixed(1)} / {limit} s
+          {elapsed.toFixed(1)} s{" "}
+          {limit ? `/ ${limit} s` : "· Sin límite de tiempo (hasta 48 MB)"}
         </Text>
         {!!cameraError && (
           <Text style={styles.error}>
@@ -587,10 +590,14 @@ export function VideoRecorder({
         )}
         {!!error && <Text style={styles.error}>{error}</Text>}
         <View style={styles.durations}>
-          {([15, 30, 45] as const).map((n) => (
+          {([15, 30, 0] as const).map((n) => (
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel={`Duración máxima ${n} segundos`}
+              accessibilityLabel={
+                n
+                  ? `Duración máxima ${n ? `${n} s` : "Sin límite"}egundos`
+                  : "Sin límite de tiempo"
+              }
               accessibilityState={{ selected: limit === n }}
               key={n}
               disabled={capturing}

@@ -1,20 +1,20 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 
 // This prototype deliberately cannot run against a hosted database or production.
-export function assertLocalVideos(env: Record<string, any>) {
+export function assertLocalVideos(env: Record<string, string | undefined>) {
   if (
     env.PROPERTY_VIDEOS_ENABLED !== 'true' ||
-    !['test', 'development'].includes(env.NODE_ENV) ||
+    !['test', 'development'].includes(env.NODE_ENV || '') ||
     env.PROJECT_ID !== 'propiedades' ||
     env.DB_DATABASE !== 'propiedades' ||
-    !['127.0.0.1', 'localhost', '::1'].includes(env.DB_HOST) ||
+    !['127.0.0.1', 'localhost', '::1'].includes(env.DB_HOST || '') ||
     !['3317', '3327'].includes(String(env.DB_PORT))
   )
     throw new NotFoundException('Videos de pruebas no disponibles.');
 }
 
 export function assertPropertyVideos(
-  env: Record<string, any>,
+  env: Record<string, string | undefined>,
   spacesEnabled: boolean,
 ) {
   if (env.NODE_ENV === 'production') {
@@ -38,14 +38,27 @@ export function videoTitle(value: unknown) {
 
 export function recordingLimit(value: unknown): number | null {
   if (value === undefined || value === null) return null;
-  if (!['15', '30', '45'].includes(String(value)))
+  if (
+    (typeof value !== 'string' && typeof value !== 'number') ||
+    !['15', '30', '45'].includes(String(value))
+  )
     throw new BadRequestException('Selecciona 15, 30 o 45 segundos.');
   return Number(value);
 }
 
-export function validateVideoProbe(probe: any, limit: number | null) {
+type VideoProbe = {
+  streams?: {
+    codec_type?: string;
+    codec_name?: string;
+    duration?: string | number;
+    width?: number;
+    height?: number;
+  }[];
+  format?: { duration?: string | number };
+};
+export function validateVideoProbe(probe: VideoProbe, limit: number | null) {
   const videos = Array.isArray(probe?.streams)
-    ? probe.streams.filter((s: any) => s.codec_type === 'video')
+    ? probe.streams.filter((s) => s.codec_type === 'video')
     : [];
   const video = videos[0];
   const duration = Math.max(
@@ -54,26 +67,30 @@ export function validateVideoProbe(probe: any, limit: number | null) {
   );
   if (
     videos.length !== 1 ||
-    video.codec_name !== 'h264' ||
+    video?.codec_name !== 'h264' ||
     !Number.isFinite(duration) ||
     duration < 1 ||
-    duration > (limit ?? 45) + 0.75 ||
-    !(video.width > 0 && video.height > 0) ||
-    video.width * video.height > 3840 * 2160
+    (limit !== null && duration > limit + 0.75) ||
+    !(Number(video?.width) > 0 && Number(video?.height) > 0) ||
+    Number(video?.width) * Number(video?.height) > 3840 * 2160
   )
     throw new BadRequestException(
-      `Utiliza un MP4/H.264 válido de 1 a ${limit ?? 45} segundos.`,
+      limit
+        ? `Utiliza un MP4/H.264 válido de 1 a ${limit} segundos.`
+        : 'Utiliza un MP4/H.264 válido de al menos 1 segundo y hasta 50 MB.',
     );
   return Math.round(duration * 1000);
 }
 
-export function validateMp4(file: any) {
+export function validateMp4(
+  file: { buffer?: unknown; mimetype?: unknown } | undefined,
+) {
   const b = file?.buffer;
   if (
     !Buffer.isBuffer(b) ||
     b.length < 32 ||
     b.length > 50 * 1024 * 1024 ||
-    file.mimetype !== 'video/mp4' ||
+    file?.mimetype !== 'video/mp4' ||
     b.toString('ascii', 4, 8) !== 'ftyp' ||
     !['isom', 'iso2', 'mp41', 'mp42', 'avc1', 'M4V '].includes(
       b.toString('ascii', 8, 12),
