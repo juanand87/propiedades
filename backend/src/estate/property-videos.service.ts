@@ -91,6 +91,9 @@ export class PropertyVideosService {
       );
       return {
         enabled: true,
+        unlimited_recording: true,
+        recording_durations: [15, 30, null],
+        max_upload_bytes: 50 * 1024 * 1024,
         background_processing: Number(processing.n) === 1,
         hls: await this.hls.available(),
         hls_direct_segments: this.storage.enabled && this.hls.enabled,
