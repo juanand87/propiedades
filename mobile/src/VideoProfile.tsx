@@ -537,9 +537,11 @@ export function VideoProfile({
               k === "videos" ? "video" : k === "saved" ? "bookmark" : "house"
             }
             size={20}
-            color={section === k ? "#0866f5" : "#123b70"}
+            color={section === k ? s.kindBadge.color : s.light.color}
           />
-          <Text style={[s.light, section === k && { color: "#0866f5" }]}>
+          <Text
+            style={[s.light, section === k && { color: s.kindBadge.color }]}
+          >
             {k === "videos"
               ? `Videos (${videoCount})`
               : k === "saved"

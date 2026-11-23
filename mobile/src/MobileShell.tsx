@@ -1796,7 +1796,13 @@ function AppContent() {
             <View accessibilityRole="tablist" style={s.nav}>
               {tabs.map((item) => {
                 const selectedTab = tab === item.key;
-                const color = selectedTab ? "#0866f5" : "#0b295a";
+                const color = night
+                  ? selectedTab
+                    ? "#00bde9"
+                    : "#f4f8ff"
+                  : selectedTab
+                    ? "#0866f5"
+                    : "#0b295a";
                 return (
                   <Pressable
                     accessibilityRole={

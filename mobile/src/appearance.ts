@@ -7,6 +7,8 @@ const night: Record<string, string> = {
   "#071c55": "#f4f8ff",
   "#10376b": "#f4f8ff",
   "#123b70": "#e2eeff",
+  "#0b295a": "#f4f8ff",
+  "#a12b36": "#ffb8ab",
   "#08275f": "#e2eeff",
   "#49658b": "#b5c8e3",
   "#315a87": "#b5c8e3",
@@ -33,8 +35,8 @@ export function useNightStyles<T extends Record<string, object>>(styles: T): T {
           property === "color" && (color === "#fff" || color === "#ffffff")
             ? color
             : typeof color === "string" && /color$/i.test(property)
-            ? night[color.toLowerCase()] || color
-            : color,
+              ? night[color.toLowerCase()] || color
+              : color,
         ]),
       ),
     ]),
