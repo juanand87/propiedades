@@ -1,4 +1,5 @@
 import { videoColors } from "./video-colors";
+import { brandColors } from "./brand-colors";
 import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -684,7 +685,7 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 14,
     alignItems: "center",
-    backgroundColor: videoColors.cyan,
+    backgroundColor: brandColors.secondary,
     marginVertical: 6,
   },
   secondary: {
@@ -692,7 +693,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: videoColors.border,
   },
-  actionText: { color: "#111111", fontWeight: "800" },
+  actionText: { color: brandColors.onSecondary, fontWeight: "800" },
   preview: {
     height: 360,
     width: "100%",
@@ -780,8 +781,8 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     backgroundColor: videoColors.surface,
   },
-  durationActive: { backgroundColor: videoColors.cyan },
-  dark: { color: "#111111", fontWeight: "800" },
+  durationActive: { backgroundColor: brandColors.secondary },
+  dark: { color: brandColors.onSecondary, fontWeight: "800" },
   controls: {
     flexDirection: "row",
     alignItems: "center",

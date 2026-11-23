@@ -1,3 +1,4 @@
+import { brandColors } from "./brand-colors";
 import { ProppixIcon } from "./ProppixIcon";
 import {
   missingPropertyData,
@@ -490,7 +491,11 @@ export function SellerPanel({
               />
             ) : (
               <View style={s.ownerAvatar}>
-                <ProppixIcon name="profile" color="#123b70" size={28} />
+                <ProppixIcon
+                  name="profile"
+                  color={brandColors.secondary}
+                  size={28}
+                />
               </View>
             )}
             <View style={{ flex: 1, gap: 4 }}>
@@ -520,7 +525,10 @@ export function SellerPanel({
               [stats?.inquiries ?? 0, "Mensajes", "messages"],
             ].map(([n, label, icon]) => (
               <View key={String(label)} style={s.stat}>
-                <ProppixIcon name={icon as "house"} color="#10376b" />
+                <ProppixIcon
+                  name={icon as "house"}
+                  color={brandColors.secondary}
+                />
                 <Text style={s.statNumber}>{n}</Text>
                 <Text style={s.statLabel}>{label}</Text>
               </View>
@@ -652,22 +660,30 @@ export function SellerPanel({
                           ? "#e1f7e7"
                           : p.publication_status === "pending_review"
                             ? "#fff0d3"
-                            : "#e6f3ff",
+                            : brandColors.secondarySurface,
                       color:
                         p.publication_status === "published"
                           ? "#137338"
                           : p.publication_status === "pending_review"
                             ? "#b66a08"
-                            : "#0755ad",
+                            : brandColors.secondary,
                     },
                   ]}
                 >
                   {publicationLabels[p.publication_status || "draft"]}
                 </Text>
                 <View style={s.ownerRow}>
-                  <ProppixIcon name="eye" size={17} color="#31517a" />
+                  <ProppixIcon
+                    name="eye"
+                    size={17}
+                    color={brandColors.secondary}
+                  />
                   <Text style={s.statLabel}>{p.view_count ?? 0}</Text>
-                  <ProppixIcon name="heart" size={17} color="#31517a" />
+                  <ProppixIcon
+                    name="heart"
+                    size={17}
+                    color={brandColors.secondary}
+                  />
                   <Text style={s.statLabel}>{p.favorite_count ?? 0}</Text>
                   <Pressable
                     accessibilityLabel={"Opciones de " + p.title}
@@ -688,7 +704,11 @@ export function SellerPanel({
                       ]);
                     }}
                   >
-                    <ProppixIcon name="more" color="#123b70" size={21} />
+                    <ProppixIcon
+                      name="more"
+                      color={brandColors.secondary}
+                      size={21}
+                    />
                   </Pressable>
                 </View>
               </View>
@@ -737,7 +757,7 @@ export function SellerPanel({
                 setDictationOpen(true);
               }}
             >
-              <ProppixIcon name="video" color="#0755ad" />
+              <ProppixIcon name="video" color={brandColors.secondary} />
               <Text style={s.voiceSecondaryText}>Usar audio del video</Text>
             </Pressable>
             <Text style={s.voiceHint}>
@@ -1075,13 +1095,13 @@ const s = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: "#e6f3ff",
+    backgroundColor: brandColors.secondarySurface,
     alignItems: "center",
     justifyContent: "center",
   },
   plan: {
     backgroundColor: "#e2f1ff",
-    color: "#0755ad",
+    color: brandColors.secondary,
     padding: 6,
     borderRadius: 15,
     fontSize: 11,
@@ -1092,21 +1112,21 @@ const s = StyleSheet.create({
     padding: 14,
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: "#c9def4",
+    borderColor: brandColors.secondaryBorder,
     backgroundColor: "#f4f9ff",
   },
   stat: { flex: 1, alignItems: "center", gap: 5 },
-  statNumber: { fontSize: 24, fontWeight: "800", color: "#10376b" },
-  statLabel: { fontSize: 11, color: "#31517a" },
-  pageTitle: { fontSize: 26, fontWeight: "800", color: "#10376b" },
+  statNumber: { fontSize: 24, fontWeight: "800", color: brandColors.secondary },
+  statLabel: { fontSize: 11, color: brandColors.secondary },
+  pageTitle: { fontSize: 26, fontWeight: "800", color: brandColors.secondary },
   kicker: {
     fontSize: 11,
     letterSpacing: 1.5,
-    color: "#0866f5",
+    color: brandColors.secondary,
     fontWeight: "800",
   },
   back: {
-    color: "#0755ad",
+    color: brandColors.secondary,
     fontWeight: "700",
     fontSize: 15,
     paddingVertical: 8,
@@ -1115,28 +1135,28 @@ const s = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    backgroundColor: "#0866f5",
+    backgroundColor: brandColors.secondary,
     borderRadius: 14,
     padding: 12,
   },
   filters: { flexDirection: "row", gap: 6, flexWrap: "wrap" },
   filter: {
-    backgroundColor: "#edf6ff",
+    backgroundColor: brandColors.secondarySurface,
     borderWidth: 1,
-    borderColor: "#d5e6fa",
+    borderColor: brandColors.secondaryBorder,
     paddingVertical: 9,
     paddingHorizontal: 10,
     borderRadius: 14,
   },
-  activeFilter: { backgroundColor: "#0755ad" },
-  filterText: { fontSize: 11, fontWeight: "600", color: "#123b70" },
+  activeFilter: { backgroundColor: brandColors.secondary },
+  filterText: { fontSize: 11, fontWeight: "600", color: brandColors.secondary },
   propertyCard: {
     flexDirection: "row",
     gap: 10,
     alignItems: "center",
     padding: 8,
     borderWidth: 1,
-    borderColor: "#d5e6fa",
+    borderColor: brandColors.secondaryBorder,
     borderRadius: 16,
     backgroundColor: "#fff",
     marginBottom: 9,
@@ -1146,7 +1166,7 @@ const s = StyleSheet.create({
     height: 90,
     borderRadius: 11,
     overflow: "hidden",
-    backgroundColor: "#edf6ff",
+    backgroundColor: brandColors.secondarySurface,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -1160,8 +1180,12 @@ const s = StyleSheet.create({
     borderRadius: 5,
     fontSize: 10,
   },
-  propertyTitle: { color: "#10376b", fontWeight: "800", fontSize: 15 },
-  price: { color: "#0866f5", fontWeight: "800", fontSize: 17 },
+  propertyTitle: {
+    color: brandColors.secondary,
+    fontWeight: "800",
+    fontSize: 15,
+  },
+  price: { color: brandColors.secondary, fontWeight: "800", fontSize: 17 },
   status: { fontSize: 10, fontWeight: "700", padding: 6, borderRadius: 7 },
   voiceHero: {
     padding: 18,
@@ -1177,15 +1201,15 @@ const s = StyleSheet.create({
     borderRadius: 25,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#0866f5",
+    backgroundColor: brandColors.secondary,
   },
-  heroTitle: { color: "#10376b", fontSize: 20, fontWeight: "800" },
+  heroTitle: { color: brandColors.secondary, fontSize: 20, fontWeight: "800" },
   voicePrimary: {
     flexDirection: "row",
     gap: 10,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#0866f5",
+    backgroundColor: brandColors.secondary,
     padding: 16,
     borderRadius: 14,
   },
@@ -1200,8 +1224,8 @@ const s = StyleSheet.create({
     padding: 14,
     borderRadius: 14,
   },
-  voiceSecondaryText: { fontWeight: "800", color: "#0755ad" },
-  voiceHint: { color: "#31517a", fontSize: 12, lineHeight: 19 },
+  voiceSecondaryText: { fontWeight: "800", color: brandColors.secondary },
+  voiceHint: { color: brandColors.secondary, fontSize: 12, lineHeight: 19 },
   card: {
     padding: 14,
     gap: 12,

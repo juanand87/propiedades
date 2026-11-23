@@ -1,3 +1,4 @@
+import { brandColors } from "./brand-colors";
 import { ModerationActions } from "./ModerationActions";
 import { ComponentRef, useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -547,7 +548,7 @@ export function MessagesScreen({
       </View>
       <Pressable
         accessibilityRole="button"
-        style={{ padding: 12, backgroundColor: "#edf6ff" }}
+        style={{ padding: 12, backgroundColor: brandColors.secondarySurface }}
         onPress={() =>
           router.push({
             pathname: "/visitas",
@@ -559,7 +560,11 @@ export function MessagesScreen({
         }
       >
         <Text
-          style={{ color: "#0866f5", fontWeight: "700", textAlign: "center" }}
+          style={{
+            color: brandColors.secondary,
+            fontWeight: "700",
+            textAlign: "center",
+          }}
         >
           {propertyId ? "Agendar visita" : "Ver agenda de visitas"}
         </Text>
@@ -620,7 +625,7 @@ export function MessagesScreen({
                     style={{
                       padding: 16,
                       borderRadius: 14,
-                      backgroundColor: "#edf6ff",
+                      backgroundColor: brandColors.secondarySurface,
                       gap: 8,
                     }}
                     onPress={() =>
@@ -630,8 +635,15 @@ export function MessagesScreen({
                       })
                     }
                   >
-                    <Text style={{ color: "#123d70" }}>{item.body}</Text>
-                    <Text style={{ color: "#0866f5", fontWeight: "700" }}>
+                    <Text style={{ color: brandColors.secondary }}>
+                      {item.body}
+                    </Text>
+                    <Text
+                      style={{
+                        color: brandColors.secondary,
+                        fontWeight: "700",
+                      }}
+                    >
                       Ver visita →
                     </Text>
                   </Pressable>
@@ -653,7 +665,7 @@ export function MessagesScreen({
                           width: 210,
                           height: 210,
                           borderRadius: 10,
-                          backgroundColor: "#edf6ff",
+                          backgroundColor: brandColors.secondarySurface,
                         }}
                       />
                     </Pressable>
@@ -912,7 +924,7 @@ const s = StyleSheet.create({
   muted: { color: videoColors.muted, textAlign: "center", lineHeight: 22 },
   white: { color: videoColors.text, fontWeight: "700" },
   primary: {
-    backgroundColor: "#0866f5",
+    backgroundColor: brandColors.secondary,
     paddingHorizontal: 24,
     paddingVertical: 14,
     borderRadius: 24,
@@ -926,7 +938,7 @@ const s = StyleSheet.create({
   },
   mine: {
     alignSelf: "flex-end",
-    backgroundColor: "#0866f5",
+    backgroundColor: brandColors.secondary,
     borderBottomRightRadius: 4,
   },
   theirs: {
@@ -958,7 +970,7 @@ const s = StyleSheet.create({
   send: {
     width: 44,
     height: 44,
-    backgroundColor: "#0866f5",
+    backgroundColor: brandColors.secondary,
     borderRadius: 22,
     alignItems: "center",
     justifyContent: "center",

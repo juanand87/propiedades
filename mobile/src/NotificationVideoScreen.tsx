@@ -1,3 +1,4 @@
+import { brandColors } from "./brand-colors";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -131,7 +132,11 @@ const s = StyleSheet.create({
     gap: 20,
   },
   text: { color: "#fff", textAlign: "center", lineHeight: 22 },
-  button: { padding: 14, borderRadius: 20, backgroundColor: "#0866f5" },
+  button: {
+    padding: 14,
+    borderRadius: 20,
+    backgroundColor: brandColors.secondary,
+  },
   close: {
     position: "absolute",
     top: 12,

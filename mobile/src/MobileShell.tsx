@@ -1,3 +1,4 @@
+import { brandColors } from "./brand-colors";
 import { useNightStyles } from "./appearance";
 import { VideoSearch } from "./VideoSearch";
 import { attachPreparedVideo } from "./video-playback-policy";
@@ -1798,11 +1799,9 @@ function AppContent() {
                 const selectedTab = tab === item.key;
                 const color = night
                   ? selectedTab
-                    ? "#00bde9"
+                    ? brandColors.secondaryOnDark
                     : "#f4f8ff"
-                  : selectedTab
-                    ? "#0866f5"
-                    : "#0b295a";
+                  : brandColors.secondary;
                 return (
                   <Pressable
                     accessibilityRole={
@@ -1997,7 +1996,7 @@ const baseStyles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: "#0866f5",
+    backgroundColor: brandColors.secondary,
     alignItems: "center",
     justifyContent: "center",
     marginTop: -15,
@@ -2008,7 +2007,7 @@ const baseStyles = StyleSheet.create({
   navIndicator: {
     position: "absolute",
     height: 3,
-    backgroundColor: "#0866f5",
+    backgroundColor: brandColors.secondary,
     borderRadius: 2,
     bottom: 3,
     width: 43,
@@ -2023,13 +2022,13 @@ const baseStyles = StyleSheet.create({
     width: 88,
     height: 88,
     borderRadius: 28,
-    backgroundColor: "#0c315e",
+    backgroundColor: brandColors.secondary,
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 24,
   },
   navIcon: { color: videoColors.muted, fontSize: 23 },
-  navLabel: { fontSize: 10, color: "#0b295a" },
+  navLabel: { fontSize: 10, color: brandColors.secondary },
   active: { color: videoColors.text },
   propertyCard: {
     borderRadius: 20,

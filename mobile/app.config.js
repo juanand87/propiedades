@@ -1,5 +1,6 @@
 const fs = require("node:fs");
 const path = require("node:path");
+const brandColors = require("./brand-colors.json");
 
 module.exports = ({ config }) => {
   const file =
@@ -18,7 +19,7 @@ module.exports = ({ config }) => {
         "expo-notifications",
         {
           defaultChannel: "messages",
-          color: "#0866f5",
+          color: brandColors.secondary,
           icon: "./assets/notification-icon.png",
         },
       ],

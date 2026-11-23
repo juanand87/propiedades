@@ -1,3 +1,4 @@
+import { brandColors } from "./brand-colors";
 import { lightColors as videoColors } from "./video-colors";
 import { useState } from "react";
 import { View, Text, TextInput, Pressable } from "react-native";
@@ -29,7 +30,7 @@ export function ContactProperty({
         style={{
           padding: 15,
           borderRadius: 24,
-          backgroundColor: "#0866f5",
+          backgroundColor: brandColors.secondary,
           alignItems: "center",
         }}
         onPress={() =>
@@ -54,11 +55,11 @@ export function ContactProperty({
         style={{
           padding: 15,
           borderRadius: 24,
-          backgroundColor: "#edf6ff",
+          backgroundColor: brandColors.secondarySurface,
           alignItems: "center",
         }}
       >
-        <Text style={{ color: "#0866f5", fontWeight: "700" }}>
+        <Text style={{ color: brandColors.secondary, fontWeight: "700" }}>
           Agendar visita
         </Text>
       </Pressable>

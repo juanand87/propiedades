@@ -1,3 +1,4 @@
+import { brandColors } from "./brand-colors";
 import { useNightStyles } from "./appearance";
 import {
   GestureDetector,
@@ -268,7 +269,7 @@ export function PropertyCatalog({
         style={s.field}
         accessibilityLabel={label}
         placeholder="Sin límite"
-        placeholderTextColor="#677b96"
+        placeholderTextColor={brandColors.secondary}
         keyboardType="decimal-pad"
         maxLength={20}
         value={
@@ -298,7 +299,7 @@ export function PropertyCatalog({
           height: 105,
           borderTopWidth: 18,
           borderLeftWidth: 18,
-          borderColor: "#dcecff",
+          borderColor: brandColors.secondarySurface,
           transform: [{ rotate: "45deg" }],
           borderRadius: 12,
         }}
@@ -313,7 +314,7 @@ export function PropertyCatalog({
               refreshing={busy}
               onRefresh={() => void load(true)}
               tintColor="#071c55"
-              colors={["#0866f5"]}
+              colors={[brandColors.secondary]}
             />
           }
         >
@@ -343,7 +344,7 @@ export function PropertyCatalog({
             </Text>
             <Text
               style={{
-                color: "#394e70",
+                color: brandColors.secondary,
                 fontSize: 13,
                 marginTop: 9,
                 marginBottom: 12,
@@ -366,7 +367,7 @@ export function PropertyCatalog({
                 style={s.searchInput}
                 accessibilityLabel="Buscar por comuna, nombre o código"
                 placeholder="Buscar propiedades en Los Lagos…"
-                placeholderTextColor="#17335f"
+                placeholderTextColor={brandColors.secondary}
                 returnKeyType="search"
                 maxLength={100}
                 value={search}
@@ -382,7 +383,11 @@ export function PropertyCatalog({
                     setFilters((previous) => ({ ...previous, search: "" }));
                   }}
                 >
-                  <ProppixIcon name="close" size={17} color="#17335f" />
+                  <ProppixIcon
+                    name="close"
+                    size={17}
+                    color={brandColors.secondary}
+                  />
                 </Pressable>
               )}
             </View>
@@ -417,7 +422,11 @@ export function PropertyCatalog({
               onPress={beginSave}
               style={s.more}
             >
-              <ProppixIcon name="bell" color="#0866f5" size={18} />
+              <ProppixIcon
+                name="bell"
+                color={brandColors.secondary}
+                size={18}
+              />
               <Text style={s.moreText}>Guardar búsqueda</Text>
             </Pressable>
             <Pressable
@@ -631,7 +640,7 @@ export function PropertyCatalog({
               onPress={() => void load(false)}
             >
               {busy ? (
-                <ActivityIndicator color="#0866f5" />
+                <ActivityIndicator color={brandColors.secondary} />
               ) : (
                 <Text style={s.moreText}>Ver más propiedades</Text>
               )}
@@ -683,7 +692,7 @@ export function PropertyCatalog({
               onChangeText={setSaveName}
               maxLength={80}
               placeholder="Ej. Casa en Los Lagos"
-              placeholderTextColor="#677b96"
+              placeholderTextColor={brandColors.secondary}
             />
             <Text style={s.chipText}>
               Recibirás avisos de nuevas propiedades que coincidan. Puedes
@@ -797,7 +806,7 @@ export function PropertyCatalog({
                 keyboardType="number-pad"
                 maxLength={2}
                 placeholder="Cualquiera"
-                placeholderTextColor="#677b96"
+                placeholderTextColor={brandColors.secondary}
                 value={draft.bedrooms}
                 onChangeText={(value) =>
                   setDraft((previous) => ({
@@ -937,7 +946,12 @@ const baseStyles = StyleSheet.create({
     height: 48,
     gap: 8,
   },
-  searchInput: { flex: 1, color: "#102b59", fontSize: 12, paddingVertical: 10 },
+  searchInput: {
+    flex: 1,
+    color: brandColors.secondary,
+    fontSize: 12,
+    paddingVertical: 10,
+  },
   filterButton: {
     width: 48,
     height: 48,
@@ -953,7 +967,7 @@ const baseStyles = StyleSheet.create({
     borderRadius: 9,
     width: 18,
     height: 18,
-    backgroundColor: "#0066ff",
+    backgroundColor: brandColors.secondary,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -975,8 +989,15 @@ const baseStyles = StyleSheet.create({
     alignItems: "center",
     gap: 5,
   },
-  categorySelected: { backgroundColor: "#0866f5", borderColor: "#79d8ff" },
-  categoryLabel: { color: "#31517a", fontSize: 10, letterSpacing: -0.25 },
+  categorySelected: {
+    backgroundColor: brandColors.secondary,
+    borderColor: "#79d8ff",
+  },
+  categoryLabel: {
+    color: brandColors.secondary,
+    fontSize: 10,
+    letterSpacing: -0.25,
+  },
   card: {
     width: "100%",
     aspectRatio: 1.7,
@@ -998,7 +1019,7 @@ const baseStyles = StyleSheet.create({
     position: "absolute",
     top: 12,
     left: 13,
-    backgroundColor: "#0566f5",
+    backgroundColor: brandColors.secondary,
     paddingHorizontal: 15,
     paddingVertical: 7,
     borderRadius: 20,
@@ -1058,12 +1079,12 @@ const baseStyles = StyleSheet.create({
     paddingVertical: 9,
     gap: 5,
   },
-  moreText: { color: "#072455", fontSize: 11, fontWeight: "700" },
+  moreText: { color: brandColors.secondary, fontSize: 11, fontWeight: "700" },
   white: { color: "#fff" },
   notice: {
     padding: 20,
     gap: 14,
-    backgroundColor: "#31517a",
+    backgroundColor: brandColors.secondary,
     borderRadius: 18,
     marginVertical: 10,
   },
@@ -1085,34 +1106,37 @@ const baseStyles = StyleSheet.create({
     flexShrink: 1,
   },
   fieldLabel: {
-    color: "#17335f",
+    color: brandColors.secondary,
     fontSize: 14,
     fontWeight: "600",
     marginBottom: 8,
   },
   field: {
-    color: "#17335f",
+    color: brandColors.secondary,
     padding: 13,
     backgroundColor: "#fff",
     borderWidth: 1,
-    borderColor: "#d3deed",
+    borderColor: brandColors.secondaryBorder,
     borderRadius: 12,
   },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   chip: {
     backgroundColor: "#fff",
     borderWidth: 1,
-    borderColor: "#d3deed",
+    borderColor: brandColors.secondaryBorder,
     paddingHorizontal: 15,
     paddingVertical: 10,
     borderRadius: 22,
   },
-  chipSelected: { backgroundColor: "#0866f5", borderColor: "#0866f5" },
-  chipText: { color: "#17335f", fontWeight: "600" },
+  chipSelected: {
+    backgroundColor: brandColors.secondary,
+    borderColor: brandColors.secondary,
+  },
+  chipText: { color: brandColors.secondary, fontWeight: "600" },
   apply: {
     alignItems: "center",
     padding: 16,
-    backgroundColor: "#0866f5",
+    backgroundColor: brandColors.secondary,
     borderRadius: 25,
   },
   applyText: { color: "#fff", fontWeight: "700" },

@@ -1,3 +1,4 @@
+import { brandColors } from "./brand-colors";
 import { missingPropertyData } from "./property-guidance";
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 import {
@@ -360,7 +361,9 @@ export function PropertyDictation({
               disabled={phase === "starting"}
               style={{ padding: 8 }}
             >
-              <Text style={{ fontSize: 30, color: "#123b70" }}>×</Text>
+              <Text style={{ fontSize: 30, color: brandColors.secondary }}>
+                ×
+              </Text>
             </Pressable>
           </View>
           <ScrollView
@@ -380,7 +383,9 @@ export function PropertyDictation({
                   su audio se enviará a OpenAI. Revisa los datos antes de
                   aplicar: no se guarda ni se enlaza automáticamente.
                 </Text>
-                {loadingVideos && <ActivityIndicator color="#0866f5" />}
+                {loadingVideos && (
+                  <ActivityIndicator color={brandColors.secondary} />
+                )}
                 {!!initialVideoId && (
                   <Text style={s.label}>
                     Audio de: {sourceVideoTitle || "el video que seleccionaste"}
@@ -440,7 +445,7 @@ export function PropertyDictation({
             )}
             {busy && (
               <>
-                <ActivityIndicator color="#0866f5" />
+                <ActivityIndicator color={brandColors.secondary} />
                 <Text style={s.text}>
                   {phase === "starting"
                     ? "Preparando micrófono…"
@@ -497,7 +502,7 @@ export function PropertyDictation({
                   maxLength={12000}
                   editable={!busy}
                   placeholder="Ejemplo: vendo casa en Puerto Varas por 150 millones de pesos…"
-                  placeholderTextColor="#61728a"
+                  placeholderTextColor={brandColors.secondary}
                   style={s.input}
                 />
                 {
@@ -610,30 +615,30 @@ const s = StyleSheet.create({
     justifyContent: "space-between",
     padding: 18,
   },
-  title: { fontSize: 22, fontWeight: "800", color: "#123b70" },
-  text: { fontSize: 15, lineHeight: 22, color: "#526b85" },
-  label: { color: "#123b70", fontWeight: "700", fontSize: 15 },
+  title: { fontSize: 22, fontWeight: "800", color: brandColors.secondary },
+  text: { fontSize: 15, lineHeight: 22, color: brandColors.secondary },
+  label: { color: brandColors.secondary, fontWeight: "700", fontSize: 15 },
   button: {
     padding: 15,
     borderRadius: 14,
-    backgroundColor: "#0866f5",
+    backgroundColor: brandColors.secondary,
     alignItems: "center",
   },
-  secondary: { backgroundColor: "#edf6ff" },
+  secondary: { backgroundColor: brandColors.secondarySurface },
   buttonText: { color: "#fff", fontWeight: "700" },
   input: {
     minHeight: 115,
     padding: 14,
     borderWidth: 1,
-    borderColor: "#c9def4",
+    borderColor: brandColors.secondaryBorder,
     borderRadius: 14,
-    color: "#123b70",
+    color: brandColors.secondary,
     textAlignVertical: "top",
   },
   proposal: {
     padding: 14,
     borderWidth: 1,
-    borderColor: "#c9def4",
+    borderColor: brandColors.secondaryBorder,
     borderRadius: 14,
     gap: 7,
   },
@@ -644,7 +649,7 @@ const s = StyleSheet.create({
     padding: 12,
     borderRadius: 10,
   },
-  previous: { color: "#61728a", fontSize: 13 },
+  previous: { color: brandColors.secondary, fontSize: 13 },
 });
 
 function DictationButton({
@@ -669,7 +674,9 @@ function DictationButton({
         disabled && { opacity: 0.45 },
       ]}
     >
-      <Text style={[s.buttonText, secondary && { color: "#123b70" }]}>
+      <Text
+        style={[s.buttonText, secondary && { color: brandColors.secondary }]}
+      >
         {label}
       </Text>
     </Pressable>

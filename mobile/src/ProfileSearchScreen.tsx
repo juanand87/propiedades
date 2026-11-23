@@ -1,3 +1,4 @@
+import { brandColors } from "./brand-colors";
 import { rememberFollowState } from "./follow-state";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -196,7 +197,7 @@ export function ProfileSearchScreen({ session }: { session: Session | null }) {
             autoFocus
             accessibilityLabel="Buscar por nombre o usuario"
             placeholder="Nombre, @usuario o empresa"
-            placeholderTextColor="#526b85"
+            placeholderTextColor={brandColors.secondary}
             value={query}
             onChangeText={setQuery}
             autoCapitalize="none"
@@ -304,7 +305,7 @@ export function ProfileSearchScreen({ session }: { session: Session | null }) {
                   <Text
                     style={[
                       s.followText,
-                      item.followed && { color: "#0866f5" },
+                      item.followed && { color: brandColors.secondary },
                     ]}
                   >
                     {following.includes(item.id)
@@ -329,7 +330,7 @@ export function ProfileSearchScreen({ session }: { session: Session | null }) {
             }
             ListFooterComponent={
               <View style={{ gap: 15, paddingVertical: 20 }}>
-                {busy && <ActivityIndicator color="#0866f5" />}
+                {busy && <ActivityIndicator color={brandColors.secondary} />}
                 {more && !busy && (
                   <Pressable
                     accessibilityRole="button"
@@ -351,26 +352,26 @@ export function ProfileSearchScreen({ session }: { session: Session | null }) {
 const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: "#fff" },
   header: { flexDirection: "row", alignItems: "center", gap: 15, padding: 18 },
-  back: { fontSize: 36, color: "#123b70" },
-  title: { fontSize: 23, fontWeight: "800", color: "#123b70" },
+  back: { fontSize: 36, color: brandColors.secondary },
+  title: { fontSize: 23, fontWeight: "800", color: brandColors.secondary },
   input: {
     marginHorizontal: 18,
-    backgroundColor: "#edf6ff",
+    backgroundColor: brandColors.secondarySurface,
     borderRadius: 16,
     padding: 15,
-    color: "#123b70",
+    color: brandColors.secondary,
     borderWidth: 1,
-    borderColor: "#c9def4",
+    borderColor: brandColors.secondaryBorder,
   },
   filters: { flexDirection: "row", gap: 9, padding: 18 },
   chip: {
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 20,
-    backgroundColor: "#edf6ff",
+    backgroundColor: brandColors.secondarySurface,
   },
-  activeChip: { backgroundColor: "#0866f5" },
-  chipText: { color: "#123b70", fontWeight: "700" },
+  activeChip: { backgroundColor: brandColors.secondary },
+  chipText: { color: brandColors.secondary, fontWeight: "700" },
   row: {
     flexDirection: "row",
     alignItems: "center",
@@ -390,27 +391,27 @@ const s = StyleSheet.create({
     width: 54,
     height: 54,
     borderRadius: 27,
-    backgroundColor: "#edf6ff",
+    backgroundColor: brandColors.secondarySurface,
     alignItems: "center",
     justifyContent: "center",
   },
-  initial: { color: "#0866f5", fontSize: 24, fontWeight: "700" },
-  name: { color: "#123b70", fontSize: 16, fontWeight: "700" },
-  muted: { color: "#526b85", lineHeight: 20 },
-  kind: { color: "#0866f5", fontSize: 12 },
+  initial: { color: brandColors.secondary, fontSize: 24, fontWeight: "700" },
+  name: { color: brandColors.secondary, fontSize: 16, fontWeight: "700" },
+  muted: { color: brandColors.secondary, lineHeight: 20 },
+  kind: { color: brandColors.secondary, fontSize: 12 },
   follow: {
-    backgroundColor: "#0866f5",
+    backgroundColor: brandColors.secondary,
     borderRadius: 14,
     paddingVertical: 12,
     paddingHorizontal: 14,
     minWidth: 86,
     alignItems: "center",
   },
-  followed: { backgroundColor: "#edf6ff" },
+  followed: { backgroundColor: brandColors.secondarySurface },
   followText: { color: "#fff", fontWeight: "700" },
   empty: { padding: 25, gap: 18 },
-  text: { color: "#123b70", fontSize: 16 },
+  text: { color: brandColors.secondary, fontSize: 16 },
   errorBox: { padding: 18, gap: 10 },
   error: { color: "#b02b3b" },
-  link: { color: "#0866f5", fontWeight: "700" },
+  link: { color: brandColors.secondary, fontWeight: "700" },
 });

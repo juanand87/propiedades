@@ -1,3 +1,4 @@
+import { brandColors } from "./brand-colors";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -151,7 +152,7 @@ export function ActivityScreen({
   if (!session)
     return (
       <View style={s.empty}>
-        <ProppixIcon name="bell" color="#0866f5" size={40} />
+        <ProppixIcon name="bell" color={brandColors.secondary} size={40} />
         <Text style={s.title}>Tu actividad en Proppix</Text>
         <Text style={s.muted}>
           Inicia sesión para ver comentarios y respuestas.
@@ -178,7 +179,7 @@ export function ActivityScreen({
           }
           style={s.close}
         >
-          <ProppixIcon name="close" color="#052553" />
+          <ProppixIcon name="close" color={brandColors.secondary} />
         </Pressable>
       </View>
       <View style={s.filters}>
@@ -243,10 +244,17 @@ export function ActivityScreen({
         }
         ListEmptyComponent={
           loading ? (
-            <ActivityIndicator style={{ marginTop: 50 }} color="#0866f5" />
+            <ActivityIndicator
+              style={{ marginTop: 50 }}
+              color={brandColors.secondary}
+            />
           ) : (
             <View style={s.empty}>
-              <ProppixIcon name="bell" color="#0866f5" size={40} />
+              <ProppixIcon
+                name="bell"
+                color={brandColors.secondary}
+                size={40}
+              />
               <Text style={s.subtitle}>
                 {unreadOnly
                   ? "No tienes avisos sin leer"
@@ -261,7 +269,7 @@ export function ActivityScreen({
         }
         ListFooterComponent={
           loading && items.length ? (
-            <ActivityIndicator color="#0866f5" />
+            <ActivityIndicator color={brandColors.secondary} />
           ) : undefined
         }
         renderItem={({ item }) => (
@@ -322,14 +330,14 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
   },
-  title: { fontSize: 27, fontWeight: "800", color: "#052553" },
+  title: { fontSize: 27, fontWeight: "800", color: brandColors.secondary },
   subtitle: {
     fontSize: 20,
     fontWeight: "700",
-    color: "#052553",
+    color: brandColors.secondary,
     textAlign: "center",
   },
-  muted: { fontSize: 14, color: "#62738a", lineHeight: 21 },
+  muted: { fontSize: 14, color: brandColors.secondary, lineHeight: 21 },
   close: { padding: 10 },
   filters: {
     flexDirection: "row",
@@ -342,42 +350,42 @@ const s = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 15,
     borderRadius: 22,
-    backgroundColor: "#edf5fc",
+    backgroundColor: brandColors.secondarySurface,
   },
-  chipSelected: { backgroundColor: "#0866f5" },
-  chipText: { color: "#13558b", fontWeight: "700" },
+  chipSelected: { backgroundColor: brandColors.secondary },
+  chipText: { color: brandColors.secondary, fontWeight: "700" },
   selectedText: { color: "#fff" },
   markAll: { marginLeft: "auto", paddingVertical: 10 },
-  link: { color: "#0866f5", fontSize: 13, fontWeight: "700" },
+  link: { color: brandColors.secondary, fontSize: 13, fontWeight: "700" },
   row: {
     flexDirection: "row",
     padding: 18,
     gap: 12,
-    borderBottomColor: "#e8eff7",
+    borderBottomColor: brandColors.secondarySurface,
     borderBottomWidth: 1,
     alignItems: "flex-start",
   },
-  unreadRow: { backgroundColor: "#eff9ff" },
+  unreadRow: { backgroundColor: brandColors.secondarySurface },
   avatar: {
     height: 48,
     width: 48,
     borderRadius: 24,
-    backgroundColor: "#dceffc",
+    backgroundColor: brandColors.secondarySurface,
     alignItems: "center",
     justifyContent: "center",
   },
-  initial: { color: "#0866f5", fontSize: 20, fontWeight: "700" },
+  initial: { color: brandColors.secondary, fontSize: 20, fontWeight: "700" },
   content: { flex: 1, gap: 5 },
   copy: { color: "#17334c", fontSize: 15, lineHeight: 21 },
   name: { fontWeight: "800" },
   body: { color: "#445c73", fontSize: 14, lineHeight: 20 },
-  video: { color: "#0866f5", fontSize: 13, fontWeight: "600" },
+  video: { color: brandColors.secondary, fontSize: 13, fontWeight: "600" },
   date: { fontSize: 12, color: "#73859a", marginTop: 2 },
   dot: {
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: "#0866f5",
+    backgroundColor: brandColors.secondary,
     marginTop: 6,
   },
   empty: {
@@ -387,7 +395,11 @@ const s = StyleSheet.create({
     justifyContent: "center",
     gap: 16,
   },
-  primary: { backgroundColor: "#0866f5", padding: 16, borderRadius: 24 },
+  primary: {
+    backgroundColor: brandColors.secondary,
+    padding: 16,
+    borderRadius: 24,
+  },
   primaryText: { color: "#fff", fontWeight: "700" },
   errorBox: { padding: 16, gap: 10, backgroundColor: "#fff3f2" },
   error: { color: "#9a2828" },

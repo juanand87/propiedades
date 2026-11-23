@@ -1,3 +1,4 @@
+import { brandColors } from "./brand-colors";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -75,7 +76,7 @@ export function BlockedUsersScreen({ session }: { session: Session | null }) {
           }
           style={{ padding: 10 }}
         >
-          <ProppixIcon name="close" color="#052553" />
+          <ProppixIcon name="close" color={brandColors.secondary} />
         </Pressable>
       </View>
       <ScrollView contentContainerStyle={s.content}>
@@ -83,7 +84,7 @@ export function BlockedUsersScreen({ session }: { session: Session | null }) {
           Desbloquear no restaura los seguimientos anteriores. Si la otra cuenta
           también te bloqueó, ese bloqueo sigue vigente.
         </Text>
-        {busy && <ActivityIndicator color="#0866f5" />}
+        {busy && <ActivityIndicator color={brandColors.secondary} />}
         {!!error && (
           <>
             <Text accessibilityRole="alert" style={{ color: "#a42c3a" }}>
@@ -141,10 +142,15 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
   },
-  title: { color: "#052553", fontWeight: "800", fontSize: 22, flexShrink: 1 },
+  title: {
+    color: brandColors.secondary,
+    fontWeight: "800",
+    fontSize: 22,
+    flexShrink: 1,
+  },
   content: { padding: 22, gap: 20 },
-  text: { color: "#33506d", fontSize: 14, lineHeight: 22 },
-  blue: { color: "#0866f5", fontWeight: "700" },
+  text: { color: brandColors.secondary, fontSize: 14, lineHeight: 22 },
+  blue: { color: brandColors.secondary, fontWeight: "700" },
   row: {
     flexDirection: "row",
     alignItems: "center",

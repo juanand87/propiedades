@@ -1,3 +1,4 @@
+import { brandColors } from "./brand-colors";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 export type ProfileIdentityDraft = {
   profile_kind: "person" | "company" | null;
@@ -73,7 +74,7 @@ export function ProfileIdentityFields({
       <TextInput
         accessibilityLabel="Usuario público del perfil"
         placeholder="ejemplo.proppix"
-        placeholderTextColor="#526b85"
+        placeholderTextColor={brandColors.secondary}
         value={value.username}
         onChangeText={(username) => onChange({ ...value, username })}
         autoCapitalize="none"
@@ -92,26 +93,29 @@ export function ProfileIdentityFields({
 }
 const s = StyleSheet.create({
   group: { gap: 10, marginVertical: 12 },
-  label: { fontWeight: "700", color: "#123b70" },
+  label: { fontWeight: "700", color: brandColors.secondary },
   row: { flexDirection: "row", gap: 10 },
   kind: {
     flex: 1,
     padding: 13,
     borderWidth: 1,
-    borderColor: "#bed8f4",
+    borderColor: brandColors.secondaryBorder,
     borderRadius: 14,
     alignItems: "center",
-    backgroundColor: "#edf6ff",
+    backgroundColor: brandColors.secondarySurface,
   },
-  selected: { backgroundColor: "#0866f5", borderColor: "#0866f5" },
-  kindText: { color: "#123b70", fontWeight: "700" },
+  selected: {
+    backgroundColor: brandColors.secondary,
+    borderColor: brandColors.secondary,
+  },
+  kindText: { color: brandColors.secondary, fontWeight: "700" },
   input: {
     borderWidth: 1,
-    borderColor: "#bed8f4",
+    borderColor: brandColors.secondaryBorder,
     borderRadius: 12,
     padding: 13,
-    color: "#123b70",
+    color: brandColors.secondary,
     backgroundColor: "#fff",
   },
-  help: { color: "#526b85", fontSize: 12, lineHeight: 18 },
+  help: { color: brandColors.secondary, fontSize: 12, lineHeight: 18 },
 });

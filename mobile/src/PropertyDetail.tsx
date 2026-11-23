@@ -1,3 +1,4 @@
+import { brandColors } from "./brand-colors";
 import { useState } from "react";
 import {
   View,
@@ -35,10 +36,10 @@ export function PropertyDetail({
   const [expanded, setExpanded] = useState(false),
     [contact, setContact] = useState(initialContact);
   const text = dark ? "#f4f8ff" : "#071c55",
-    muted = dark ? "#b4c7e3" : "#465e80",
+    muted = dark ? "#b4c7e3" : brandColors.secondary,
     bg = dark ? "#040f2b" : "#fbfcff",
-    surface = dark ? "#132544" : "#e8f1ff",
-    accent = dark ? "#05c4ed" : "#0866f5";
+    surface = dark ? "#132544" : brandColors.secondarySurface,
+    accent = dark ? brandColors.secondaryOnDark : brandColors.secondary;
   const specs: [ProppixIconName, string, string][] = [
     [
       "house",
@@ -246,15 +247,13 @@ export function PropertyDetail({
             style={{
               flex: 1,
               borderRadius: 20,
-              backgroundColor: accent,
+              backgroundColor: brandColors.secondary,
               padding: 14,
               alignItems: "center",
               opacity: p.is_demo ? 0.5 : 1,
             }}
           >
-            <Text
-              style={{ color: dark ? "#04112f" : "#fff", fontWeight: "800" }}
-            >
+            <Text style={{ color: brandColors.onSecondary, fontWeight: "800" }}>
               Contactar
             </Text>
           </Pressable>
@@ -280,7 +279,7 @@ export function PropertyDetail({
                   )
                 }
               >
-                <Text style={{ color: "#0866f5", padding: 12 }}>
+                <Text style={{ color: brandColors.secondary, padding: 12 }}>
                   Llamar al anunciante
                 </Text>
               </Pressable>

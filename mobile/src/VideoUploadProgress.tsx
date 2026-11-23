@@ -1,3 +1,4 @@
+import { brandColors } from "./brand-colors";
 import { ActivityIndicator, Modal, StyleSheet, Text, View } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { VideoUploadProgress as Progress } from "./video-upload";
@@ -20,7 +21,7 @@ export function VideoUploadProgress({
     <View style={s.screen} accessibilityViewIsModal>
       <StatusBar style="dark" />
       <View style={s.card}>
-        <ActivityIndicator size="large" color="#0866f5" />
+        <ActivityIndicator size="large" color={brandColors.secondary} />
         <Text style={s.title}>
           {progress?.phase === "processing"
             ? "Confirmando la carga"
@@ -80,7 +81,7 @@ export function VideoUploadProgress({
 const s = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: "#f5f9ff",
+    backgroundColor: brandColors.secondarySurface,
     justifyContent: "center",
     padding: 24,
   },
@@ -88,18 +89,18 @@ const s = StyleSheet.create({
     padding: 24,
     borderRadius: 22,
     backgroundColor: "#fff",
-    borderColor: "#dce8f8",
+    borderColor: brandColors.secondarySurface,
     borderWidth: 1,
     gap: 18,
   },
   title: {
-    color: "#082750",
+    color: brandColors.secondary,
     fontSize: 25,
     fontWeight: "800",
     textAlign: "center",
   },
   description: {
-    color: "#365b80",
+    color: brandColors.secondary,
     fontSize: 15,
     lineHeight: 23,
     textAlign: "center",
@@ -110,12 +111,21 @@ const s = StyleSheet.create({
     backgroundColor: "#e6effb",
     overflow: "hidden",
   },
-  fill: { height: "100%", backgroundColor: "#0866f5", borderRadius: 8 },
+  fill: {
+    height: "100%",
+    backgroundColor: brandColors.secondary,
+    borderRadius: 8,
+  },
   percent: {
-    color: "#0866f5",
+    color: brandColors.secondary,
     fontSize: 22,
     fontWeight: "800",
     textAlign: "center",
   },
-  note: { color: "#56728c", fontSize: 13, lineHeight: 21, textAlign: "center" },
+  note: {
+    color: brandColors.secondary,
+    fontSize: 13,
+    lineHeight: 21,
+    textAlign: "center",
+  },
 });

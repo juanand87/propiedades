@@ -1,3 +1,4 @@
+import { brandColors } from "./brand-colors";
 import { useState } from "react";
 import {
   ActivityIndicator,
@@ -30,7 +31,7 @@ export function ModerationActions({
   targetId,
   authorId,
   session,
-  color = "#0866f5",
+  color = brandColors.secondary,
   label = "Reportar",
 }: {
   kind: "user" | "video" | "comment";
@@ -144,7 +145,7 @@ export function ModerationActions({
                 onPress={() => setOpen(false)}
                 style={{ padding: 12 }}
               >
-                <ProppixIcon name="close" color="#052553" />
+                <ProppixIcon name="close" color={brandColors.secondary} />
               </Pressable>
             </View>
             <ScrollView
@@ -173,7 +174,7 @@ export function ModerationActions({
               <TextInput
                 accessibilityLabel="Detalles del reporte"
                 placeholder="Cuéntanos qué ocurrió (opcional)"
-                placeholderTextColor="#6c7f94"
+                placeholderTextColor={brandColors.secondary}
                 maxLength={1000}
                 multiline
                 value={details}
@@ -247,16 +248,21 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
   },
-  title: { fontSize: 22, fontWeight: "800", color: "#052553", flexShrink: 1 },
+  title: {
+    fontSize: 22,
+    fontWeight: "800",
+    color: brandColors.secondary,
+    flexShrink: 1,
+  },
   content: { padding: 22, paddingBottom: 40, gap: 14 },
-  text: { color: "#33506d", fontSize: 14, lineHeight: 21 },
+  text: { color: brandColors.secondary, fontSize: 14, lineHeight: 21 },
   reason: {
     padding: 15,
     borderRadius: 14,
     borderWidth: 1,
     borderColor: "#d8e6f2",
   },
-  selected: { backgroundColor: "#edfaff", borderColor: "#0866f5" },
+  selected: { backgroundColor: "#edfaff", borderColor: brandColors.secondary },
   input: {
     color: "#17334c",
     minHeight: 100,
@@ -268,16 +274,16 @@ const s = StyleSheet.create({
   primary: {
     padding: 17,
     borderRadius: 24,
-    backgroundColor: "#0866f5",
+    backgroundColor: brandColors.secondary,
     alignItems: "center",
   },
   white: { color: "#fff", fontWeight: "700" },
   secondary: {
     padding: 16,
     borderRadius: 24,
-    borderColor: "#0866f5",
+    borderColor: brandColors.secondary,
     borderWidth: 1,
     alignItems: "center",
   },
-  blue: { color: "#0866f5", fontWeight: "700" },
+  blue: { color: brandColors.secondary, fontWeight: "700" },
 });

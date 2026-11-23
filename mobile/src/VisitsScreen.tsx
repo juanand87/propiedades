@@ -1,3 +1,4 @@
+import { brandColors } from "./brand-colors";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -290,7 +291,7 @@ export function VisitsScreen({
                 {error}
               </Text>
             )}
-            {loading && <ActivityIndicator color="#0866f5" />}
+            {loading && <ActivityIndicator color={brandColors.secondary} />}
             {detail && (
               <View style={s.card}>
                 <Text style={s.title}>{detail.property_title}</Text>
@@ -493,31 +494,36 @@ const s = StyleSheet.create({
     alignItems: "center",
     gap: 15,
     borderBottomWidth: 1,
-    borderColor: "#dceafb",
+    borderColor: brandColors.secondarySurface,
   },
   back: { fontSize: 36, color: "#0755b5" },
-  title: { fontSize: 20, fontWeight: "700", color: "#123d70", flexShrink: 1 },
-  link: { color: "#0866f5", fontWeight: "700" },
+  title: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: brandColors.secondary,
+    flexShrink: 1,
+  },
+  link: { color: brandColors.secondary, fontWeight: "700" },
   content: { padding: 18, gap: 16, paddingBottom: 40 },
   text: { color: "#183c67", fontSize: 16, lineHeight: 23 },
-  muted: { color: "#526b85", lineHeight: 21 },
-  status: { color: "#0866f5", fontWeight: "700" },
+  muted: { color: brandColors.secondary, lineHeight: 21 },
+  status: { color: brandColors.secondary, fontWeight: "700" },
   error: { color: "#b02b3b" },
   card: {
     padding: 18,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: "#dceafb",
+    borderColor: brandColors.secondarySurface,
     gap: 13,
     backgroundColor: "#fff",
   },
   button: {
-    backgroundColor: "#0866f5",
+    backgroundColor: brandColors.secondary,
     padding: 15,
     borderRadius: 14,
     alignItems: "center",
   },
-  secondary: { backgroundColor: "#edf6ff" },
+  secondary: { backgroundColor: brandColors.secondarySurface },
   buttonText: { color: "#fff", fontWeight: "700", fontSize: 16 },
   input: {
     borderWidth: 1,
@@ -525,7 +531,7 @@ const s = StyleSheet.create({
     borderRadius: 12,
     padding: 14,
     minHeight: 80,
-    color: "#123d70",
+    color: brandColors.secondary,
   },
   event: {
     gap: 5,

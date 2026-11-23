@@ -1,3 +1,4 @@
+import { brandColors } from "./brand-colors";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -32,8 +33,12 @@ export function VideoSearch({
   useEffect(() => {
     const controller = new AbortController();
     const timer = setTimeout(() => {
-      setItems([]); setPage(0); setPages(0); setError(""); setBusy(q.length >= 2);
-      if(q.length < 2) return;
+      setItems([]);
+      setPage(0);
+      setPages(0);
+      setError("");
+      setBusy(q.length >= 2);
+      if (q.length < 2) return;
       void api<Page<Video>>(
         `/videos?limit=20&search=${encodeURIComponent(q)}`,
         { token, signal: controller.signal },
@@ -97,7 +102,13 @@ export function VideoSearch({
               justifyContent: "space-between",
             }}
           >
-            <Text style={{ fontSize: 23, fontWeight: "800", color: "#123b70" }}>
+            <Text
+              style={{
+                fontSize: 23,
+                fontWeight: "800",
+                color: brandColors.secondary,
+              }}
+            >
               Buscar videos
             </Text>
             <Pressable
@@ -105,7 +116,9 @@ export function VideoSearch({
               onPress={onClose}
               style={{ padding: 10 }}
             >
-              <Text style={{ fontSize: 26, color: "#123b70" }}>×</Text>
+              <Text style={{ fontSize: 26, color: brandColors.secondary }}>
+                ×
+              </Text>
             </Pressable>
           </View>
           <TextInput
@@ -116,7 +129,7 @@ export function VideoSearch({
               setQuery(value);
             }}
             placeholder="Título del video"
-            placeholderTextColor="#526b85"
+            placeholderTextColor={brandColors.secondary}
             accessibilityLabel="Buscar videos por título"
             maxLength={100}
             returnKeyType="search"
@@ -124,8 +137,8 @@ export function VideoSearch({
               marginHorizontal: 18,
               padding: 15,
               borderRadius: 16,
-              backgroundColor: "#edf6ff",
-              color: "#123b70",
+              backgroundColor: brandColors.secondarySurface,
+              color: brandColors.secondary,
             }}
           />
           {!!error && (
@@ -163,7 +176,7 @@ export function VideoSearch({
                 </View>
                 <Text
                   numberOfLines={2}
-                  style={{ color: "#123b70", paddingVertical: 8 }}
+                  style={{ color: brandColors.secondary, paddingVertical: 8 }}
                 >
                   {item.title}
                 </Text>
@@ -171,7 +184,7 @@ export function VideoSearch({
             )}
             ListEmptyComponent={
               !busy && !error ? (
-                <Text style={{ padding: 20, color: "#526b85" }}>
+                <Text style={{ padding: 20, color: brandColors.secondary }}>
                   {q.length < 2
                     ? "Escribe al menos 2 caracteres del título."
                     : "No encontramos videos con ese título."}
@@ -180,13 +193,22 @@ export function VideoSearch({
             }
             ListFooterComponent={
               busy ? (
-                <ActivityIndicator color="#0866f5" />
+                <ActivityIndicator color={brandColors.secondary} />
               ) : page < pages ? (
                 <Pressable
-                  onPress={() => { setBusy(true); setError(""); setExtra(page + 1); }}
+                  onPress={() => {
+                    setBusy(true);
+                    setError("");
+                    setExtra(page + 1);
+                  }}
                   style={{ padding: 18 }}
                 >
-                  <Text style={{ color: "#0866f5", textAlign: "center" }}>
+                  <Text
+                    style={{
+                      color: brandColors.secondary,
+                      textAlign: "center",
+                    }}
+                  >
                     Cargar más videos
                   </Text>
                 </Pressable>

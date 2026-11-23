@@ -1,3 +1,4 @@
+import { brandColors } from "./brand-colors";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -152,7 +153,7 @@ export function SavedSearchesScreen({ session }: { session: Session | null }) {
           }
           style={{ padding: 10 }}
         >
-          <ProppixIcon name="close" color="#052553" />
+          <ProppixIcon name="close" color={brandColors.secondary} />
         </Pressable>
       </View>
       {!session ? (
@@ -187,7 +188,7 @@ export function SavedSearchesScreen({ session }: { session: Session | null }) {
               onPress={() => void load()}
               style={{ padding: 10 }}
             >
-              <ProppixIcon name="refresh" color="#0866f5" />
+              <ProppixIcon name="refresh" color={brandColors.secondary} />
             </Pressable>
           </View>
           <ScrollView contentContainerStyle={s.content}>
@@ -196,7 +197,7 @@ export function SavedSearchesScreen({ session }: { session: Session | null }) {
                 {error}
               </Text>
             )}
-            {busy && <ActivityIndicator color="#0866f5" />}
+            {busy && <ActivityIndicator color={brandColors.secondary} />}
             {section === "searches" ? (
               <>
                 <Text style={s.muted}>
@@ -219,7 +220,9 @@ export function SavedSearchesScreen({ session }: { session: Session | null }) {
                         disabled={busy}
                         onValueChange={() => void toggle(item)}
                         trackColor={{ false: "#d6e1ec", true: "#85d9f4" }}
-                        thumbColor={item.enabled ? "#0866f5" : "#fff"}
+                        thumbColor={
+                          item.enabled ? brandColors.secondary : "#fff"
+                        }
                       />
                     </View>
                     <Text style={s.text}>
@@ -327,7 +330,7 @@ const s = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
   },
-  title: { fontSize: 26, fontWeight: "800", color: "#052553" },
+  title: { fontSize: 26, fontWeight: "800", color: brandColors.secondary },
   tabs: {
     flexDirection: "row",
     gap: 10,
@@ -338,9 +341,9 @@ const s = StyleSheet.create({
     paddingVertical: 11,
     paddingHorizontal: 18,
     borderRadius: 24,
-    backgroundColor: "#edf5fc",
+    backgroundColor: brandColors.secondarySurface,
   },
-  active: { backgroundColor: "#0866f5" },
+  active: { backgroundColor: brandColors.secondary },
   content: { padding: 20, gap: 16, paddingBottom: 40 },
   card: {
     padding: 18,
@@ -356,16 +359,21 @@ const s = StyleSheet.create({
     alignItems: "center",
     gap: 10,
   },
-  name: { flexShrink: 1, fontSize: 17, fontWeight: "700", color: "#052553" },
-  text: { color: "#33506d", lineHeight: 22 },
-  muted: { color: "#6c7f94", fontSize: 13, lineHeight: 20 },
-  link: { color: "#0866f5", fontWeight: "700" },
+  name: {
+    flexShrink: 1,
+    fontSize: 17,
+    fontWeight: "700",
+    color: brandColors.secondary,
+  },
+  text: { color: brandColors.secondary, lineHeight: 22 },
+  muted: { color: brandColors.secondary, fontSize: 13, lineHeight: 20 },
+  link: { color: brandColors.secondary, fontWeight: "700" },
   error: { color: "#a42c3a" },
   primary: {
     padding: 16,
     borderRadius: 24,
     alignItems: "center",
-    backgroundColor: "#0866f5",
+    backgroundColor: brandColors.secondary,
   },
   white: { color: "#fff", fontWeight: "700" },
   empty: { padding: 24, gap: 20 },

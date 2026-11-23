@@ -1,3 +1,4 @@
+import { brandColors } from "./brand-colors";
 import { ActivityIndicator, Text, View, StyleSheet } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { ProppixBrand, ProppixMark } from "./ProppixIdentity";
@@ -43,7 +44,7 @@ const s = StyleSheet.create({
     marginTop: 14,
     textAlign: "center",
   },
-  status: { color: "#31517a", fontSize: 13, marginTop: 14 },
+  status: { color: brandColors.secondary, fontSize: 13, marginTop: 14 },
   footer: {
     position: "absolute",
     bottom: 38,

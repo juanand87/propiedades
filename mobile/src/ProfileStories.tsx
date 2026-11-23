@@ -1,3 +1,4 @@
+import { brandColors } from "./brand-colors";
 import { ReactNode, useEffect, useState } from "react";
 import {
   Alert,
@@ -189,7 +190,7 @@ export function ProfileStories({
             width: 27,
             height: 27,
             borderRadius: 14,
-            backgroundColor: "#0866f5",
+            backgroundColor: brandColors.secondary,
             alignItems: "center",
             justifyContent: "center",
           }}
@@ -218,7 +219,9 @@ export function ProfileStories({
           }}
         >
           <Pressable onPress={() => setPick(false)}>
-            <Text style={{ color: "#0866f5", padding: 12 }}>Cerrar ×</Text>
+            <Text style={{ color: brandColors.secondary, padding: 12 }}>
+              Cerrar ×
+            </Text>
           </Pressable>
           <Text style={{ fontSize: 22, color: "#071c55", fontWeight: "700" }}>
             Compartir video como historia

@@ -1,3 +1,4 @@
+import { brandColors } from "./brand-colors";
 import { ProfileStories } from "./ProfileStories";
 import { useNightStyles } from "./appearance";
 import { ProppixIcon } from "./ProppixIcon";
@@ -758,7 +759,7 @@ export function VideoProfile({
             {error}
           </Text>
         )}
-        {busy && <ActivityIndicator color="#0866f5" />}
+        {busy && <ActivityIndicator color={brandColors.secondary} />}
         {sectionTabs}
       </View>
     );
@@ -802,7 +803,7 @@ export function VideoProfile({
               style={[s.input, { flex: 1 }]}
               accessibilityLabel="Buscar usuario"
               placeholder="Buscar usuario"
-              placeholderTextColor="#31517a"
+              placeholderTextColor={brandColors.secondary}
               value={relationSearch}
               onChangeText={setRelationSearch}
               onSubmitEditing={() => void showFollowers()}
@@ -904,7 +905,7 @@ export function VideoProfile({
             <RefreshControl
               refreshing={loading && page > 0}
               onRefresh={() => void load()}
-              tintColor="#0866f5"
+              tintColor={brandColors.secondary}
             />
           }
           onEndReached={() => {
@@ -981,12 +982,12 @@ export function VideoProfile({
                 </Text>
               </View>
             ) : (
-              <ActivityIndicator color="#0866f5" />
+              <ActivityIndicator color={brandColors.secondary} />
             )
           }
           ListFooterComponent={
             loading && page > 0 ? (
-              <ActivityIndicator color="#0866f5" />
+              <ActivityIndicator color={brandColors.secondary} />
             ) : (
               <View style={{ height: 24 }} />
             )
@@ -1227,18 +1228,18 @@ const baseStyles = StyleSheet.create({
     gap: 6,
     padding: 10,
     borderWidth: 1,
-    borderColor: "#a5c1e1",
+    borderColor: brandColors.secondaryBorder,
     borderRadius: 13,
     alignItems: "center",
   },
   kindBadge: {
-    color: "#0866f5",
+    color: brandColors.secondary,
     fontSize: 11,
     fontWeight: "700",
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 12,
-    backgroundColor: "#dcecff",
+    backgroundColor: brandColors.secondarySurface,
   },
   recordButton: {
     flexDirection: "row",
@@ -1246,7 +1247,7 @@ const baseStyles = StyleSheet.create({
     padding: 15,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#0866f5",
+    backgroundColor: brandColors.secondary,
     borderRadius: 16,
   },
   uploadButton: {
@@ -1256,7 +1257,7 @@ const baseStyles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
-    borderColor: "#a5c1e1",
+    borderColor: brandColors.secondaryBorder,
     borderRadius: 16,
     backgroundColor: "#fff",
   },
@@ -1281,30 +1282,30 @@ const baseStyles = StyleSheet.create({
     gap: 12,
     width: "100%",
   },
-  title: { color: "#10376b", fontSize: 24, fontWeight: "800" },
-  gear: { color: "#0866f5", fontSize: 25, padding: 8 },
+  title: { color: brandColors.secondary, fontSize: 24, fontWeight: "800" },
+  gear: { color: brandColors.secondary, fontSize: 25, padding: 8 },
   avatarWrap: { position: "relative" },
   avatar: {
     width: 82,
     height: 82,
     borderRadius: 41,
-    backgroundColor: "#edf4ff",
+    backgroundColor: brandColors.secondarySurface,
     alignItems: "center",
     justifyContent: "center",
   },
-  initial: { color: "#0866f5", fontSize: 20, fontWeight: "800" },
+  initial: { color: brandColors.secondary, fontSize: 20, fontWeight: "800" },
   camera: {
     position: "absolute",
     bottom: 0,
     right: -2,
-    backgroundColor: "#0866f5",
+    backgroundColor: brandColors.secondary,
     width: 28,
     height: 28,
     borderRadius: 14,
     alignItems: "center",
     justifyContent: "center",
   },
-  handle: { color: "#10376b", fontWeight: "600" },
+  handle: { color: brandColors.secondary, fontWeight: "600" },
   counters: {
     flexDirection: "row",
     justifyContent: "space-around",
@@ -1317,39 +1318,43 @@ const baseStyles = StyleSheet.create({
     gap: 7,
     paddingVertical: 12,
     borderRightWidth: 1,
-    borderColor: "#e0e8f2",
+    borderColor: brandColors.secondaryBorder,
   },
-  counterNumber: { color: "#10376b", fontSize: 23, fontWeight: "800" },
-  muted: { color: "#31517a", fontSize: 13 },
+  counterNumber: {
+    color: brandColors.secondary,
+    fontSize: 23,
+    fontWeight: "800",
+  },
+  muted: { color: brandColors.secondary, fontSize: 13 },
   explainer: {
-    color: "#31517a",
+    color: brandColors.secondary,
     fontSize: 13,
     lineHeight: 21,
     padding: 14,
     borderRadius: 16,
-    backgroundColor: "#edf6ff",
+    backgroundColor: brandColors.secondarySurface,
   },
   row: { flexDirection: "row", gap: 10 },
   button: {
     paddingHorizontal: 18,
     paddingVertical: 13,
     borderRadius: 10,
-    backgroundColor: "#0866f5",
+    backgroundColor: brandColors.secondary,
     marginVertical: 3,
     minHeight: 46,
   },
   secondary: {
-    backgroundColor: "#edf4ff",
+    backgroundColor: brandColors.secondarySurface,
     borderWidth: 1,
-    borderColor: "#d3e0f2",
+    borderColor: brandColors.secondaryBorder,
   },
   buttonText: { color: "#fff", fontWeight: "800", textAlign: "center" },
-  light: { color: "#10376b", fontWeight: "600" },
+  light: { color: brandColors.secondary, fontWeight: "600" },
   tabs: {
     flexDirection: "row",
     width: "100%",
     borderBottomWidth: 1,
-    borderBottomColor: "#d3e0f2",
+    borderBottomColor: brandColors.secondaryBorder,
   },
   tab: {
     flex: 1,
@@ -1359,11 +1364,14 @@ const baseStyles = StyleSheet.create({
     justifyContent: "center",
     gap: 6,
   },
-  selectedTab: { borderBottomColor: "#0866f5", borderBottomWidth: 3 },
+  selectedTab: {
+    borderBottomColor: brandColors.secondary,
+    borderBottomWidth: 3,
+  },
   tile: {
     flex: 1 / 3,
     aspectRatio: 0.7,
-    backgroundColor: "#edf4ff",
+    backgroundColor: brandColors.secondarySurface,
     margin: 4,
     borderRadius: 14,
     overflow: "hidden",
@@ -1432,14 +1440,14 @@ const baseStyles = StyleSheet.create({
     padding: 25,
   },
   dialog: {
-    backgroundColor: "#edf4ff",
+    backgroundColor: brandColors.secondarySurface,
     borderRadius: 22,
     padding: 22,
     gap: 14,
   },
   input: {
-    backgroundColor: "#edf4ff",
-    color: "#10376b",
+    backgroundColor: brandColors.secondarySurface,
+    color: brandColors.secondary,
     padding: 14,
     borderRadius: 10,
   },

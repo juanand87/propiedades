@@ -1,6 +1,8 @@
 import { useColorScheme } from "react-native";
+import { brandColors } from "./brand-colors";
 const night: Record<string, string> = {
-  "#31517a": "#b5c8e3",
+  [brandColors.secondarySurface]: "#15264a",
+  [brandColors.secondaryBorder]: "#406089",
   "#fff": "#06132e",
   "#ffffff": "#06132e",
   "#fbfcff": "#06132e",
@@ -20,7 +22,6 @@ const night: Record<string, string> = {
   "#d3e0f2": "#294266",
   "#e0e8f2": "#294266",
   "#a5c1e1": "#406089",
-  "#0866f5": "#00bde9",
   "#ffffffee": "#15264a",
   "#1c568b": "#b5d5f8",
 };
@@ -33,11 +34,15 @@ export function useNightStyles<T extends Record<string, object>>(styles: T): T {
       Object.fromEntries(
         Object.entries(value).map(([property, color]) => [
           property,
-          property === "color" && (color === "#fff" || color === "#ffffff")
-            ? color
-            : typeof color === "string" && /color$/i.test(property)
-              ? night[color.toLowerCase()] || color
-              : color,
+          color === brandColors.secondary
+            ? property === "color"
+              ? brandColors.secondaryOnDark
+              : color
+            : property === "color" && (color === "#fff" || color === "#ffffff")
+              ? color
+              : typeof color === "string" && /color$/i.test(property)
+                ? night[color.toLowerCase()] || color
+                : color,
         ]),
       ),
     ]),

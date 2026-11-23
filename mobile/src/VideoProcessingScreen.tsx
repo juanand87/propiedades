@@ -1,3 +1,4 @@
+import { brandColors } from "./brand-colors";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -233,7 +234,7 @@ export function VideoProcessingScreen({
     <ScrollView contentContainerStyle={s.screen}>
       <View style={s.card}>
         {!ready && !failed && (
-          <ActivityIndicator size="large" color="#0866f5" />
+          <ActivityIndicator size="large" color={brandColors.secondary} />
         )}
         <Text style={s.title}>
           {ready
@@ -348,7 +349,7 @@ const s = StyleSheet.create({
     flexGrow: 1,
     justifyContent: "center",
     padding: 22,
-    backgroundColor: "#f5f9ff",
+    backgroundColor: brandColors.secondarySurface,
   },
   card: {
     gap: 20,
@@ -356,24 +357,29 @@ const s = StyleSheet.create({
     padding: 24,
     backgroundColor: "#fff",
     borderWidth: 1,
-    borderColor: "#dce8f8",
+    borderColor: brandColors.secondarySurface,
   },
   title: {
-    color: "#082750",
+    color: brandColors.secondary,
     fontWeight: "800",
     fontSize: 25,
     textAlign: "center",
   },
   description: {
-    color: "#365b80",
+    color: brandColors.secondary,
     fontSize: 16,
     lineHeight: 24,
     textAlign: "center",
   },
-  note: { color: "#56728c", fontSize: 13, lineHeight: 21, textAlign: "center" },
+  note: {
+    color: brandColors.secondary,
+    fontSize: 13,
+    lineHeight: 21,
+    textAlign: "center",
+  },
   error: { color: "#a5303a", textAlign: "center", lineHeight: 22 },
   button: {
-    backgroundColor: "#0866f5",
+    backgroundColor: brandColors.secondary,
     borderRadius: 16,
     padding: 17,
     alignItems: "center",
@@ -389,5 +395,5 @@ const s = StyleSheet.create({
     fontSize: 16,
     textAlign: "center",
   },
-  secondaryText: { color: "#123b70" },
+  secondaryText: { color: brandColors.secondary },
 });

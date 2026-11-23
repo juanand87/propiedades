@@ -1,3 +1,4 @@
+import { brandColors } from "./brand-colors";
 import {
   followState,
   rememberFollowState,
@@ -516,8 +517,14 @@ export function SocialVideoActions({
                 })
               }
             >
-              <ProppixIcon name="plus" size={22} color="#0b295a" />
-              <Text style={[s.propertyActionText, { color: "#0b295a" }]}>
+              <ProppixIcon
+                name="plus"
+                size={22}
+                color={brandColors.secondary}
+              />
+              <Text
+                style={[s.propertyActionText, { color: brandColors.secondary }]}
+              >
                 Crear propiedad en Proppix
               </Text>
             </Pressable>
@@ -937,7 +944,7 @@ const s = StyleSheet.create({
     alignItems: "center",
     gap: 7,
     padding: 13,
-    backgroundColor: "#0866f5",
+    backgroundColor: brandColors.secondary,
     borderRadius: 15,
   },
   propertyActionText: {
@@ -971,7 +978,7 @@ const s = StyleSheet.create({
     width: 46,
     height: 46,
     borderRadius: 23,
-    backgroundColor: "#0866f5",
+    backgroundColor: brandColors.secondary,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -1047,14 +1054,14 @@ const s = StyleSheet.create({
     borderBottomWidth: 1,
   },
   highlightedComment: {
-    backgroundColor: "#edf6ff",
+    backgroundColor: brandColors.secondarySurface,
     borderColor: "#31c8ee",
     borderWidth: 1,
     borderRadius: 12,
     paddingHorizontal: 12,
   },
   highlightLabel: {
-    color: "#0866f5",
+    color: brandColors.secondary,
     fontSize: 12,
     fontWeight: "700",
     marginBottom: 8,
