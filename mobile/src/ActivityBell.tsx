@@ -1,7 +1,13 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import { ProppixIcon } from "./ProppixIcon";
-export function ActivityBell({ unread = 0 }: { unread?: number }) {
+export function ActivityBell({
+  unread = 0,
+  color = "#071c55",
+}: {
+  unread?: number;
+  color?: string;
+}) {
   const router = useRouter();
   return (
     <Pressable
@@ -10,7 +16,7 @@ export function ActivityBell({ unread = 0 }: { unread?: number }) {
       onPress={() => router.push("/actividad")}
       style={s.button}
     >
-      <ProppixIcon name="bell" size={25} />
+      <ProppixIcon name="bell" size={25} color={color} />
       {unread > 0 && (
         <View style={s.badge}>
           <Text style={s.text}>{unread > 99 ? "99+" : unread}</Text>

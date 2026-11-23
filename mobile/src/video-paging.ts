@@ -25,3 +25,20 @@ export function resumeVideoIndex(
       result = i;
   return result;
 }
+
+export function enteringVideoIndex(
+  offset: number,
+  pageHeight: number,
+  start: number,
+  count: number,
+  playing: number,
+) {
+  if (!(pageHeight > 0) || count < 1) return 0;
+  const anchor = Math.max(0, Math.min(count - 1, start));
+  const progress = (offset - anchor * pageHeight) / pageHeight;
+  if (progress >= 0.2 || (playing === anchor + 1 && progress > 0.08))
+    return Math.min(count - 1, anchor + 1);
+  if (progress <= -0.2 || (playing === anchor - 1 && progress < -0.08))
+    return Math.max(0, anchor - 1);
+  return anchor;
+}

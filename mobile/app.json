@@ -2,16 +2,16 @@
   "expo": {
     "name": "Proppix",
     "slug": "proppix",
-    "version": "1.0.37",
+    "version": "1.0.38",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "dark",
+    "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": true
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#06272d",
+        "backgroundColor": "#ffffff",
         "foregroundImage": "./assets/android-icon-foreground.png"
       },
       "predictiveBackGestureEnabled": false,
@@ -20,12 +20,25 @@
         "android.permission.RECORD_AUDIO",
         "android.permission.CAMERA"
       ],
-      "versionCode": 38
+      "versionCode": 39
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#f5f7ff",
+          "image": "./assets/splash-logo.png",
+          "imageWidth": 240,
+          "resizeMode": "contain",
+          "dark": {
+            "backgroundColor": "#f5f7ff",
+            "image": "./assets/splash-logo.png"
+          }
+        }
+      ],
       "expo-video",
       "expo-secure-store",
       [

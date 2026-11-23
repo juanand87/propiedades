@@ -1,5 +1,5 @@
 import { ProppixIcon } from "./ProppixIcon";
-import { clampVideoOffset } from "./video-paging";
+import { clampVideoOffset, enteringVideoIndex } from "./video-paging";
 import { rememberFollowState } from "./follow-state";
 import { beginVideoLoad, videoSourceReady } from "./playback-metrics";
 import { VideoCover } from "./VideoCover";
@@ -991,9 +991,15 @@ export function VideoProfile({
                 length: height,
                 offset: i * height,
               })}
-              onScrollBeginDrag={() => {
+              onScrollBeginDrag={(e) => {
                 viewerDragging.current = true;
-                viewerDragIndex.current = active;
+                viewerDragIndex.current = Math.max(
+                  0,
+                  Math.min(
+                    videos.length - 1,
+                    Math.round(e.nativeEvent.contentOffset.y / height),
+                  ),
+                );
               }}
               onScroll={(e) => {
                 if (!viewerDragging.current) return;
@@ -1009,7 +1015,15 @@ export function VideoProfile({
                     offset: bounded,
                     animated: false,
                   });
-                setActive(Math.round(bounded / height));
+                setActive(
+                  enteringVideoIndex(
+                    bounded,
+                    height,
+                    viewerDragIndex.current,
+                    videos.length,
+                    active,
+                  ),
+                );
               }}
               onMomentumScrollEnd={(e) => {
                 if (!viewerDragging.current) return;

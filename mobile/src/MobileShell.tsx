@@ -1,5 +1,4 @@
 import { VideoSearch } from "./VideoSearch";
-import { playbackSummary } from "./playback-metrics";
 import { attachPreparedVideo } from "./video-playback-policy";
 import { ProfileSearchScreen } from "./ProfileSearchScreen";
 import {
@@ -75,8 +74,13 @@ import { ContactProperty } from "./ContactProperty";
 import { VideoProfile } from "./VideoProfile";
 import { PropertyCatalog } from "./PropertyCatalog";
 import { ProppixBrand } from "./ProppixBrand";
+import { ProppixLaunch } from "./ProppixLaunch";
 import { ProppixIcon, ProppixIconName } from "./ProppixIcon";
-import { clampVideoOffset, resumeVideoIndex } from "./video-paging";
+import {
+  clampVideoOffset,
+  resumeVideoIndex,
+  enteringVideoIndex,
+} from "./video-paging";
 import { prepareVideoCache, useVideoPreload } from "./useVideoPreload";
 import { randomUUID } from "expo-crypto";
 import { PropertySlideshow } from "./PropertySlideshow";
@@ -927,31 +931,14 @@ function AppContent() {
   if (!ready)
     return (
       <SafeAreaView style={s.safe}>
-        <View style={s.welcome}>
-          <Text style={s.eyebrow}>PROPIEDADES · LAB</Text>
-          <Text style={s.hero}>Tu próximo lugar,{`\n`}en movimiento.</Text>
-          <Text style={s.muted}>
-            {IS_PRODUCTION
-              ? "Conectando con Proppix…"
-              : "Conectando con el backend NestJS local. Sin conexión a producción."}
-          </Text>
-          <Button
-            label="Ver tiempos de reproducción"
-            secondary
-            onPress={() =>
-              Alert.alert("Rendimiento de videos", playbackSummary())
-            }
-          />
-          <Text style={s.code}>{API_URL}</Text>
-          {booting ? (
-            <ActivityIndicator color={videoColors.cyan} />
-          ) : (
+        <ProppixLaunch>
+          {!booting && (
             <>
               <Text style={s.error}>{error}</Text>
               <Button label="Reintentar conexión" onPress={() => void boot()} />
             </>
           )}
-        </View>
+        </ProppixLaunch>
       </SafeAreaView>
     );
   const feedScreen = (
@@ -989,9 +976,15 @@ function AppContent() {
             windowSize={5}
             removeClippedSubviews={false}
             extraData={[active, preparedVideos, foreground, detail, favorites]}
-            onScrollBeginDrag={() => {
+            onScrollBeginDrag={(e) => {
               feedDragging.current = true;
-              feedDragIndex.current = active;
+              feedDragIndex.current = Math.max(
+                0,
+                Math.min(
+                  videos.length - 1,
+                  Math.round(e.nativeEvent.contentOffset.y / height),
+                ),
+              );
             }}
             onMomentumScrollEnd={(e) => {
               if (!feedDragging.current) return;
@@ -1024,7 +1017,15 @@ function AppContent() {
                   offset: bounded,
                   animated: false,
                 });
-              setActive(Math.round(bounded / height));
+              setActive(
+                enteringVideoIndex(
+                  bounded,
+                  height,
+                  feedDragIndex.current,
+                  videos.length,
+                  active,
+                ),
+              );
             }}
             scrollEventThrottle={16}
             onEndReached={() => void loadFeed()}
@@ -1471,7 +1472,7 @@ function AppContent() {
           onPress={() => setVideoSearchOpen(true)}
           style={{ padding: 9 }}
         >
-          <ProppixIcon name="search" size={25} />
+          <ProppixIcon name="search" size={25} color="#071c55" />
         </Pressable>
         <Pressable
           accessibilityRole="button"
@@ -1479,7 +1480,7 @@ function AppContent() {
           onPress={() => setAccountMenu(true)}
           style={{ padding: 9 }}
         >
-          <ProppixIcon name="menu" size={25} />
+          <ProppixIcon name="menu" size={25} color="#071c55" />
         </Pressable>
         <ActivityBell unread={activityUnread} />
       </View>
@@ -1622,7 +1623,7 @@ function AppContent() {
       <SafeAreaView
         style={[
           s.safe,
-          tab === "feed" && !propertyRoute && { backgroundColor: "#052b65" },
+          tab === "feed" && !propertyRoute && { backgroundColor: "#f5f7ff" },
         ]}
         edges={
           recordingRoute
@@ -1630,13 +1631,7 @@ function AppContent() {
             : ["top", "left", "right"]
         }
       >
-        <StatusBar
-          style={
-            recordingRoute || (tab === "feed" && !propertyRoute)
-              ? "light"
-              : "dark"
-          }
-        />
+        <StatusBar style={recordingRoute ? "light" : "dark"} />
         {!homePair && !recordingRoute && tab !== "catalog" && appHeader}
         <Modal
           visible={accountMenu}
@@ -1938,7 +1933,7 @@ const s = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    backgroundColor: "#052b65",
+    backgroundColor: "#f5f7ff",
   },
   brand: { fontSize: 24, fontWeight: "800", color: "#fff", letterSpacing: -1 },
   headerSub: { fontSize: 9, color: videoColors.muted, marginTop: 3 },

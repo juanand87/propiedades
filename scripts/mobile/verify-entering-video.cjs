@@ -1,0 +1,10 @@
+const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),assert=require('node:assert/strict');
+const root=path.resolve(__dirname,'../..'),ts=require(path.join(root,'mobile/node_modules/typescript'));
+const context={exports:{}};vm.runInNewContext(ts.transpileModule(fs.readFileSync(path.join(root,'mobile/src/video-paging.ts'),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText,context);
+const {enteringVideoIndex:enter,clampVideoOffset:clamp}=context.exports;
+assert.equal(enter(3180,1000,3,10,3),3);assert.equal(enter(3200,1000,3,10,3),4,'Incoming video starts before half of the swipe');
+assert.equal(enter(3120,1000,3,10,4),4,'Small finger movement does not oscillate audio');assert.equal(enter(3070,1000,3,10,4),3,'Cancelled swipe restores original video');
+assert.equal(enter(2800,1000,3,10,3),2);assert.equal(enter(2880,1000,3,10,2),2);assert.equal(enter(2930,1000,3,10,2),3);
+assert.equal(enter(-500,1000,0,10,0),0);assert.equal(enter(11000,1000,9,10,9),9);assert.equal(enter(9000,1000,3,10,3),4,'Never skip multiple videos');
+assert.equal(clamp(9000,1000,3,10),4000);assert.equal(enter(0,0,0,0,0),0);
+console.log('PASS: 12 checks: early playback in both directions, cancellation, hysteresis, boundaries and one-item paging.');

@@ -38,11 +38,12 @@ const categories: {
   icon: ProppixIconName;
   type?: string;
   operation?: string;
+  options?: boolean;
 }[] = [
   { label: "Casas", icon: "house", type: "house" },
   { label: "Departamentos", icon: "building", type: "apartment" },
   { label: "Terrenos", icon: "land", type: "land" },
-  { label: "Arriendos", icon: "handshake", operation: "rent" },
+  { label: "Otros", icon: "filters", options: true },
 ];
 
 export function PropertyCatalog({
@@ -257,21 +258,20 @@ export function PropertyCatalog({
   );
   return (
     <View style={s.root}>
-      <Image
-        source={require("../assets/los-lagos.jpg")}
-        style={[
-          StyleSheet.absoluteFill,
-          { width: "100%", height: "100%", top: -70 },
-        ]}
-        resizeMode="cover"
-      />
-      <LinearGradient
-        colors={[
-          "rgba(0,35,100,.35)",
-          "rgba(0,39,105,.15)",
-          "rgba(0,29,72,.8)",
-        ]}
-        style={StyleSheet.absoluteFill}
+      <View
+        pointerEvents="none"
+        style={{
+          position: "absolute",
+          right: -25,
+          top: 115,
+          width: 105,
+          height: 105,
+          borderTopWidth: 18,
+          borderLeftWidth: 18,
+          borderColor: "#dcecff",
+          transform: [{ rotate: "45deg" }],
+          borderRadius: 12,
+        }}
       />
       <GestureDetector gesture={scrollGesture}>
         <ScrollView
@@ -282,7 +282,7 @@ export function PropertyCatalog({
             <RefreshControl
               refreshing={busy}
               onRefresh={() => void load(true)}
-              tintColor="#fff"
+              tintColor="#071c55"
               colors={["#0866f5"]}
             />
           }
@@ -298,7 +298,7 @@ export function PropertyCatalog({
                   style={s.iconButton}
                   onPress={() => searchInput.current?.focus()}
                 >
-                  <ProppixIcon name="search" size={27} />
+                  <ProppixIcon name="search" size={27} color="#071c55" />
                 </Pressable>
                 <ActivityBell unread={activityUnread} />
               </View>
@@ -307,7 +307,16 @@ export function PropertyCatalog({
               Encuentra el{"\n"}
               <Text style={s.highlight}>hogar</Text> que buscas
             </Text>
-            <View style={s.swoosh} />
+            <Text
+              style={{
+                color: "#394e70",
+                fontSize: 13,
+                marginTop: 9,
+                marginBottom: 12,
+              }}
+            >
+              Compra, vende o arrienda con confianza.
+            </Text>
           </View>
           <View style={s.searchRow}>
             <View style={s.search}>
@@ -352,7 +361,7 @@ export function PropertyCatalog({
               }}
               style={s.filterButton}
             >
-              <ProppixIcon name="filters" color="#08275f" size={27} />
+              <ProppixIcon name="filters" color="#fff" size={25} />
               {activeFilterCount > 0 && (
                 <View style={s.badge}>
                   <Text style={s.badgeText}>{activeFilterCount}</Text>
@@ -396,7 +405,12 @@ export function PropertyCatalog({
                   accessibilityRole="button"
                   accessibilityState={{ selected }}
                   style={[s.category, selected && s.categorySelected]}
-                  onPress={() =>
+                  onPress={() => {
+                    if (category.options) {
+                      setDraft(filters);
+                      setFilterOpen(true);
+                      return;
+                    }
                     setFilters((previous) =>
                       category.type
                         ? {
@@ -407,12 +421,16 @@ export function PropertyCatalog({
                             ...previous,
                             operation_type: selected ? "" : category.operation!,
                           },
-                    )
-                  }
+                    );
+                  }}
                 >
-                  <ProppixIcon name={category.icon} size={30} />
+                  <ProppixIcon
+                    name={category.icon}
+                    size={28}
+                    color={selected ? "#fff" : "#1c568b"}
+                  />
                   <Text
-                    style={s.categoryLabel}
+                    style={[s.categoryLabel, selected && { color: "#fff" }]}
                     numberOfLines={1}
                     adjustsFontSizeToFit
                   >
@@ -528,9 +546,8 @@ export function PropertyCatalog({
                         </View>
                       )}
                     </View>
-                    <View style={s.more}>
-                      <Text style={s.moreText}>Ver más</Text>
-                      <ProppixIcon name="arrow" color="#08275f" size={18} />
+                    <View style={s.cardArrow}>
+                      <ProppixIcon name="arrow" color="#fff" size={22} />
                     </View>
                   </View>
                 </View>
@@ -819,7 +836,7 @@ export function PropertyCatalog({
 }
 
 const s = StyleSheet.create({
-  root: { flex: 1, backgroundColor: "#063782" },
+  root: { flex: 1, backgroundColor: "#f5f7ff" },
   content: { paddingHorizontal: 14, paddingTop: 12, paddingBottom: 20 },
   hero: { paddingHorizontal: 12, paddingBottom: 7 },
   heading: {
@@ -836,13 +853,14 @@ const s = StyleSheet.create({
     justifyContent: "center",
   },
   headline: {
-    color: "#fff",
+    color: "#071c55",
     fontSize: 28,
+    fontWeight: "800",
     lineHeight: 32,
     letterSpacing: -0.6,
     marginTop: 15,
   },
-  highlight: { color: "#30c8ee", fontWeight: "800" },
+  highlight: { color: "#071c55", fontWeight: "800" },
   swoosh: {
     width: "75%",
     height: 16,
@@ -876,7 +894,7 @@ const s = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: "#fff",
+    backgroundColor: "#071c55",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -901,19 +919,20 @@ const s = StyleSheet.create({
   category: {
     flex: 1,
     borderWidth: 1,
-    borderColor: "#ffffff55",
-    backgroundColor: "#05387588",
+    borderColor: "#fff",
+    backgroundColor: "#ffffffee",
+    boxShadow: "0 4px 12px #173b6c0c",
     borderRadius: 14,
     paddingVertical: 10,
     alignItems: "center",
     gap: 5,
   },
   categorySelected: { backgroundColor: "#0866f5", borderColor: "#79d8ff" },
-  categoryLabel: { color: "#fff", fontSize: 10, letterSpacing: -0.25 },
+  categoryLabel: { color: "#304a70", fontSize: 10, letterSpacing: -0.25 },
   card: {
     width: "100%",
-    aspectRatio: 2.12,
-    minHeight: 172,
+    aspectRatio: 1.7,
+    minHeight: 210,
     borderRadius: 21,
     overflow: "hidden",
     borderWidth: 1,
@@ -969,6 +988,14 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     gap: 6,
+  },
+  cardArrow: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#ff7b5e",
+    alignItems: "center",
+    justifyContent: "center",
   },
   specs: { flexDirection: "row", flexWrap: "wrap", gap: 11, flex: 1 },
   spec: { flexDirection: "row", alignItems: "center", gap: 4 },
