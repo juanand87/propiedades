@@ -1,3 +1,4 @@
+import { ProfileStories } from "./ProfileStories";
 import { useNightStyles } from "./appearance";
 import { ProppixIcon } from "./ProppixIcon";
 import { clampVideoOffset, enteringVideoIndex } from "./video-paging";
@@ -554,48 +555,72 @@ export function VideoProfile({
       <View style={{ paddingHorizontal: 16 }}>{sectionTabs}</View>
     ) : (
       <View style={s.header}>
-        {userId && button("← Volver", () => router.back(), true)}
-        <View style={s.topline}>
+        <View
+          style={{
+            flexDirection: "row",
+            width: "100%",
+            alignItems: "center",
+            justifyContent: "space-between",
+          }}
+        >
           <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={
-              own ? "Cambiar foto de perfil" : "Foto de perfil"
-            }
-            disabled={!own || busy}
-            onPress={() => void choosePhoto()}
-            style={[
-              s.avatarWrap,
-              {
-                borderWidth: 2,
-                borderColor: "#05b9e7",
-                borderRadius: 50,
-                padding: 3,
-              },
-            ]}
+            accessibilityLabel="Volver"
+            onPress={() => router.back()}
+            style={{ padding: 8 }}
           >
-            {profile?.avatar_thumbnail_url || profile?.avatar_url ? (
-              <Image
-                fadeDuration={0}
-                source={{
-                  uri: mediaUrl(
-                    profile!.avatar_thumbnail_url || profile!.avatar_url!,
-                  ),
-                }}
-                style={s.avatar}
-              />
-            ) : (
-              <View style={s.avatar}>
-                <Text style={s.initial}>
-                  {profile?.display_name.slice(0, 1) || "P"}
-                </Text>
-              </View>
-            )}
-            {own && (
-              <View style={s.camera}>
-                <ProppixIcon name="edit" size={15} />
-              </View>
-            )}
+            <Text style={[s.light, { fontSize: 20 }]}>
+              ‹{" "}
+              <Text style={{ fontSize: 16 }}>
+                @{profile?.username || "perfil"}
+              </Text>
+            </Text>
           </Pressable>
+          {own && (
+            <Pressable
+              accessibilityLabel="Editar perfil"
+              onPress={() => {
+                setIdentity({
+                  profile_kind: profile?.profile_kind || null,
+                  username: profile?.username || "",
+                  display_name: profile?.display_name || "",
+                });
+                setEditProfile(true);
+              }}
+              style={s.editButton}
+            >
+              <Text style={s.light}>Editar perfil</Text>
+            </Pressable>
+          )}
+        </View>
+        <View style={s.topline}>
+          {target && (
+            <ProfileStories
+              key={`${target}:${session?.user.id || "guest"}`}
+              userId={target}
+              session={session}
+              own={own}
+              videos={videos}
+            >
+              {profile?.avatar_thumbnail_url || profile?.avatar_url ? (
+                <Image
+                  fadeDuration={0}
+                  source={{
+                    uri: mediaUrl(
+                      profile!.avatar_thumbnail_url || profile!.avatar_url!,
+                    ),
+                  }}
+                  style={s.avatar}
+                />
+              ) : (
+                <View style={s.avatar}>
+                  <Text style={s.initial}>
+                    {profile?.display_name.slice(0, 1) || "P"}
+                  </Text>
+                </View>
+              )}
+            </ProfileStories>
+          )}
+
           <View style={{ flex: 1, gap: 7 }}>
             <Text numberOfLines={1} style={s.title}>
               {profile?.display_name || "Tu perfil"}
@@ -618,24 +643,6 @@ export function VideoProfile({
               )}
             </View>
           </View>
-          {own && (
-            <Pressable
-              accessibilityLabel="Editar perfil"
-              onPress={() => {
-                setIdentity({
-                  profile_kind: profile?.profile_kind || null,
-                  username: profile?.username || "",
-                  display_name: profile?.display_name || "",
-                });
-                setEditProfile(true);
-              }}
-            >
-              <View style={s.editButton}>
-                <ProppixIcon name="edit" color={s.light.color} size={17} />
-                <Text style={s.light}>Editar perfil</Text>
-              </View>
-            </Pressable>
-          )}
         </View>
         <View style={s.counters}>
           {(
@@ -684,28 +691,43 @@ export function VideoProfile({
             </Pressable>
           </View>
         ) : (
-          session &&
-          profile &&
-          button(
-            profile?.followed ? "Siguiendo" : "Seguir",
-            () =>
-              void run(async () => {
-                const updated = await api<VideoProfileData>(
-                  `/video-profiles/${target}/follow`,
-                  {
-                    method: "POST",
-                    token,
-                    body: { active: !profile?.followed },
-                  },
-                );
-                rememberFollowState(
-                  session?.user.id,
-                  updated.id,
-                  updated.followed,
-                );
-                setProfile(updated);
-              }),
-          )
+          <View style={{ flexDirection: "row", width: "100%", gap: 8 }}>
+            <View style={{ flex: 1 }}>
+              {session &&
+                profile &&
+                button(
+                  profile?.followed ? "Siguiendo" : "Seguir",
+                  () =>
+                    void run(async () => {
+                      const updated = await api<VideoProfileData>(
+                        `/video-profiles/${target}/follow`,
+                        {
+                          method: "POST",
+                          token,
+                          body: { active: !profile?.followed },
+                        },
+                      );
+                      rememberFollowState(
+                        session?.user.id,
+                        updated.id,
+                        updated.followed,
+                      );
+                      setProfile(updated);
+                    }),
+                )}
+            </View>
+            <View style={{ flex: 1 }}>
+              {button(
+                "Mensaje",
+                () =>
+                  router.push({
+                    pathname: "/mensajes",
+                    params: { recipientId: target },
+                  }),
+                true,
+              )}
+            </View>
+          </View>
         )}
         {own && (
           <Text style={s.explainer}>
@@ -713,17 +735,6 @@ export function VideoProfile({
             confianza.
           </Text>
         )}
-        {!own &&
-          profile &&
-          button(
-            "Enviar mensaje",
-            () =>
-              router.push({
-                pathname: "/mensajes",
-                params: { recipientId: profile.id },
-              }),
-            true,
-          )}
         {!own && target && (
           <ModerationActions
             kind="user"
@@ -1107,6 +1118,12 @@ export function VideoProfile({
                   ? "Editar perfil"
                   : "Completa tu perfil"}
               </Text>
+              <Pressable
+                onPress={() => void choosePhoto()}
+                style={s.editButton}
+              >
+                <Text style={s.light}>Cambiar foto de perfil</Text>
+              </Pressable>
               <ProfileIdentityFields
                 value={identity}
                 onChange={setIdentity}

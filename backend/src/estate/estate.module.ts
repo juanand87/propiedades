@@ -1,4 +1,6 @@
 import { PropertyDictationService } from './property-dictation.service';
+import { ProfileStoriesService } from './profile-stories.service';
+import { ProfileStoriesController } from './profile-stories.controller';
 import { VideoUploadJobsService } from './video-upload-jobs.service';
 import { VideoUploadJobsController } from './video-upload-jobs.controller';
 import { ReviewMailService } from './review-mail.service';
@@ -53,6 +55,7 @@ import {
     }),
   ],
   controllers: [
+    ProfileStoriesController,
     VideoUploadJobsController,
     ReviewMailController,
     PropertyDictationController,
@@ -70,6 +73,7 @@ import {
     MessagingController,
   ],
   providers: [
+    ProfileStoriesService,
     VideoUploadJobsService,
     PropertyVideoPublicationService,
     ReviewMailService,
