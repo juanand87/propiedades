@@ -1,3 +1,4 @@
+import { useNightStyles } from "./appearance";
 import { VideoSearch } from "./VideoSearch";
 import { attachPreparedVideo } from "./video-playback-policy";
 import { ProfileSearchScreen } from "./ProfileSearchScreen";
@@ -36,6 +37,7 @@ import {
   ScrollView,
   Share,
   StyleSheet,
+  useColorScheme,
   Text,
   TextInput,
   View,
@@ -70,7 +72,6 @@ import { lightColors as videoColors } from "./video-colors";
 import { VideoCard } from "./VideoCard";
 import { VideoRecorder } from "./VideoRecorder";
 import { SellerPanel } from "./SellerPanel";
-import { ContactProperty } from "./ContactProperty";
 import { VideoProfile } from "./VideoProfile";
 import { PropertyCatalog } from "./PropertyCatalog";
 import { ProppixBrand } from "./ProppixBrand";
@@ -83,7 +84,7 @@ import {
 } from "./video-paging";
 import { prepareVideoCache, useVideoPreload } from "./useVideoPreload";
 import { randomUUID } from "expo-crypto";
-import { PropertySlideshow } from "./PropertySlideshow";
+import { PropertyDetail } from "./PropertyDetail";
 import { MessagesScreen } from "./MessagesScreen";
 import { useMessageNotifications } from "./useMessageNotifications";
 import { NotificationVideoScreen } from "./NotificationVideoScreen";
@@ -127,6 +128,8 @@ function Button({
   );
 }
 function AppContent() {
+  const s = useNightStyles(baseStyles);
+  const night = useColorScheme() === "dark";
   const pathname = usePathname(),
     router = useRouter();
   const routes: Record<
@@ -1472,7 +1475,11 @@ function AppContent() {
           onPress={() => setVideoSearchOpen(true)}
           style={{ padding: 9 }}
         >
-          <ProppixIcon name="search" size={25} color="#071c55" />
+          <ProppixIcon
+            name="search"
+            size={25}
+            color={night ? "#f4f8ff" : "#071c55"}
+          />
         </Pressable>
         <Pressable
           accessibilityRole="button"
@@ -1480,7 +1487,11 @@ function AppContent() {
           onPress={() => setAccountMenu(true)}
           style={{ padding: 9 }}
         >
-          <ProppixIcon name="menu" size={25} color="#071c55" />
+          <ProppixIcon
+            name="menu"
+            size={25}
+            color={night ? "#f4f8ff" : "#071c55"}
+          />
         </Pressable>
         <ActivityBell unread={activityUnread} />
       </View>
@@ -1623,7 +1634,8 @@ function AppContent() {
       <SafeAreaView
         style={[
           s.safe,
-          tab === "feed" && !propertyRoute && { backgroundColor: "#f5f7ff" },
+          tab === "feed" &&
+            !propertyRoute && { backgroundColor: s.header.backgroundColor },
         ]}
         edges={
           recordingRoute
@@ -1631,7 +1643,7 @@ function AppContent() {
             : ["top", "left", "right"]
         }
       >
-        <StatusBar style={recordingRoute ? "light" : "dark"} />
+        <StatusBar style={recordingRoute || night ? "light" : "dark"} />
         {!homePair && !recordingRoute && tab !== "catalog" && appHeader}
         <Modal
           visible={accountMenu}
@@ -1836,80 +1848,18 @@ function AppContent() {
           onRequestClose={closeDetail}
         >
           <SafeAreaView style={s.safe}>
-            <ScrollView style={s.content} keyboardShouldPersistTaps="handled">
-              <Button
-                label="← Volver al recorrido"
-                secondary
-                onPress={closeDetail}
+            {detailBusy && <ActivityIndicator color={videoColors.cyan} />}
+            {detail && (
+              <PropertyDetail
+                key={detail.id}
+                property={detail}
+                session={session}
+                saved={favorites.includes(detail.id)}
+                onFavorite={() => void favorite(detail.id)}
+                onClose={closeDetail}
+                initialContact={contact === "1"}
               />
-              {detail && (
-                <>
-                  {detailBusy && <ActivityIndicator color={videoColors.cyan} />}
-                  {contact === "1" && (
-                    <>
-                      <Text style={s.h2}>{detail.title}</Text>
-                      <ContactProperty
-                        key={detail.id}
-                        property={detail}
-                        session={session}
-                      />
-                    </>
-                  )}
-                  <PropertySlideshow key={detail.id} media={detail.media} />
-                  <Text style={s.eyebrow}>
-                    {detail.commune_name} · {detail.region_name}
-                  </Text>
-                  <Text style={s.h1}>{detail.title}</Text>
-                  <Text style={s.accent}>{price(detail)}</Text>
-                  <Text style={s.muted}>{detail.description}</Text>
-                  <Text style={s.h2}>{detail.advertiser.name}</Text>
-                  {contact !== "1" && (
-                    <ContactProperty
-                      key={detail.id}
-                      property={detail}
-                      session={session}
-                    />
-                  )}
-                  {detail.is_demo ? (
-                    <View style={s.info}>
-                      <Text style={s.demo}>PUBLICACIÓN DE EJEMPLO</Text>
-                      <Text style={s.muted}>
-                        Datos e imágenes ficticios. No recibe consultas ni
-                        visitas.
-                      </Text>
-                    </View>
-                  ) : (
-                    <>
-                      {detail.advertiser.phone && (
-                        <Button
-                          label="Llamar al anunciante"
-                          onPress={() =>
-                            void Linking.openURL(
-                              `tel:${detail.advertiser.phone!.replace(/[^\d+]/g, "")}`,
-                            ).catch(() =>
-                              Alert.alert(
-                                "No disponible",
-                                "Este dispositivo no puede realizar llamadas.",
-                              ),
-                            )
-                          }
-                        />
-                      )}
-                      <Button
-                        label={
-                          favorites.includes(detail.id)
-                            ? "Quitar de favoritos"
-                            : "Guardar en favoritos"
-                        }
-                        secondary
-                        onPress={() => void favorite(detail.id)}
-                      />
-                    </>
-                  )}
-                  <View style={{ height: 40 }} />
-                </>
-              )}
-            </ScrollView>
+            )}
           </SafeAreaView>
         </Modal>
       </SafeAreaView>
@@ -1925,7 +1875,7 @@ export default function App() {
     </GestureHandlerRootView>
   );
 }
-const s = StyleSheet.create({
+const baseStyles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: videoColors.background },
   header: {
     height: 72,
@@ -2107,3 +2057,5 @@ const s = StyleSheet.create({
     marginVertical: 8,
   },
 });
+
+const s = baseStyles;

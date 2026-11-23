@@ -1,3 +1,4 @@
+import { useNightStyles } from "./appearance";
 import {
   GestureDetector,
   useNativeGesture,
@@ -63,6 +64,7 @@ export function PropertyCatalog({
   onFavorite: (id: string) => void;
   onOpen: (property: Property) => void;
 }) {
+  const s = useNightStyles(baseStyles);
   const router = useRouter();
   const [saveOpen, setSaveOpen] = useState(false);
   const [saveName, setSaveName] = useState("");
@@ -298,7 +300,11 @@ export function PropertyCatalog({
                   style={s.iconButton}
                   onPress={() => searchInput.current?.focus()}
                 >
-                  <ProppixIcon name="search" size={27} color="#071c55" />
+                  <ProppixIcon
+                    name="search"
+                    size={27}
+                    color={s.headline.color}
+                  />
                 </Pressable>
                 <ActivityBell unread={activityUnread} />
               </View>
@@ -427,7 +433,7 @@ export function PropertyCatalog({
                   <ProppixIcon
                     name={category.icon}
                     size={28}
-                    color={selected ? "#fff" : "#1c568b"}
+                    color={selected ? "#fff" : s.categoryLabel.color}
                   />
                   <Text
                     style={[s.categoryLabel, selected && { color: "#fff" }]}
@@ -835,7 +841,7 @@ export function PropertyCatalog({
   );
 }
 
-const s = StyleSheet.create({
+const baseStyles = StyleSheet.create({
   root: { flex: 1, backgroundColor: "#f5f7ff" },
   content: { paddingHorizontal: 14, paddingTop: 12, paddingBottom: 20 },
   hero: { paddingHorizontal: 12, paddingBottom: 7 },

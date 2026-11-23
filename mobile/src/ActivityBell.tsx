@@ -1,13 +1,21 @@
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import {
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+  useColorScheme,
+} from "react-native";
 import { useRouter } from "expo-router";
 import { ProppixIcon } from "./ProppixIcon";
 export function ActivityBell({
   unread = 0,
-  color = "#071c55",
+  color,
 }: {
   unread?: number;
   color?: string;
 }) {
+  const dark = useColorScheme() === "dark";
+  color ??= dark ? "#f4f8ff" : "#071c55";
   const router = useRouter();
   return (
     <Pressable

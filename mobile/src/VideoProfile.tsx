@@ -1,3 +1,4 @@
+import { useNightStyles } from "./appearance";
 import { ProppixIcon } from "./ProppixIcon";
 import { clampVideoOffset, enteringVideoIndex } from "./video-paging";
 import { rememberFollowState } from "./follow-state";
@@ -187,7 +188,7 @@ export function FullVideo(props: {
           video={{ ...props.video, url, hls_url: hlsUrl }}
         />
       ) : error ? (
-        <Text style={s.playerError}>{error}</Text>
+        <Text style={baseStyles.playerError}>{error}</Text>
       ) : (
         <DelayedVideoSpinner waiting={props.active} />
       )}
@@ -211,6 +212,7 @@ export function VideoProfile({
   initialSection?: "properties";
   propertyFavorite?: PropertyFavorite;
 }) {
+  const s = useNightStyles(baseStyles);
   const router = useRouter();
   const target = userId || session?.user.id;
   const own = target === session?.user.id;
@@ -561,7 +563,15 @@ export function VideoProfile({
             }
             disabled={!own || busy}
             onPress={() => void choosePhoto()}
-            style={s.avatarWrap}
+            style={[
+              s.avatarWrap,
+              {
+                borderWidth: 2,
+                borderColor: "#05b9e7",
+                borderRadius: 50,
+                padding: 3,
+              },
+            ]}
           >
             {profile?.avatar_thumbnail_url || profile?.avatar_url ? (
               <Image
@@ -621,7 +631,7 @@ export function VideoProfile({
               }}
             >
               <View style={s.editButton}>
-                <ProppixIcon name="edit" color="#123b70" size={17} />
+                <ProppixIcon name="edit" color={s.light.color} size={17} />
                 <Text style={s.light}>Editar perfil</Text>
               </View>
             </Pressable>
@@ -630,16 +640,18 @@ export function VideoProfile({
         <View style={s.counters}>
           {(
             [
-              [profile?.following || 0, "Siguiendo"],
+              [videoCount, "Publicaciones"],
               [profile?.followers || 0, "Seguidores"],
-              [profile?.likes || 0, "Me gusta"],
+              [profile?.following || 0, "Siguiendo"],
             ] as const
           ).map(([n, label]) => (
             <Pressable
               key={label}
               style={s.counter}
-              disabled={label === "Me gusta" || busy}
-              accessibilityRole={label !== "Me gusta" ? "button" : undefined}
+              disabled={label === "Publicaciones" || busy}
+              accessibilityRole={
+                label !== "Publicaciones" ? "button" : undefined
+              }
               onPress={() => {
                 setRelationSearch("");
                 void showFollowers(
@@ -667,7 +679,7 @@ export function VideoProfile({
               style={[s.uploadButton, { flex: 1 }]}
               onPress={() => void pickVideo()}
             >
-              <ProppixIcon name="upload" color="#123b70" />
+              <ProppixIcon name="upload" color={s.light.color} />
               <Text style={s.light}>Subir video</Text>
             </Pressable>
           </View>
@@ -697,7 +709,8 @@ export function VideoProfile({
         )}
         {own && (
           <Text style={s.explainer}>
-            Tus videos primero. Vincular una propiedad es opcional.
+            Encuentra el hogar que buscas. Compra, vende o arrienda con
+            confianza.
           </Text>
         )}
         {!own &&
@@ -1182,7 +1195,7 @@ export function VideoProfile({
     </View>
   );
 }
-const s = StyleSheet.create({
+const baseStyles = StyleSheet.create({
   editButton: {
     flexDirection: "row",
     gap: 6,
@@ -1246,9 +1259,9 @@ const s = StyleSheet.create({
   gear: { color: "#0866f5", fontSize: 25, padding: 8 },
   avatarWrap: { position: "relative" },
   avatar: {
-    width: 76,
-    height: 76,
-    borderRadius: 38,
+    width: 82,
+    height: 82,
+    borderRadius: 41,
     backgroundColor: "#edf4ff",
     alignItems: "center",
     justifyContent: "center",
@@ -1280,7 +1293,7 @@ const s = StyleSheet.create({
     borderRightWidth: 1,
     borderColor: "#e0e8f2",
   },
-  counterNumber: { color: "#10376b", fontSize: 28, fontWeight: "800" },
+  counterNumber: { color: "#10376b", fontSize: 23, fontWeight: "800" },
   muted: { color: "#49658b", fontSize: 13 },
   explainer: {
     color: "#315a87",

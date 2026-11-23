@@ -1,4 +1,4 @@
-import { Text, View } from "react-native";
+import { Text, View, useColorScheme } from "react-native";
 import Svg, { Path, Rect } from "react-native-svg";
 export function ProppixMark({
   size = 52,
@@ -48,18 +48,20 @@ export function ProppixMark({
 }
 export function ProppixBrand({
   compact = false,
-  light = false,
+  light,
 }: {
   compact?: boolean;
   light?: boolean;
 }) {
+  const dark = useColorScheme() === "dark";
+  light ??= dark;
   return (
     <View
       accessibilityLabel="Proppix"
       style={{
         flexDirection: "row",
         alignItems: "center",
-        gap: compact ? 1 : 2,
+        gap: 0,
       }}
     >
       <ProppixMark size={compact ? 41 : 55} light={light} />
@@ -69,6 +71,7 @@ export function ProppixBrand({
           fontWeight: "800",
           fontSize: compact ? 30 : 40,
           letterSpacing: -1.6,
+          marginLeft: compact ? -6 : -8,
         }}
       >
         ropp<Text style={{ color: "#05b9e7" }}>i</Text>x
