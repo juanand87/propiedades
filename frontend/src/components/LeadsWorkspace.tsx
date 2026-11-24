@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { Search, Users, Clock3, X, Send, RefreshCw } from "lucide-react";
 import { date, request, send } from "@/lib/estate-api";
 import { Empty, Notice } from "./EstateApp";
@@ -54,6 +55,28 @@ type History = {
   }[];
 };
 export function LeadsWorkspace() {
+  const focusedInquiry = useSearchParams().get("inquiryId");
+  useEffect(() => {
+    if (!focusedInquiry) return;
+    const controller = new AbortController();
+    request(`/me/leads/${encodeURIComponent(focusedInquiry)}`, {
+      signal: controller.signal,
+    })
+      .then(async (lead) => {
+        if (controller.signal.aborted) return;
+        setSelected(lead);
+        setHistory(null);
+        setNote("");
+        const h = await request(`/me/leads/${lead.id}/history`, {
+          signal: controller.signal,
+        });
+        if (!controller.signal.aborted) setHistory(h);
+      })
+      .catch((e) => {
+        if (!controller.signal.aborted) setError(e.message);
+      });
+    return () => controller.abort();
+  }, [focusedInquiry]);
   const [taskRevision, setTaskRevision] = useState(0);
   const tasksChanged = useCallback(() => setTaskRevision((n) => n + 1), []);
   const [data, setData] = useState<Data | null>(null),

@@ -3,6 +3,7 @@ import { HousePreloader } from "./HousePreloader";
 import { ProfessionalProfile } from "./ProfessionalProfile";
 import { CompanyTeam } from "./CompanyTeam";
 import { LeadsWorkspace } from "./LeadsWorkspace";
+import { CommercialSummary } from "./CommercialSummary";
 import { formatClpInput, parseClpInput } from "@/lib/clp";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -269,6 +270,7 @@ function Overview({ root }: { root: string }) {
         </Link>
       </div>
       <Notice error={error} />
+      <CommercialSummary root={root}/>
       <div className="stats-grid">
         {[
           ["Publicaciones", data?.total, House],

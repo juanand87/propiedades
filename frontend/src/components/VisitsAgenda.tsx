@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { date, request, send } from "@/lib/estate-api";
 import { Notice, useEstate } from "./EstateApp";
 type Visit = {
@@ -52,6 +53,25 @@ function slot(value: string) {
   };
 }
 export function VisitsAgenda() {
+  const focusedVisit = useSearchParams().get("visitId");
+  useEffect(() => {
+    if (!focusedVisit) return;
+    const controller = new AbortController();
+    request(`/me/visits/${encodeURIComponent(focusedVisit)}`, {
+      signal: controller.signal,
+    })
+      .then((v) => {
+        if (!controller.signal.aborted) {
+          setSelected(v);
+          setProposing(false);
+          setNote("");
+        }
+      })
+      .catch((e) => {
+        if (!controller.signal.aborted) setError(e.message);
+      });
+    return () => controller.abort();
+  }, [focusedVisit]);
   const { user } = useEstate();
   const isAdmin = user?.role === "admin";
   const [items, setItems] = useState<Visit[]>([]),
