@@ -31,4 +31,8 @@ assert.deepEqual(destination({type:'inquiry_assignment',inquiryId:videoId}),{kin
 assert.equal(destination({type:'inquiry_assignment',inquiryId:'../../private'}),null);
 assert.equal(destination({type:'inquiry_assignment',inquiryId:'https://other.invalid'}),null);
 assert.equal(destination({type:'inquiry_assignment',conversationId}),null);
-console.log('PASS: 26 notification destination checks. No network or credentials.');
+assert.deepEqual(destination({type:'inquiry_task',inquiryId:videoId,taskId:commentId}),{kind:'inquiry',inquiryId:videoId});
+assert.equal(destination({type:'inquiry_task',inquiryId:'../../private'}),null);
+assert.equal(destination({type:'inquiry_task',inquiryId:'https://other.invalid'}),null);
+assert.equal(destination({type:'inquiry_task',conversationId}),null);
+console.log('PASS: 30 notification destination checks. No network or credentials.');

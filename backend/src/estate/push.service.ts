@@ -12,6 +12,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { DataSource, EntityManager } from 'typeorm';
 import { InquiryNoticesService } from './inquiry-notices.service';
+import { InquiryTasksService } from './inquiry-tasks.service';
 import { JWT } from 'google-auth-library';
 import { readFileSync } from 'node:fs';
 import { Actor } from './rules';
@@ -65,6 +66,7 @@ export class PushService implements OnModuleInit, OnModuleDestroy {
     private db: DataSource,
     private config: ConfigService,
     @Optional() private inquiryNotices?: InquiryNoticesService,
+    @Optional() private inquiryTasks?: InquiryTasksService,
   ) {}
   async available(db: Pick<DataSource, 'query'> | EntityManager = this.db) {
     const [row] = await db.query<{ n: number }[]>(
@@ -354,6 +356,7 @@ export class PushService implements OnModuleInit, OnModuleDestroy {
     visit?: { id: string; noticeId: string; title: string },
     upload?: { videoId: string; uploadId: string; failed: boolean },
     lead?: { inquiryId: string; noticeId: string },
+    task?: { inquiryId: string; taskId: string; key: string },
   ) {
     const { auth, projectId } = this.credentials();
     const { token: accessToken } = await auth.getAccessToken();
@@ -406,8 +409,21 @@ export class PushService implements OnModuleInit, OnModuleDestroy {
                     body: 'Tu empresa te asignó una consulta. Toca para revisar los datos y continuar el seguimiento.',
                   }
                 : {}),
+              ...(task
+                ? {
+                    title: 'Recordatorio de seguimiento',
+                    body: 'Tienes una acción pendiente. Toca para revisar el interesado.',
+                  }
+                : {}),
             },
             data: {
+              ...(task
+                ? {
+                    type: 'inquiry_task',
+                    inquiryId: task.inquiryId,
+                    taskId: task.taskId,
+                  }
+                : {}),
               ...(lead
                 ? {
                     type: 'inquiry_assignment',
@@ -451,17 +467,19 @@ export class PushService implements OnModuleInit, OnModuleDestroy {
                 channel_id: 'messages',
                 sound: 'default',
                 icon: 'notification_icon',
-                tag: lead
-                  ? 'inquiry-assignment-' + lead.noticeId
-                  : upload
-                    ? 'video-ready-' + upload.uploadId
-                    : visit
-                      ? 'visit-' + visit.noticeId
-                      : property
-                        ? 'property-match-' + property.matchId
-                        : activity
-                          ? 'video-comment-' + activity.commentId
-                          : 'message-' + row.message_id,
+                tag: task
+                  ? 'inquiry-task-' + task.key
+                  : lead
+                    ? 'inquiry-assignment-' + lead.noticeId
+                    : upload
+                      ? 'video-ready-' + upload.uploadId
+                      : visit
+                        ? 'visit-' + visit.noticeId
+                        : property
+                          ? 'property-match-' + property.matchId
+                          : activity
+                            ? 'video-comment-' + activity.commentId
+                            : 'message-' + row.message_id,
               },
             },
           },
@@ -752,6 +770,18 @@ export class PushService implements OnModuleInit, OnModuleDestroy {
           undefined,
           undefined,
           { inquiryId, noticeId },
+        ),
+      );
+      await this.inquiryTasks?.flush((token, key, inquiryId, taskId) =>
+        this.sendFcm(
+          { token, message_id: key, conversation_id: '' },
+          false,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          { inquiryId, taskId, key },
         ),
       );
     } finally {

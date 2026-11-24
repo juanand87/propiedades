@@ -68,6 +68,51 @@ describe('message push delivery', () => {
       .mockResolvedValue({ token: 'test-access-token' } as never);
   });
   afterEach(() => jest.restoreAllMocks());
+  it('sends a private task reminder to its native inquiry destination', async () => {
+    const { service } = setup();
+    Object.assign(service, {
+      inquiryTasks: {
+        flush: async (
+          deliver: (
+            token: string,
+            key: string,
+            inquiry: string,
+            task: string,
+          ) => Promise<string>,
+        ) => {
+          await deliver(
+            token,
+            '41',
+            '11111111-1111-4111-8111-111111111111',
+            '22222222-2222-4222-8222-222222222222',
+          );
+        },
+      },
+    });
+    const network = jest.spyOn(global, 'fetch').mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ name: 'accepted' }),
+    } as Response);
+    await service.flush();
+    const payload = JSON.parse(
+      network.mock.calls.at(-1)![1]!.body as string,
+    ) as {
+      message: {
+        data: { type: string; inquiryId: string; taskId: string };
+        notification: { title: string };
+        android: { notification: { tag: string } };
+      };
+    };
+    expect(payload.message.data).toMatchObject({
+      type: 'inquiry_task',
+      inquiryId: '11111111-1111-4111-8111-111111111111',
+      taskId: '22222222-2222-4222-8222-222222222222',
+    });
+    expect(payload.message.notification.title).toBe(
+      'Recordatorio de seguimiento',
+    );
+    expect(payload.message.android.notification.tag).toBe('inquiry-task-41');
+  });
   it('sends an assignment with a scoped destination and stable Android tag', async () => {
     const { service } = setup();
     Object.assign(service, {

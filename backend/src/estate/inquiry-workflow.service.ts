@@ -65,6 +65,9 @@ export class InquiryWorkflowService {
     }
     return { ...lead, owner };
   }
+  authorize(actor: Actor, id: string, tx: DB = this.db, lock = false) {
+    return this.access(actor, id, tx, lock);
+  }
   async list(actor: Actor, inquiryId?: string) {
     await this.ready();
     const items = await this.db.query<Record<string, unknown>[]>(
@@ -141,6 +144,21 @@ export class InquiryWorkflowService {
         id,
       ]);
       await this.event(tx, actor, id, 'stage', previous, stage);
+      if (stage === 'closed') {
+        const [schema] = await tx.query<{ n: number }[]>(
+          "SELECT COUNT(*) n FROM information_schema.tables WHERE table_schema=DATABASE() AND table_name IN ('estate_inquiry_tasks','estate_inquiry_task_events')",
+        );
+        if (Number(schema?.n) === 2) {
+          await tx.query(
+            "INSERT INTO estate_inquiry_task_events(id,task_id,actor_id,action,snapshot_json) SELECT UUID(),id,?,'cancelled',JSON_OBJECT('kind',kind,'note',note,'due_at',DATE_FORMAT(due_at,'%Y-%m-%dT%H:%i:%sZ'),'status','cancelled','reason','inquiry_closed') FROM estate_inquiry_tasks WHERE inquiry_id=? AND status='pending'",
+            [actor.id, id],
+          );
+          await tx.query(
+            "UPDATE estate_inquiry_tasks SET status='cancelled',revision=revision+1,updated_by=?,updated_at=UTC_TIMESTAMP(3) WHERE inquiry_id=? AND status='pending'",
+            [actor.id, id],
+          );
+        }
+      }
       return { success: true };
     });
   }

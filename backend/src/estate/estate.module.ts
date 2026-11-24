@@ -4,6 +4,8 @@ import { CompanyTeamController } from './company-team.controller';
 import { InquiryWorkflowService } from './inquiry-workflow.service';
 import { InquiryWorkflowController } from './inquiry-workflow.controller';
 import { InquiryNoticesService } from './inquiry-notices.service';
+import { InquiryTasksService } from './inquiry-tasks.service';
+import { InquiryTasksController } from './inquiry-tasks.controller';
 import { ProfileStoriesService } from './profile-stories.service';
 import { ProfileStoriesController } from './profile-stories.controller';
 import { VideoUploadJobsService } from './video-upload-jobs.service';
@@ -60,6 +62,7 @@ import {
     }),
   ],
   controllers: [
+    InquiryTasksController,
     InquiryWorkflowController,
     CompanyTeamController,
     ProfileStoriesController,
@@ -80,6 +83,7 @@ import {
     MessagingController,
   ],
   providers: [
+    InquiryTasksService,
     InquiryNoticesService,
     InquiryWorkflowService,
     CompanyTeamService,

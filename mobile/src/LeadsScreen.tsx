@@ -13,6 +13,7 @@ import { api, Session } from "./api";
 import { KeyboardSafeView } from "./KeyboardSafeView";
 import { useNightStyles } from "./appearance";
 import { brandColors } from "./brand-colors";
+import { LeadTasks } from "./LeadTasks";
 const stages: Record<string, string> = {
   new: "Nuevo",
   contacted: "Contactado",
@@ -41,6 +42,7 @@ type History = {
   }[];
 };
 export function LeadsScreen({ session }: { session: Session | null }) {
+  const [taskRevision, setTaskRevision] = useState(0);
   const s = useNightStyles(styles),
     router = useRouter(),
     { inquiryId } = useLocalSearchParams<{ inquiryId?: string }>();
@@ -109,6 +111,7 @@ export function LeadsScreen({ session }: { session: Session | null }) {
         }),
       );
       setMessage("Estado actualizado.");
+      setTaskRevision((n) => n + 1);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -180,6 +183,19 @@ export function LeadsScreen({ session }: { session: Session | null }) {
             {message}
           </Text>
         )}
+        {session && !loading && !inquiryId && (
+          <LeadTasks
+            key="all"
+            session={session}
+            revision={taskRevision}
+            onOpen={(id) =>
+              router.push({
+                pathname: "/interesados",
+                params: { inquiryId: id },
+              })
+            }
+          />
+        )}
         {!session ? (
           <>
             <Text style={s.text}>Inicia sesión para ver esta consulta.</Text>
@@ -207,6 +223,12 @@ export function LeadsScreen({ session }: { session: Session | null }) {
               Responsable: {selected.assignee_name || "Anunciante"}
             </Text>
             <Text style={s.label}>Estado · {stages[selected.stage]}</Text>
+            <LeadTasks
+              key={selected.id}
+              session={session}
+              inquiryId={selected.id}
+              revision={taskRevision}
+            />
             <View style={s.chips}>
               {Object.entries(stages).map(([key, label]) => (
                 <Pressable

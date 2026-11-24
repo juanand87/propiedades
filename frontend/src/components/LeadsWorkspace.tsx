@@ -4,6 +4,7 @@ import { Search, Users, Clock3, X, Send, RefreshCw } from "lucide-react";
 import { date, request, send } from "@/lib/estate-api";
 import { Empty, Notice } from "./EstateApp";
 import { HousePreloader } from "./HousePreloader";
+import { LeadTasks } from "./LeadTasks";
 import "./leads-workspace.css";
 const stages: Record<string, string> = {
   new: "Nuevo",
@@ -53,6 +54,8 @@ type History = {
   }[];
 };
 export function LeadsWorkspace() {
+  const [taskRevision, setTaskRevision] = useState(0);
+  const tasksChanged = useCallback(() => setTaskRevision((n) => n + 1), []);
   const [data, setData] = useState<Data | null>(null),
     [error, setError] = useState(""),
     [notice, setNotice] = useState(""),
@@ -92,6 +95,7 @@ export function LeadsWorkspace() {
     try {
       await action();
       await load();
+      setTaskRevision((n) => n + 1);
       setNotice(success);
     } catch (e) {
       setError((e as Error).message);
@@ -152,6 +156,17 @@ export function LeadsWorkspace() {
         </button>
       </header>
       <Notice error={error} success={notice} />
+      {data && (
+        <LeadTasks
+          revision={taskRevision}
+          onChanged={tasksChanged}
+          onOpen={(id) => {
+            void request(`/me/leads/${id}`)
+              .then(open)
+              .catch((e) => setError(e.message));
+          }}
+        />
+      )}
       {!data && !error && <HousePreloader />}
       {data && (
         <>
@@ -310,7 +325,7 @@ export function LeadsWorkspace() {
                       </p>
                     )}
                     <button className="button outline" onClick={() => open(i)}>
-                      Notas e historial
+                      Notas, acciones e historial
                     </button>
                   </div>
                 </article>
@@ -352,7 +367,7 @@ export function LeadsWorkspace() {
           >
             <header>
               <div>
-                <h2>Notas e historial</h2>
+                <h2>Seguimiento del interesado</h2>
                 <p>
                   {selected.name} · {selected.title}
                 </p>
@@ -366,6 +381,12 @@ export function LeadsWorkspace() {
               </button>
             </header>
             <Notice error={error} />
+            <LeadTasks
+              key={selected.id}
+              inquiryId={selected.id}
+              revision={taskRevision}
+              onChanged={tasksChanged}
+            />
             {!history ? (
               <p role="status">Cargando seguimiento…</p>
             ) : (

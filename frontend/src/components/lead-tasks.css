@@ -1,0 +1,160 @@
+.lead-tasks {
+  background: #fff;
+  border: 1px solid #d5e3f2;
+  border-radius: 18px;
+  padding: 20px;
+  margin: 20px 0;
+  color: #10345b;
+}
+.lead-tasks > header {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+.lead-tasks h2 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 21px;
+  margin: 0;
+}
+.task-filters,
+.task-actions,
+.task-fields {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.task-filters {
+  margin: 20px 0;
+}
+.task-filters > button {
+  border: 1px solid #bdcee1;
+  background: #edf4fc;
+  border-radius: 12px;
+  color: #31517a;
+  padding: 12px;
+  cursor: pointer;
+  min-height: 44px;
+}
+.task-filters > button[aria-pressed="true"] {
+  background: #31517a;
+  color: #fff;
+}
+.task-overdue-filter strong,
+.task-late {
+  color: #a32235;
+}
+.task-filters > button[aria-pressed="true"] strong {
+  color: #fff;
+}
+.task-filters label {
+  font-size: 13px;
+}
+.lead-tasks input,
+.lead-tasks select,
+.lead-tasks textarea {
+  padding: 10px;
+  border: 1px solid #bdcee1;
+  border-radius: 10px;
+  max-width: 100%;
+  background: #fff;
+  color: #10345b;
+  font: inherit;
+}
+.task-form {
+  padding: 18px;
+  background: #f1f7ff;
+  border-radius: 14px;
+  margin-top: 16px;
+}
+.task-fields {
+  align-items: end;
+  margin-bottom: 14px;
+}
+.task-fields label {
+  flex: 1;
+  min-width: 150px;
+}
+.task-form label {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+}
+.task-form input,
+.task-form select,
+.task-form textarea {
+  display: block;
+  width: 100%;
+  margin-top: 6px;
+}
+.task-form p,
+.task-help {
+  font-size: 13px;
+  color: #31517a;
+}
+.task-list {
+  display: grid;
+  gap: 14px;
+}
+.task-item {
+  border: 1px solid #d5e3f2;
+  border-left: 4px solid #31517a;
+  padding: 16px;
+  border-radius: 12px;
+}
+.task-item.overdue {
+  border-left-color: #a32235;
+}
+.task-item h3 {
+  font-size: 17px;
+  margin: 0 0 8px;
+}
+.task-time,
+.task-late {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+}
+.task-responsible {
+  font-size: 13px;
+  color: #31517a;
+}
+.task-note {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.task-actions {
+  margin-top: 12px;
+}
+.task-events {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid #d5e3f2;
+}
+.task-events p {
+  font-size: 14px;
+}
+.task-help {
+  margin: 18px 0 0;
+}
+@media (max-width: 600px) {
+  .lead-tasks {
+    padding: 15px;
+  }
+  .task-actions > .button {
+    flex: 1;
+    justify-content: center;
+  }
+  .task-fields {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+  .task-fields label {
+    min-width: 0;
+  }
+}

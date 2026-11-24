@@ -17,7 +17,7 @@ export function notificationDestination(
 ): NotificationDestination | null {
   if (!data || typeof data !== "object" || Array.isArray(data)) return null;
   const fields = data as Record<string, unknown>;
-  if (fields.type === "inquiry_assignment")
+  if (fields.type === "inquiry_assignment" || fields.type === "inquiry_task")
     return validId(fields.inquiryId)
       ? { kind: "inquiry", inquiryId: fields.inquiryId }
       : null;
