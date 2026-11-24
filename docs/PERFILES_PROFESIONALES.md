@@ -10,6 +10,10 @@ El registro por correo, la selección posterior al acceso con Google, la edició
 
 Ejecutar `database/PERFILES_PROFESIONALES.sql` antes del despliegue. Conserva los @usuarios existentes y asigna identificadores editables a las cuentas que aún no tenían perfil público.
 
-Las tablas `estate_company_teams`, `estate_company_members` y `estate_company_property_assignments` son la base para una etapa posterior. Todavía no hay invitaciones ni acceso compartido: no se amplían los permisos de ninguna cuenta. La verificación documental de agentes y empresas también requiere un flujo posterior; elegir Empresa o Agente no acredita identidad ni concede una insignia de verificación.
+La sección web **Mi equipo** permite a las empresas aprobadas invitar agentes con cuentas propias, asignarles propiedades y retirar su acceso. Ejecutar también `database/EQUIPOS_CORREDORAS.sql` antes de desplegar esta sección. Las invitaciones vencen a los siete días, son de un solo uso y deben aceptarse con el correo invitado. Se envían con el SMTP configurado; si falla, el panel informa el fallo y ofrece copiar el enlace privado.
+
+Los permisos por propiedad son **lectura** o **proponer cambios**. El agente puede proponer cambios descriptivos y de precio; la empresa revisa y aplica cada propuesta. La aplicación utiliza las reglas normales de publicación de la empresa, verifica que la revisión de la propiedad siga vigente y conserva su propietario, medios y membresía. No se conceden permisos globales de administración ni acceso a los mensajes de la empresa. Retirar al agente elimina sus asignaciones y rechaza sus propuestas pendientes. La gestión del equipo se realiza desde `/dashboard/equipo`; no requiere instalar un APK nuevo.
+
+La verificación documental de agentes y empresas requiere un flujo posterior; elegir Empresa o Agente no acredita identidad ni concede una insignia de verificación.
 
 La sesión de la web vive en `BrowserSessionProvider`, dentro del layout raíz de Next.js. Navegar con enlaces conserva el estado; una recarga completa vuelve a restaurar/renovar la sesión. Las peticiones siguen validándose en el backend y un 401 continúa usando la renovación existente. El preloader tiene una casa animada y respeta movimiento reducido.

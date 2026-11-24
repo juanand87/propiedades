@@ -17,6 +17,7 @@ import { PropertyFeed } from "./PropertyFeed";
 import { PublicView } from "./PublicView";
 import { Workspace } from "./Workspace";
 import { AuthView } from "./AuthView";
+import { TeamInvitation } from "./TeamInvitation";
 import { BrokerSite } from "./BrokerSite";
 import { MarketplaceFooter } from "./MarketplaceFooter";
 
@@ -319,7 +320,9 @@ export default function EstateApp({
               </div>
             </header>
           </SiteHeaderFrame>
-          {workspace ? (
+          {path[0] === "invitaciones" && path[1] === "equipo" ? (
+            <TeamInvitation />
+          ) : workspace ? (
             <Workspace path={path} />
           ) : auth ? (
             <AuthView

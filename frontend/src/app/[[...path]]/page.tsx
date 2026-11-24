@@ -99,6 +99,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       path[0] === "dashboard" ||
       path[0] === "cuenta" ||
       path[0] === "favoritos"
+      || path[0] === "invitaciones"
         ? { index: false, follow: false }
         : undefined,
   };
@@ -119,6 +120,7 @@ export default async function Page({ params }: Props) {
       "cuenta",
       "informacion",
       "privacidad",
+      "invitaciones",
     ].includes(path[0] || "")
   )
     notFound();

@@ -1,6 +1,7 @@
 "use client";
 import { HousePreloader } from "./HousePreloader";
 import { ProfessionalProfile } from "./ProfessionalProfile";
+import { CompanyTeam } from "./CompanyTeam";
 import { formatClpInput, parseClpInput } from "@/lib/clp";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -126,6 +127,7 @@ export function Workspace({ path }: { path: string[] }) {
     { href: "visitas", name: "Solicitudes de visita", icon: CalendarDays },
     { href: "biblioteca", name: "Biblioteca de imágenes", icon: Images },
     { href: "perfil", name: "Perfil de anunciante", icon: Building2 },
+    { href: "equipo", name: "Mi equipo", icon: Users },
     { href: "sitio", name: "Mi sitio web", icon: House },
     ...(isAdmin
       ? [
@@ -199,6 +201,8 @@ export function Workspace({ path }: { path: string[] }) {
           ) : (
             <ManagedProperties root={root} />
           )
+        ) : section === "equipo" ? (
+          <CompanyTeam />
         ) : section === "perfil" ? (
           <Profile />
         ) : section === "biblioteca" ? (

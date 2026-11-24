@@ -994,13 +994,13 @@ export class EstateService {
       throw new ForbiddenException('Tu cuenta de anunciante está suspendida.');
     return u.advertiser_id;
   }
-  async saveProperty(u: Actor, b: any, id?: string) {
+  async saveProperty(u: Actor, b: any, id?: string, transaction?: EntityManager) {
     const advertiserId = id
       ? undefined
       : isAdmin(u) && b.advertiser_id
         ? uuid(b.advertiser_id)
         : this.publisher(u);
-    return this.db.transaction(async (manager) => {
+    const save = async (manager:EntityManager) => {
       if (!id && !isAdmin(u)) {
         await manager.query('SELECT id FROM users WHERE id=? FOR UPDATE', [
           u.id,
@@ -1266,7 +1266,8 @@ export class EstateService {
           'Edición enviada nuevamente a revisión.',
         );
       return { id };
-    });
+    };
+    return transaction ? save(transaction) : this.db.transaction(save);
   }
   private async history(
     m: EntityManager,

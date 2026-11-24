@@ -370,6 +370,12 @@ export class ReviewMailService implements OnModuleInit, OnModuleDestroy {
       return 'No se pudo conectar al servidor SMTP con TLS.';
     return 'No se pudo enviar el correo. Revisa SMTP y destinatarios.';
   }
+  async sendCompanyInvitation(recipient:string,url:string,company:string,id:string){
+    await this.requireTables();
+    const {config,password}=await this.stored();
+    if(!config.enabled)throw new ServiceUnavailableException('Activa SMTP para enviar invitaciones.');
+    await this.deliver(config,password,[address(recipient)],'Proppix · Invitación a un equipo',`${company} te invita a su equipo en Proppix.\n\nAbre este enlace e inicia sesión o regístrate con ${recipient}:\n${url}\n\nLa invitación vence en 7 días y solo se puede aceptar una vez. Si no esperabas este correo, puedes ignorarlo.`,`<team-${id}@proppix.local>`);
+  }
   async test(actor: Actor) {
     admin(actor);
     await this.requireTables();

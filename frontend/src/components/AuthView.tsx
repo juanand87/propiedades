@@ -35,6 +35,11 @@ export function AuthView({
   function finish(r: any) {
     saveBrowserSession(r);
     setUser(r.user);
+    const invitation = sessionStorage.getItem("proppix:team-invite");
+    if (invitation && /^[a-f0-9]{64}$/.test(invitation)) {
+      router.replace(`/invitaciones/equipo#token=${invitation}`);
+      return;
+    }
     if (r.user.role !== "admin" && r.user.account_type === null) {
       setChoosing(true);
       return;
