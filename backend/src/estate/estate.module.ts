@@ -1,6 +1,8 @@
 import { PropertyDictationService } from './property-dictation.service';
 import { CompanyTeamService } from './company-team.service';
 import { CompanyTeamController } from './company-team.controller';
+import { InquiryWorkflowService } from './inquiry-workflow.service';
+import { InquiryWorkflowController } from './inquiry-workflow.controller';
 import { ProfileStoriesService } from './profile-stories.service';
 import { ProfileStoriesController } from './profile-stories.controller';
 import { VideoUploadJobsService } from './video-upload-jobs.service';
@@ -57,6 +59,7 @@ import {
     }),
   ],
   controllers: [
+    InquiryWorkflowController,
     CompanyTeamController,
     ProfileStoriesController,
     VideoUploadJobsController,
@@ -76,6 +79,7 @@ import {
     MessagingController,
   ],
   providers: [
+    InquiryWorkflowService,
     CompanyTeamService,
     ProfileStoriesService,
     VideoUploadJobsService,

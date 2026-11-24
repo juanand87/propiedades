@@ -2,6 +2,7 @@
 import { HousePreloader } from "./HousePreloader";
 import { ProfessionalProfile } from "./ProfessionalProfile";
 import { CompanyTeam } from "./CompanyTeam";
+import { LeadsWorkspace } from "./LeadsWorkspace";
 import { formatClpInput, parseClpInput } from "@/lib/clp";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -207,8 +208,10 @@ export function Workspace({ path }: { path: string[] }) {
           <Profile />
         ) : section === "biblioteca" ? (
           <Library />
-        ) : section === "contactos" || section === "visitas" ? (
-          <Contacts visits={section === "visitas"} />
+        ) : section === "contactos" ? (
+          <LeadsWorkspace />
+        ) : section === "visitas" ? (
+          <Contacts visits />
         ) : section === "anunciantes" && isAdmin ? (
           <AdvertiserAdmin />
         ) : section === "usuarios" && isAdmin ? (

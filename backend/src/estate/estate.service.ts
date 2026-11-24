@@ -1,4 +1,5 @@
 import { profileIdentity } from './profile-identity';
+import { InquiryWorkflowService } from './inquiry-workflow.service';
 import { propertyFilters } from './property-filters';
 import { membershipPlans, MembershipPlan } from './membership';
 import {
@@ -107,6 +108,7 @@ export class EstateService {
     @Optional() private config?: ConfigService,
     @Optional() private reviewMail?: ReviewMailService,
     @Optional() private videoPublication?: PropertyVideoPublicationService,
+    @Optional() private inquiryWorkflow?: InquiryWorkflowService,
   ) {}
   private attempts = new Map<string, { n: number; reset: number }>();
   get onboardingEnabled() {
@@ -1773,11 +1775,16 @@ export class EstateService {
       if (booking)
         throw new BadRequestException('Gestiona esta visita desde la Agenda.');
     }
-    if (b.status)
-      await this.db.query('UPDATE property_inquiries SET status=? WHERE id=?', [
-        choice(b.status, ['new', 'contacted', 'closed']),
-        id,
-      ]);
+    if (b.status) {
+      const status = choice(b.status, ['new', 'contacted', 'closed']);
+      if (this.inquiryWorkflow && (await this.inquiryWorkflow.available()))
+        await this.inquiryWorkflow.update(u, id, { stage: status }, false);
+      else
+        await this.db.query(
+          'UPDATE property_inquiries SET status=? WHERE id=?',
+          [status, id],
+        );
+    }
     if (text(b.message, 5000))
       await this.db.query(
         'INSERT INTO property_inquiry_messages(id,inquiry_id,author_id,message) VALUES (?,?,?,?)',

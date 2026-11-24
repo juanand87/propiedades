@@ -259,6 +259,19 @@ export class CompanyTeamService {
         'DELETE FROM estate_company_property_assignments WHERE team_id=? AND user_id=?',
         [team.id, userId],
       );
+      const [leads] = await tx.query<{ n: number }[]>(
+        "SELECT COUNT(*) n FROM information_schema.tables WHERE table_schema=DATABASE() AND table_name IN ('estate_inquiry_assignments','estate_inquiry_events')",
+      );
+      if (Number(leads?.n) === 2) {
+        await tx.query(
+          "INSERT INTO estate_inquiry_events(id,inquiry_id,actor_id,action,previous_value,next_value) SELECT UUID(),inquiry_id,?,'assignment',user_id,NULL FROM estate_inquiry_assignments WHERE team_id=? AND user_id=?",
+          [actor.id, team.id, userId],
+        );
+        await tx.query(
+          'DELETE FROM estate_inquiry_assignments WHERE team_id=? AND user_id=?',
+          [team.id, userId],
+        );
+      }
       await tx.query(
         "UPDATE estate_company_property_proposals SET status='rejected',reviewed_by=?,reviewed_at=UTC_TIMESTAMP(3) WHERE team_id=? AND user_id=? AND status='pending'",
         [actor.id, team.id, userId],
