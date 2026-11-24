@@ -1,10 +1,11 @@
 "use client";
+import { useBrowserSession } from "./BrowserSessionProvider";
 import { SiteHeaderFrame } from "./SiteHeaderFrame";
 
 import Link from "next/link";
 import { createContext, useContext, useEffect, useState } from "react";
 import { House, Menu, X, ArrowUpRight, Heart } from "lucide-react";
-import { restoreBrowserSession, request } from "@/lib/estate-api";
+import { request } from "@/lib/estate-api";
 import { assetUrl } from "@/lib/estate-api";
 import {
   designStyle,
@@ -116,9 +117,8 @@ export default function EstateApp({
   initialSettings?: any;
   initialAdvertiser?: any;
 }) {
-  const [user, setUser] = useState<any>(null),
-    [loading, setLoading] = useState(true),
-    [favorites, setFavorites] = useState<string[]>([]),
+  const { user, setUser, loading } = useBrowserSession();
+  const [favorites, setFavorites] = useState<string[]>([]),
     [menu, setMenu] = useState(false);
   const [catalog, setCatalog] = useState<any>({
       types: [],
@@ -145,15 +145,6 @@ export default function EstateApp({
     // Initialize remote catalogs and browser-only session state once on hydration.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     reload().catch(() => {});
-    const token = localStorage.getItem("propiedades:token");
-    if (token) {
-      restoreBrowserSession()
-        .then(setUser)
-        .catch(() => setUser(null))
-        .finally(() => setLoading(false));
-    } else {
-      setLoading(false);
-    }
   }, []);
   useEffect(() => {
     if (user)

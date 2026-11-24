@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { getSiteUrl } from "@/lib/siteUrl";
 import "./globals.css";
 import "./modern.css";
+import { BrowserSessionProvider } from "@/components/BrowserSessionProvider";
 export const metadata: Metadata = {
   metadataBase: new URL(getSiteUrl()),
   title: {
@@ -18,7 +19,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="es-CL">
-      <body>{children}</body>
+      <body>
+        <BrowserSessionProvider>{children}</BrowserSessionProvider>
+      </body>
     </html>
   );
 }

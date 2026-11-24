@@ -2798,3 +2798,5 @@ td select {
   gap: 8px;
   margin: 12px 0;
 }
+
+.house-preloader{min-height:340px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;color:#31517a;background:linear-gradient(145deg,#fff,#edf2f7);border-radius:24px;margin:24px auto;max-width:1280px}.house-preloader-icon{position:relative;padding:22px;border-radius:26px;background:#fff;box-shadow:0 10px 36px #31517a12;animation:house-breathe 1.7s ease-in-out infinite}.house-preloader-icon span{position:absolute;inset:10px;border:2px solid #31517a25;border-radius:22px;animation:house-ring 1.7s ease-out infinite}.house-preloader strong{font-size:24px;color:#071c55}.house-preloader-caption{font-size:14px}@keyframes house-breathe{50%{transform:translateY(-5px)}}@keyframes house-ring{to{transform:scale(1.25);opacity:0}}@media(prefers-reduced-motion:reduce){.house-preloader-icon,.house-preloader-icon span{animation:none}}

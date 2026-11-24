@@ -1,4 +1,5 @@
 "use client";
+import { HousePreloader } from "./HousePreloader";
 import { formatClpInput, parseClpInput } from "@/lib/clp";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -104,7 +105,7 @@ export function Workspace({ path }: { path: string[] }) {
       router.replace(root === "/panel" ? "/panel/login" : "/login");
   }, [loading, user, root, router]);
   if (loading || !user)
-    return <main className="section empty">Verificando tu cuenta…</main>;
+    return <HousePreloader />;
   if (root === "/panel" && !isAdmin)
     return (
       <main className="section">
