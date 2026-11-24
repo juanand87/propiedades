@@ -4,6 +4,7 @@ type Screen =
   | "feed"
   | "catalog"
   | "messages"
+  | "leads"
   | "activity"
   | "savedSearches"
   | "blockedUsers"

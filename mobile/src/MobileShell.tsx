@@ -17,6 +17,7 @@ import {
 } from "react-native-gesture-handler";
 import { preparedPlayerFor } from "./video-source";
 import { VisitsScreen } from "./VisitsScreen";
+import { LeadsScreen } from "./LeadsScreen";
 import { BlockedUsersScreen } from "./BlockedUsersScreen";
 import { listenModerationChange } from "./moderation-events";
 import {
@@ -155,6 +156,7 @@ function AppContent() {
   const savedSearchRoute = pathname === "/busquedas";
   const profileSearchRoute = pathname === "/buscar-perfiles";
   const visitsRoute = pathname === "/visitas";
+  const leadsRoute = pathname === "/interesados";
   const blockedUsersRoute = pathname === "/bloqueados";
   const {
     propertyId,
@@ -341,6 +343,7 @@ function AppContent() {
     !savedSearchRoute &&
     !blockedUsersRoute &&
     !visitsRoute &&
+    !leadsRoute &&
     !profileSearchRoute;
   const homePair = pathname === "/" || pathname === "/propiedades";
   const feedScrollGesture = useNativeGesture({ enabled: feedVisible });
@@ -1649,6 +1652,7 @@ function AppContent() {
             onChanged={() => setActivityRevision((value) => value + 1)}
           />
         ),
+        leads: <LeadsScreen key={session?.user.id || "guest"} session={session} />,
         savedSearches: (
           <SavedSearchesScreen
             key={session?.user.id || "guest"}
@@ -1752,6 +1756,7 @@ function AppContent() {
                   router.push("/visitas");
                 }}
               />
+              <Button label="Mis interesados" secondary onPress={()=>{setAccountMenu(false);router.push("/interesados")}}/>
               <Button
                 label="Cuenta"
                 secondary

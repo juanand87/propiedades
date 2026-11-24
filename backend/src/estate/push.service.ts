@@ -6,10 +6,12 @@ import {
   Logger,
   OnModuleDestroy,
   OnModuleInit,
+  Optional,
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { DataSource, EntityManager } from 'typeorm';
+import { InquiryNoticesService } from './inquiry-notices.service';
 import { JWT } from 'google-auth-library';
 import { readFileSync } from 'node:fs';
 import { Actor } from './rules';
@@ -62,6 +64,7 @@ export class PushService implements OnModuleInit, OnModuleDestroy {
   constructor(
     private db: DataSource,
     private config: ConfigService,
+    @Optional() private inquiryNotices?: InquiryNoticesService,
   ) {}
   async available(db: Pick<DataSource, 'query'> | EntityManager = this.db) {
     const [row] = await db.query<{ n: number }[]>(
@@ -350,6 +353,7 @@ export class PushService implements OnModuleInit, OnModuleDestroy {
     property?: { propertyId: string; matchId: string },
     visit?: { id: string; noticeId: string; title: string },
     upload?: { videoId: string; uploadId: string; failed: boolean },
+    lead?: { inquiryId: string; noticeId: string },
   ) {
     const { auth, projectId } = this.credentials();
     const { token: accessToken } = await auth.getAccessToken();
@@ -396,8 +400,21 @@ export class PushService implements OnModuleInit, OnModuleDestroy {
                       : test
                         ? 'Las notificaciones de tu cuenta están funcionando.'
                         : 'Tienes un mensaje nuevo. Toca para abrir la conversación.',
+              ...(lead
+                ? {
+                    title: 'Nuevo interesado asignado',
+                    body: 'Tu empresa te asignó una consulta. Toca para revisar los datos y continuar el seguimiento.',
+                  }
+                : {}),
             },
             data: {
+              ...(lead
+                ? {
+                    type: 'inquiry_assignment',
+                    inquiryId: lead.inquiryId,
+                    noticeId: lead.noticeId,
+                  }
+                : {}),
               ...(upload
                 ? {
                     type: 'video_ready',
@@ -434,15 +451,17 @@ export class PushService implements OnModuleInit, OnModuleDestroy {
                 channel_id: 'messages',
                 sound: 'default',
                 icon: 'notification_icon',
-                tag: upload
-                  ? 'video-ready-' + upload.uploadId
-                  : visit
-                    ? 'visit-' + visit.noticeId
-                    : property
-                      ? 'property-match-' + property.matchId
-                      : activity
-                        ? 'video-comment-' + activity.commentId
-                        : 'message-' + row.message_id,
+                tag: lead
+                  ? 'inquiry-assignment-' + lead.noticeId
+                  : upload
+                    ? 'video-ready-' + upload.uploadId
+                    : visit
+                      ? 'visit-' + visit.noticeId
+                      : property
+                        ? 'property-match-' + property.matchId
+                        : activity
+                          ? 'video-comment-' + activity.commentId
+                          : 'message-' + row.message_id,
               },
             },
           },
@@ -724,6 +743,17 @@ export class PushService implements OnModuleInit, OnModuleDestroy {
       await this.flushVideoComments();
       await this.flushSearchMatches();
       await this.flushVisits();
+      await this.inquiryNotices?.flush((token, noticeId, inquiryId) =>
+        this.sendFcm(
+          { token, message_id: noticeId, conversation_id: '' },
+          false,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          { inquiryId, noticeId },
+        ),
+      );
     } finally {
       if (locked)
         await runner

@@ -10,6 +10,16 @@ El estado detallado se guarda por separado y sincroniza el estado anterior de la
 
 Las asignaciones solo admiten agentes activos de la misma empresa aprobada. Reasignar, desasignar o retirar del equipo corta el acceso a la consulta y sus notas. Retirar del equipo elimina las asignaciones y registra la retirada, por lo que aceptar otra invitación no restaura los interesados anteriores. El historial registra quién cambió el estado o el responsable; las notas no se envían al interesado.
 
-Se muestran las 200 consultas más recientes accesibles para la cuenta. Si hay más, la pantalla avisa; sus indicadores y filtros corresponden al listado visible. Los avisos automáticos al asignar y los recordatorios comerciales quedan para una siguiente etapa. Esta actualización web no requiere instalar un APK.
+Se muestran las 200 consultas más recientes accesibles para la cuenta. Si hay más, la pantalla avisa; sus indicadores y filtros corresponden al listado visible. La ficha directa por identificador puede abrir también una consulta anterior.
+
+## Aviso al agente
+
+Ejecutar `database/AVISOS_INTERESADOS.sql` antes del despliegue de los avisos. Cada nueva asignación crea un aviso en la misma transacción que el cambio de responsable. Repetir una asignación al mismo agente no genera otro aviso. No se envían avisos históricos por ejecutar la migración. La cola utiliza el trabajador de Firebase ya configurado, su exclusión mutua en MySQL y reintentos persistentes. Antes de expandir y enviar se valida el dispositivo, la cuenta, el equipo y la asignación vigente; un aviso anterior no revive si el interesado vuelve al mismo agente.
+
+El aviso muestra texto genérico, sin nombre, teléfono, correo ni mensaje del interesado. La versión Android **1.0.45** agrega `Mis interesados` y abre la ficha correspondiente al tocarlo, incluso desde un arranque en frío después de recuperar la sesión. El servidor vuelve a comprobar el acceso al consultar o modificar la ficha. Se requiere instalar este APK para abrir el nuevo destino; se mantiene Firebase directo y compilación local, sin usar Expo Push Service ni EAS.
+
+Los avisos se intentan durante 24 horas y se descartan si dejan de corresponder a la asignación vigente. No se generan mensajes para un agente sin dispositivo registrado. Los recordatorios por fecha y próxima acción quedan para una siguiente etapa.
 
 Validación: `backend/test/inquiry-workflow.integration.cjs` utiliza exclusivamente el MySQL local de QA en 127.0.0.1:3317, verifica su directorio de datos y elimina solo sus fixtures al finalizar. No envía correos ni notificaciones.
+
+`backend/test/inquiry-notices.integration.cjs` verifica la cola con Firebase simulado: atomicidad, idempotencia, reinicio, backoff, reasignación A-B-A, retirada, cambio de cuenta del dispositivo y token caducado. `push.service.spec.ts` comprueba el mensaje FCM y su etiqueta de Android; `scripts/mobile/verify-notification-destination.cjs` valida los destinos recibidos.

@@ -68,6 +68,42 @@ describe('message push delivery', () => {
       .mockResolvedValue({ token: 'test-access-token' } as never);
   });
   afterEach(() => jest.restoreAllMocks());
+  it('sends an assignment with a scoped destination and stable Android tag', async () => {
+    const { service } = setup();
+    Object.assign(service, {
+      inquiryNotices: {
+        flush: async (
+          deliver: (
+            token: string,
+            notice: string,
+            id: string,
+          ) => Promise<string>,
+        ) => {
+          await deliver(token, '17', '11111111-1111-4111-8111-111111111111');
+        },
+      },
+    });
+    const network = jest.spyOn(global, 'fetch').mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ name: 'accepted' }),
+    } as Response);
+    await service.flush();
+    const body = JSON.parse(network.mock.calls.at(-1)![1]!.body as string) as {
+      message: {
+        data: { type: string; inquiryId: string; noticeId: string };
+        notification: { title: string; body: string };
+        android: { notification: { tag: string } };
+      };
+    };
+    expect(body.message.data).toMatchObject({
+      type: 'inquiry_assignment',
+      inquiryId: '11111111-1111-4111-8111-111111111111',
+      noticeId: '17',
+    });
+    expect(body.message.notification.title).toBe('Nuevo interesado asignado');
+    expect(body.message.android.notification.tag).toBe('inquiry-assignment-17');
+    expect(body.message.notification.body).not.toContain('example.invalid');
+  });
   it.each(['sent', 'offline', 'obsolete', 'unregistered'] as const)(
     'handles durable visit notification %s',
     async (state) => {
@@ -423,14 +459,13 @@ describe('message push delivery', () => {
     'delivers even when polling already marked the message read: %o',
     async (read) => {
       const { service } = setup(read);
-      const network = jest
-        .spyOn(global, 'fetch')
-        .mockResolvedValue({
-          ok: true,
-          json: async () => ({
+      const network = jest.spyOn(global, 'fetch').mockResolvedValue({
+        ok: true,
+        json: () =>
+          Promise.resolve({
             name: 'projects/proppix-test/messages/read-race',
           }),
-        } as Response);
+      } as Response);
       await service.flush();
       expect(network).toHaveBeenCalledTimes(1);
     },

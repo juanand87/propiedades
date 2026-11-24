@@ -124,7 +124,12 @@ export function useMessageNotifications(
       );
       if (!destination) return;
       handled.current = response.notification.request.identifier;
-      if (destination.kind === "video_ready") {
+      if (destination.kind === "inquiry") {
+        router.push({
+          pathname: "/interesados",
+          params: { inquiryId: destination.inquiryId },
+        });
+      } else if (destination.kind === "video_ready") {
         router.push({
           pathname: "/carga-video/[uploadId]",
           params: { uploadId: destination.uploadId },

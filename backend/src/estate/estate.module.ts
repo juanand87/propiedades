@@ -3,6 +3,7 @@ import { CompanyTeamService } from './company-team.service';
 import { CompanyTeamController } from './company-team.controller';
 import { InquiryWorkflowService } from './inquiry-workflow.service';
 import { InquiryWorkflowController } from './inquiry-workflow.controller';
+import { InquiryNoticesService } from './inquiry-notices.service';
 import { ProfileStoriesService } from './profile-stories.service';
 import { ProfileStoriesController } from './profile-stories.controller';
 import { VideoUploadJobsService } from './video-upload-jobs.service';
@@ -79,6 +80,7 @@ import {
     MessagingController,
   ],
   providers: [
+    InquiryNoticesService,
     InquiryWorkflowService,
     CompanyTeamService,
     ProfileStoriesService,

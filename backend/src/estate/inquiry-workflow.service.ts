@@ -5,10 +5,12 @@ import {
   Injectable,
   NotFoundException,
   ServiceUnavailableException,
+  Optional,
 } from '@nestjs/common';
 import { DataSource, EntityManager } from 'typeorm';
 import { randomUUID } from 'node:crypto';
 import { Actor, choice, isAdmin, text, uuid } from './rules';
+import { InquiryNoticesService } from './inquiry-notices.service';
 export const inquiryStages = [
   'new',
   'contacted',
@@ -20,12 +22,18 @@ type DB = Pick<EntityManager, 'query'>;
 type Lead = { id: string; owner_user_id: string; status: string };
 @Injectable()
 export class InquiryWorkflowService {
-  constructor(private db: DataSource) {}
+  constructor(
+    private db: DataSource,
+    @Optional() private notices?: InquiryNoticesService,
+  ) {}
   async available() {
     const [r] = await this.db.query<{ n: number }[]>(
       "SELECT COUNT(*) n FROM information_schema.tables WHERE table_schema=DATABASE() AND table_name IN ('estate_inquiry_workflow','estate_inquiry_assignments','estate_inquiry_events')",
     );
     return Number(r.n) === 3;
+  }
+  async notificationsAvailable() {
+    return this.notices ? this.notices.available() : false;
   }
   private async ready() {
     if (!(await this.available()))
@@ -57,7 +65,7 @@ export class InquiryWorkflowService {
     }
     return { ...lead, owner };
   }
-  async list(actor: Actor) {
+  async list(actor: Actor, inquiryId?: string) {
     await this.ready();
     const items = await this.db.query<Record<string, unknown>[]>(
       `SELECT i.id,i.name,i.email,i.phone,i.message,i.created_at,p.id property_id,p.title,p.code,a.display_name company_name,
@@ -74,13 +82,14 @@ export class InquiryWorkflowService {
    LEFT JOIN estate_profile_identity pi ON pi.user_id=a.user_id
    LEFT JOIN estate_company_teams ot ON ot.owner_user_id=a.user_id AND pi.profile_kind='company' AND a.status='approved'
    WHERE (?=1 OR a.user_id=? OR (ia.user_id=? AND m.status='active' AND ot.id=ia.team_id))
-   ORDER BY i.created_at DESC,i.id DESC LIMIT 201`,
+   ${inquiryId ? 'AND i.id=?' : ''} ORDER BY i.created_at DESC,i.id DESC LIMIT 201`,
       [
         actor.id,
         isAdmin(actor) ? 1 : 0,
         isAdmin(actor) ? 1 : 0,
         actor.id,
         actor.id,
+        ...(inquiryId ? [uuid(inquiryId)] : []),
       ],
     );
     const agents = await this.db.query<
@@ -143,10 +152,12 @@ export class InquiryWorkflowService {
     previous: string | null,
     next: string | null,
   ) {
+    const eventId = randomUUID();
     await tx.query(
       'INSERT INTO estate_inquiry_events(id,inquiry_id,actor_id,action,previous_value,next_value) VALUES (?,?,?,?,?,?)',
-      [randomUUID(), id, actor.id, action, previous, next],
+      [eventId, id, actor.id, action, previous, next],
     );
+    return eventId;
   }
   async assign(actor: Actor, id: string, userId: unknown) {
     await this.ready();
@@ -190,7 +201,15 @@ export class InquiryWorkflowService {
           'DELETE FROM estate_inquiry_assignments WHERE inquiry_id=?',
           [id],
         );
-      await this.event(tx, actor, id, 'assignment', old?.user_id || null, user);
+      const eventId = await this.event(
+        tx,
+        actor,
+        id,
+        'assignment',
+        old?.user_id || null,
+        user,
+      );
+      if (user) await this.notices?.enqueue(tx, eventId, id, user);
       return { success: true };
     });
   }
@@ -206,6 +225,14 @@ export class InquiryWorkflowService {
       [id],
     );
     return { notes, events };
+  }
+  async detail(actor: Actor, id: string) {
+    await this.ready();
+    await this.access(actor, id);
+    const result = await this.list(actor, id);
+    if (!result.items[0])
+      throw new NotFoundException('Consulta no disponible.');
+    return result.items[0];
   }
   async note(actor: Actor, id: string, value: unknown) {
     await this.ready();

@@ -15,10 +15,20 @@ import type { Actor } from './rules';
 export class InquiryWorkflowController {
   constructor(private leads: InquiryWorkflowService) {}
   @Get('inquiry-workflow/capabilities') async capabilities() {
-    return { enabled: await this.leads.available(), version: 1 };
+    return {
+      enabled: await this.leads.available(),
+      assignment_notifications: await this.leads.notificationsAvailable(),
+      version: 2,
+    };
   }
   @Get('me/leads') @UseGuards(EstateGuard) list(@Req() r: { user: Actor }) {
     return this.leads.list(r.user);
+  }
+  @Get('me/leads/:id') @UseGuards(EstateGuard) detail(
+    @Req() r: { user: Actor },
+    @Param('id') id: string,
+  ) {
+    return this.leads.detail(r.user, id);
   }
   @Patch('me/leads/:id') @UseGuards(EstateGuard) update(
     @Req() r: { user: Actor },
