@@ -98,9 +98,11 @@ export function ProfileIdentityFields({
 const s = StyleSheet.create({
   group: { gap: 10, marginVertical: 12 },
   label: { fontWeight: "700", color: brandColors.secondary },
-  row: { flexDirection: "row", gap: 10 },
+  row: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
   kind: {
-    flex: 1,
+    flexGrow: 1,
+    flexBasis: 90,
+    minWidth: 90,
     padding: 13,
     borderWidth: 1,
     borderColor: brandColors.secondaryBorder,
@@ -112,7 +114,11 @@ const s = StyleSheet.create({
     backgroundColor: brandColors.secondary,
     borderColor: brandColors.secondary,
   },
-  kindText: { color: brandColors.secondary, fontWeight: "700" },
+  kindText: {
+    color: brandColors.secondary,
+    fontWeight: "700",
+    textAlign: "center",
+  },
   input: {
     borderWidth: 1,
     borderColor: brandColors.secondaryBorder,

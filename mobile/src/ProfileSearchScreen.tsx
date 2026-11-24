@@ -366,7 +366,7 @@ const s = StyleSheet.create({
     borderWidth: 1,
     borderColor: brandColors.secondaryBorder,
   },
-  filters: { flexDirection: "row", gap: 9, padding: 18 },
+  filters: { flexDirection: "row", flexWrap: "wrap", gap: 9, padding: 18 },
   chip: {
     paddingHorizontal: 16,
     paddingVertical: 10,
