@@ -1,7 +1,7 @@
 import { brandColors } from "./brand-colors";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 export type ProfileIdentityDraft = {
-  profile_kind: "person" | "company" | null;
+  profile_kind: "person" | "agent" | "company" | null;
   username: string;
   display_name: string;
 };
@@ -31,9 +31,9 @@ export function ProfileIdentityFields({
 }) {
   return (
     <View style={s.group}>
-      <Text style={s.label}>Tipo de perfil</Text>
+      <Text style={s.label}>¿Cómo usarás Proppix?</Text>
       <View style={s.row}>
-        {(["person", "company"] as const).map((kind) => (
+        {(["person", "agent", "company"] as const).map((kind) => (
           <Pressable
             key={kind}
             accessibilityRole="radio"
@@ -48,7 +48,11 @@ export function ProfileIdentityFields({
                 value.profile_kind === kind && { color: "#fff" },
               ]}
             >
-              {kind === "person" ? "Persona" : "Empresa"}
+              {kind === "person"
+                ? "Particular"
+                : kind === "agent"
+                  ? "Agente"
+                  : "Empresa"}
             </Text>
           </Pressable>
         ))}
@@ -86,7 +90,7 @@ export function ProfileIdentityFields({
       <Text style={s.help}>
         El nombre y @usuario serán públicos. Usa de 3 a 30 letras sin tildes,
         números, puntos o guiones bajos. Puedes comprar o vender con cualquiera
-        de los dos tipos de perfil.
+        de los tres tipos de perfil.
       </Text>
     </View>
   );

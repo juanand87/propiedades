@@ -59,7 +59,7 @@ export class VideoSocialService {
         : query.kind == null
           ? 'all'
           : '';
-    if (!['all', 'person', 'company'].includes(String(kind)))
+    if (!['all', 'person', 'agent', 'company'].includes(String(kind)))
       throw new BadRequestException('Filtro de perfiles inválido.');
     const q = text(query.q, 100).replace(/^@/, '').trim();
     const page = Math.max(
@@ -249,6 +249,14 @@ export class VideoSocialService {
           [actor.id, name, avatar],
         );
         if (identity) {
+          await tx.query('UPDATE advertisers SET kind=? WHERE user_id=?', [
+            identity.profile_kind === 'company'
+              ? 'agency'
+              : identity.profile_kind === 'agent'
+                ? 'broker'
+                : 'owner',
+            actor.id,
+          ]);
           const [old] = await tx.query<{ user_id: string }[]>(
             'SELECT user_id FROM estate_profile_identity WHERE user_id=? FOR UPDATE',
             [actor.id],

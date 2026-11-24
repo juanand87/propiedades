@@ -30,7 +30,7 @@ export function ProfileSearchScreen({ session }: { session: Session | null }) {
   const router = useRouter(),
     token = session?.access_token;
   const [query, setQuery] = useState(""),
-    [kind, setKind] = useState<"all" | "person" | "company">("all");
+    [kind, setKind] = useState<"all" | "person" | "agent" | "company">("all");
   const [items, setItems] = useState<Person[]>([]),
     [more, setMore] = useState(false),
     [page, setPage] = useState(1),
@@ -211,7 +211,8 @@ export function ProfileSearchScreen({ session }: { session: Session | null }) {
             {(
               [
                 ["all", "Todos"],
-                ["person", "Personas"],
+                ["person", "Particulares"],
+                ["agent", "Agentes"],
                 ["company", "Empresas"],
               ] as const
             ).map(([value, label]) => (
@@ -287,11 +288,13 @@ export function ProfileSearchScreen({ session }: { session: Session | null }) {
                       </Text>
                     )}
                     <Text style={s.kind}>
-                      {item.profile_kind === "company"
-                        ? "Empresa"
-                        : item.profile_kind === "person"
-                          ? "Persona"
-                          : "Perfil"}
+                      {item.profile_kind === "agent"
+                        ? "Agente"
+                        : item.profile_kind === "company"
+                          ? "Empresa"
+                          : item.profile_kind === "person"
+                            ? "Particular"
+                            : "Perfil"}
                     </Text>
                   </View>
                 </Pressable>

@@ -32,7 +32,7 @@ describe('public profile identity', () => {
     ).toThrow();
   });
   it.each([undefined, 'agency', 'admin', 0, null])(
-    'requires explicit person or company kind %s',
+    'requires a valid profile kind %s',
     (profile_kind) => {
       expect(() =>
         profileIdentity({
@@ -40,7 +40,23 @@ describe('public profile identity', () => {
           username: 'juan',
           display_name: 'Juan',
         }),
-      ).toThrow('Persona o Empresa');
+      ).toThrow('Particular, Agente o Empresa');
+    },
+  );
+  it.each(['person', 'agent', 'company'])(
+    'supports %s without granting roles or publication permissions',
+    (profile_kind) => {
+      expect(
+        profileIdentity({
+          profile_kind,
+          username: 'perfil.proppix',
+          display_name: 'Perfil Proppix',
+        }),
+      ).toEqual({
+        profile_kind,
+        username: 'perfil.proppix',
+        display_name: 'Perfil Proppix',
+      });
     },
   );
   it('requires a visible company name', () => {

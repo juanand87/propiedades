@@ -16,6 +16,7 @@ export function AuthView({
     [busy, setBusy] = useState(false);
   const [choosing, setChoosing] = useState(false),
     [googleEnabled, setGoogleEnabled] = useState(false);
+  const [profileKind, setProfileKind] = useState("person");
   const googleRun = useRef(0);
   useEffect(() => {
     let live = true;
@@ -120,7 +121,18 @@ export function AuthView({
         <Notice error={error} />
         {choosing || (user?.role !== "admin" && user?.account_type === null) ? (
           <div className="form-grid">
-            <h3>¿Cómo quieres usar Propiedades?</h3>
+            <h3>¿Cómo usarás Proppix?</h3>
+            <label>
+              Tu perfil
+              <select
+                value={profileKind}
+                onChange={(e) => setProfileKind(e.target.value)}
+              >
+                <option value="person">Particular</option>
+                <option value="agent">Agente / corredor independiente</option>
+                <option value="company">Empresa / corredora</option>
+              </select>
+            </label>
             <p>Puedes explorar y guardar favoritos incluso si eliges vender.</p>
             {(["buyer", "seller"] as const).map((kind) => (
               <button
@@ -133,6 +145,7 @@ export function AuthView({
                   try {
                     const user = await send("/me/account-type", {
                       account_type: kind,
+                      profile_kind: profileKind,
                     });
                     setUser(user);
                     router.replace(
@@ -224,6 +237,50 @@ export function AuthView({
                     />
                   </label>
                 </div>
+              )}
+              {register && (
+                <>
+                  <label>
+                    ¿Cómo usarás Proppix?
+                    <select
+                      name="profile_kind"
+                      required
+                      value={profileKind}
+                      onChange={(e) => setProfileKind(e.target.value)}
+                    >
+                      <option value="" disabled>
+                        Selecciona tu perfil
+                      </option>
+                      <option value="person">Particular</option>
+                      <option value="agent">
+                        Agente / corredor independiente
+                      </option>
+                      <option value="company">Empresa / corredora</option>
+                    </select>
+                  </label>
+                  <label>
+                    Nombre público
+                    <input
+                      name="display_name"
+                      required
+                      minLength={2}
+                      maxLength={100}
+                    />
+                  </label>
+                  <label>
+                    @usuario
+                    <input
+                      name="username"
+                      required
+                      pattern="[a-zA-Z0-9][a-zA-Z0-9._]{2,29}"
+                      maxLength={30}
+                    />
+                  </label>
+                  <small>
+                    Todos los perfiles pueden buscar propiedades, seguir cuentas
+                    y enviar mensajes. Tu membresía se administra por separado.
+                  </small>
+                </>
               )}
               <label>
                 Correo electrónico

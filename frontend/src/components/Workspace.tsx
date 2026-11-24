@@ -1,5 +1,6 @@
 "use client";
 import { HousePreloader } from "./HousePreloader";
+import { ProfessionalProfile } from "./ProfessionalProfile";
 import { formatClpInput, parseClpInput } from "@/lib/clp";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -104,8 +105,7 @@ export function Workspace({ path }: { path: string[] }) {
     if (!loading && !user)
       router.replace(root === "/panel" ? "/panel/login" : "/login");
   }, [loading, user, root, router]);
-  if (loading || !user)
-    return <HousePreloader />;
+  if (loading || !user) return <HousePreloader />;
   if (root === "/panel" && !isAdmin)
     return (
       <main className="section">
@@ -900,6 +900,9 @@ function Profile() {
     <>
       <span className="eyebrow">LA PRESENTACIÓN DE TUS PUBLICACIONES</span>
       <h1>Tu perfil de anunciante</h1>
+      <ProfessionalProfile
+        onSaved={(kind) => setForm((previous: any) => ({ ...previous, kind }))}
+      />
       <Notice error={error || failure} success={message} />
       {data && (
         <p>
@@ -941,19 +944,7 @@ function Profile() {
             onChange={(e) => set("display_name", e.target.value)}
           />
         </label>
-        <label>
-          Tipo de anunciante
-          <select
-            value={form.kind}
-            onChange={(e) => set("kind", e.target.value)}
-          >
-            {["owner", "broker", "agency"].map((k) => (
-              <option key={k} value={k}>
-                {labels[k]}
-              </option>
-            ))}
-          </select>
-        </label>
+
         <label>
           Presentación
           <textarea
@@ -1297,6 +1288,7 @@ function UserAdmin() {
               <th>Nombre</th>
               <th>Correo</th>
               <th>Rol</th>
+              <th>Tipo de perfil</th>
               <th>Membresía</th>
               <th>Cuenta</th>
             </tr>
@@ -1331,6 +1323,28 @@ function UserAdmin() {
                         {labels[s]}
                       </option>
                     ))}
+                  </select>
+                </td>
+                <td>
+                  <select
+                    aria-label={`Tipo de perfil de ${u.email}`}
+                    value={u.profile_kind || "person"}
+                    onChange={async (e) => {
+                      try {
+                        await send(
+                          "/admin/users/" + u.id,
+                          { profile_kind: e.target.value },
+                          "PATCH",
+                        );
+                        reload();
+                      } catch (e) {
+                        setFailure((e as Error).message);
+                      }
+                    }}
+                  >
+                    <option value="person">Particular</option>
+                    <option value="agent">Agente</option>
+                    <option value="company">Empresa / corredora</option>
                   </select>
                 </td>
                 <td>

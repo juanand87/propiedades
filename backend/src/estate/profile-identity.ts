@@ -1,12 +1,16 @@
 import { BadRequestException } from '@nestjs/common';
-export type ProfileKind = 'person' | 'company';
+export type ProfileKind = 'person' | 'agent' | 'company';
 export function profileIdentity(body: {
   profile_kind?: unknown;
   username?: unknown;
   display_name?: unknown;
 }) {
-  if (body.profile_kind !== 'person' && body.profile_kind !== 'company')
-    throw new BadRequestException('Elige Persona o Empresa.');
+  if (
+    body.profile_kind !== 'person' &&
+    body.profile_kind !== 'agent' &&
+    body.profile_kind !== 'company'
+  )
+    throw new BadRequestException('Elige Particular, Agente o Empresa.');
   const username =
     typeof body.username === 'string'
       ? body.username.trim().replace(/^@/, '').toLowerCase()

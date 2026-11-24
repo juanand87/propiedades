@@ -131,6 +131,9 @@ function Button({
 function AppContent() {
   const s = useNightStyles(baseStyles);
   const night = useColorScheme() === "dark";
+  const [onboardingKind, setOnboardingKind] = useState<
+    "person" | "agent" | "company" | null
+  >(null);
   const pathname = usePathname(),
     router = useRouter();
   const routes: Record<
@@ -725,7 +728,17 @@ function AppContent() {
       const user = await api<Session["user"]>("/me/account-type", {
         method: "POST",
         token: session.access_token,
-        body: { account_type },
+        body: {
+          account_type,
+          ...(!session.user.account_type
+            ? {
+                profile_kind:
+                  onboardingKind ||
+                  registrationIdentity.profile_kind ||
+                  "person",
+              }
+            : {}),
+        },
       });
       const value = { ...session, user };
       await SecureStore.setItemAsync(sessionKey, JSON.stringify(value));
@@ -1147,6 +1160,49 @@ function AppContent() {
               <Text style={s.muted}>
                 Compra, guarda favoritos o publica propiedades gratis.
               </Text>
+              {!session.user.account_type && (
+                <View style={{ flexDirection: "row", gap: 6 }}>
+                  {(
+                    [
+                      ["person", "Particular"],
+                      ["agent", "Agente"],
+                      ["company", "Empresa"],
+                    ] as const
+                  ).map(([kind, label]) => (
+                    <Pressable
+                      key={kind}
+                      accessibilityRole="radio"
+                      accessibilityState={{
+                        checked:
+                          (onboardingKind ||
+                            registrationIdentity.profile_kind ||
+                            "person") === kind,
+                      }}
+                      onPress={() => setOnboardingKind(kind)}
+                      style={[
+                        s.secondary,
+                        { flex: 1, padding: 10, borderRadius: 12 },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          s.muted,
+                          {
+                            fontWeight:
+                              (onboardingKind ||
+                                registrationIdentity.profile_kind ||
+                                "person") === kind
+                                ? "800"
+                                : "400",
+                          },
+                        ]}
+                      >
+                        {label}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+              )}
               <Button
                 label="Soy comprador · Ver propiedades"
                 disabled={authBusy}

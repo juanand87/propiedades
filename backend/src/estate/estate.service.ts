@@ -120,6 +120,37 @@ export class EstateService {
     const kind = choice(body.account_type, ['buyer', 'seller']);
     await this.db.transaction(async (tx) => {
       await tx.query('SELECT id FROM users WHERE id=? FOR UPDATE', [u.id]);
+      if (body.profile_kind !== undefined) {
+        const selected = choice(body.profile_kind, [
+          'person',
+          'agent',
+          'company',
+        ]);
+        const [existing] = await tx.query<{ user_id: string }[]>(
+          'SELECT user_id FROM estate_profile_identity WHERE user_id=?',
+          [u.id],
+        );
+        if (existing)
+          await tx.query(
+            'UPDATE estate_profile_identity SET profile_kind=? WHERE user_id=?',
+            [selected, u.id],
+          );
+        else
+          await tx.query(
+            'INSERT INTO estate_profile_identity(user_id,profile_kind,username) VALUES (?,?,?)',
+            [u.id, selected, 'u' + u.id.replace(/-/g, '').slice(0, 29)],
+          );
+      }
+      const [identity] = await tx.query<{ profile_kind: string }[]>(
+        'SELECT profile_kind FROM estate_profile_identity WHERE user_id=?',
+        [u.id],
+      );
+      const advertiserKind =
+        identity?.profile_kind === 'company'
+          ? 'agency'
+          : identity?.profile_kind === 'agent'
+            ? 'broker'
+            : 'owner';
       const [a] = await tx.query(
         'SELECT id,status FROM advertisers WHERE user_id=?',
         [u.id],
@@ -129,8 +160,14 @@ export class EstateService {
       if (kind === 'seller' && !a) {
         const id = randomUUID();
         await tx.query(
-          "INSERT INTO advertisers(id,user_id,slug,display_name,kind,status) VALUES (?,?,?,?,'owner','pending')",
-          [id, u.id, `${slugify(u.firstName)}-${id.slice(0, 8)}`, u.firstName],
+          "INSERT INTO advertisers(id,user_id,slug,display_name,kind,status) VALUES (?,?,?,?,?,'pending')",
+          [
+            id,
+            u.id,
+            `${slugify(u.firstName)}-${id.slice(0, 8)}`,
+            u.firstName,
+            advertiserKind,
+          ],
         );
       }
       await tx.query(
@@ -593,7 +630,17 @@ export class EstateService {
   async saveAdvertiser(u: Actor, b: any) {
     const name = text(b.display_name, 160);
     if (!name) throw new BadRequestException('Falta el nombre público.');
-    const kind = choice(b.kind, ['owner', 'broker', 'agency'], 'owner');
+    const [identity] = await this.db.query<{ profile_kind: string }[]>(
+      'SELECT profile_kind FROM estate_profile_identity WHERE user_id=?',
+      [u.id],
+    );
+    const kind = identity
+      ? identity.profile_kind === 'company'
+        ? 'agency'
+        : identity.profile_kind === 'agent'
+          ? 'broker'
+          : 'owner'
+      : choice(b.kind, ['owner', 'broker', 'agency'], 'owner');
     let a = await this.advertiser(u);
     if (!a) {
       const id = randomUUID(),
@@ -1773,11 +1820,40 @@ export class EstateService {
   async users(u: Actor) {
     admin(u);
     return this.db.query(
-      "SELECT u.id,u.email,u.firstName,u.lastName,u.role,u.isActive,u.createdAt,COALESCE(m.plan,'free') membership_plan FROM users u LEFT JOIN estate_user_memberships m ON m.user_id=CONVERT(u.id USING utf8mb4) COLLATE utf8mb4_unicode_ci ORDER BY u.createdAt DESC LIMIT 500",
+      "SELECT u.id,u.email,u.firstName,u.lastName,u.role,u.isActive,u.createdAt,COALESCE(m.plan,'free') membership_plan,pi.profile_kind FROM users u LEFT JOIN estate_profile_identity pi ON pi.user_id=CONVERT(u.id USING utf8mb4) COLLATE utf8mb4_unicode_ci LEFT JOIN estate_user_memberships m ON m.user_id=CONVERT(u.id USING utf8mb4) COLLATE utf8mb4_unicode_ci ORDER BY u.createdAt DESC LIMIT 500",
     );
   }
   async updateUser(u: Actor, id: string, b: any) {
     admin(u);
+    if (b.profile_kind !== undefined) {
+      const kind = choice(b.profile_kind, ['person', 'agent', 'company']);
+      await this.db.transaction(async (tx) => {
+        const [target] = await tx.query<{ id: string }[]>(
+          'SELECT id FROM users WHERE id=? FOR UPDATE',
+          [uuid(id)],
+        );
+        if (!target) throw new NotFoundException('Usuario no encontrado.');
+        const [identity] = await tx.query<{ user_id: string }[]>(
+          'SELECT user_id FROM estate_profile_identity WHERE user_id=?',
+          [id],
+        );
+        if (identity)
+          await tx.query(
+            'UPDATE estate_profile_identity SET profile_kind=? WHERE user_id=?',
+            [kind, id],
+          );
+        else
+          await tx.query(
+            'INSERT INTO estate_profile_identity(user_id,profile_kind,username) VALUES (?,?,?)',
+            [id, kind, 'u' + id.replace(/-/g, '').slice(0, 29)],
+          );
+        await tx.query('UPDATE advertisers SET kind=? WHERE user_id=?', [
+          kind === 'company' ? 'agency' : kind === 'agent' ? 'broker' : 'owner',
+          id,
+        ]);
+      });
+      return { success: true };
+    }
     if (b.membership_plan !== undefined) {
       const plan = choice(b.membership_plan, ['free', 'basic', 'pro']);
       await this.db.transaction(async (tx) => {

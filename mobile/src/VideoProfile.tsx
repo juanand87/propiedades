@@ -653,7 +653,11 @@ export function VideoProfile({
               )}
               {profile?.profile_kind && (
                 <Text style={s.kindBadge}>
-                  {profile.profile_kind === "company" ? "Empresa" : "Persona"}
+                  {profile.profile_kind === "company"
+                    ? "Empresa"
+                    : profile.profile_kind === "agent"
+                      ? "Agente"
+                      : "Particular"}
                 </Text>
               )}
             </View>
